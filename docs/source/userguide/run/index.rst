@@ -54,6 +54,24 @@ This can be disabled by setting the property ``CONFIG.GIT_OPERATIONAL_CHECK_ENAB
 to ``False`` (it is ``True`` by default). Note, however, that this is discouraged as
 it would affect the traceability of operational experiments.
 
+Returning memory to the operating system
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Long running experiments may hold on to memory that Python has already freed. A
+sysadmin can opt in to returning that free memory to the OS with
+``RUNTIME.MEMORY_RELEASE_MODE``:
+
+* ``off`` (default): never force a release.
+* ``on_unload``: compact the heap whenever finished jobs are unloaded.
+* ``interval``: compact the heap every ``RUNTIME.MEMORY_RELEASE_INTERVAL``
+  iterations of the run loop.
+
+The release calls ``gc.collect()`` followed by glibc's ``malloc_trim``. It is a
+safe no-op on platforms without ``malloc_trim``.
+
+See :doc:`Troubleshooting </troubleshooting/index>` for when to enable it and how
+to set it globally (autosubmitrc) or per experiment.
+
 Running an experiment created with another version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

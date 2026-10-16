@@ -48,6 +48,10 @@ The following table summarizes what configuration files Autosubmit expects and w
       -
         - Parameters that control workflow behavior.
         - Parameters that activate extra functionalities.
+    * - ``asruntime.yml`` (optional)
+      -
+        - Runtime and performance tuning parameters in a ``RUNTIME`` section (for example ``RUNTIME.MEMORY_RELEASE_MODE``).
+        - Created manually for now.
     * - ``proj_<EXPID>.yml``
       -
         - Project-dependent parameters.

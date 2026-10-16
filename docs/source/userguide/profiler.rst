@@ -72,9 +72,11 @@ The most relevant functions of the profiler, in detail
   enabled, it also starts ``tracemalloc``.
 
 * The **iteration_checkpoint()** function: Records memory, Python object count, file descriptors,
-  and the number of loaded jobs and edges for a completed iteration. When allocation tracing is
-  enabled, it also records the largest positive Python allocation differences since the previous
-  checkpoint. A maximum number of checkpoints can be configured.
+  and the number of loaded jobs and edges for a completed iteration. It also measures the memory the
+  profiler itself keeps resident while materialising the object list at each checkpoint (reported as
+  ``PROFILER OVERHEAD``). When allocation tracing is enabled, it also records the largest positive
+  Python allocation differences since the previous checkpoint. A maximum number of checkpoints can be
+  configured.
 
 * The **stop()** function: Stops the execution-time profiler, records the final memory usage, and
   generates the profiling report automatically.
@@ -95,8 +97,10 @@ The report contains the following information:
   consecutive checkpoints.
 
 * **Overall growth**: Initial and final process RSS, together with overall object and file-descriptor
-  growth. The object and file-descriptor growth uses the third iteration as the startup baseline when
-  at least three checkpoints are available.
+  growth, and the ``PROFILER OVERHEAD`` (the memory the profiler itself keeps resident while
+  materialising the object list). The benchmark subtracts that overhead from the memory metrics so
+  they reflect a plain run. The object and file-descriptor growth uses the third iteration as the
+  startup baseline when at least three checkpoints are available.
 
 * **File descriptor details**: When available, the report lists final file descriptors and identifies
   changes between iterations. On Linux, files, pipes, and sockets are displayed using information

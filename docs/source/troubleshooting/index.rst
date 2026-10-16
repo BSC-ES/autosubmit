@@ -76,6 +76,36 @@ Example output of the command:
 
 
 
+The Autosubmit process uses more and more memory during a long run
+==================================================================
+
+*Explanation*: Python and the system allocator keep memory that has already been freed, so a long-running Autosubmit process can keep a high memory footprint even after its jobs have finished. By default Autosubmit does not force returning that free memory to the operating system.
+
+*Solution*: If your long-running experiment (or the machine it runs on) shows high memory usage, you can opt in to returning free memory to the OS with ``CONFIG.MEMORY_RELEASE_MODE``:
+
+* ``off`` (default): never force a release.
+* ``on_unload``: compact the heap whenever finished jobs are unloaded.
+* ``interval``: compact the heap every ``CONFIG.MEMORY_RELEASE_INTERVAL`` iterations of the run loop.
+
+To apply it to every experiment on the machine, set it in the ``[runtime]`` section of the autosubmitrc (see :ref:`configure-autosubmit`):
+
+.. code-block:: ini
+
+    [runtime]
+    memory_release_mode = interval
+    memory_release_interval = 10
+
+To override it for a single experiment, put it in ``$EXPID/conf/asruntime.yml`` (the experiment configuration wins over the autosubmitrc default):
+
+.. code-block:: yaml
+
+    RUNTIME:
+        MEMORY_RELEASE_MODE: "on_unload"
+
+The release calls ``gc.collect()`` followed by glibc's ``malloc_trim``. It is a safe no-op on platforms without ``malloc_trim``.
+
+.. note:: Today ``asruntime.yml`` is created manually. A future change will add a command to generate it with the commented defaults.
+
 Other possible errors
 =====================
 

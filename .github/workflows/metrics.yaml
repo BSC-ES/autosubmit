@@ -1,267 +1,871 @@
 name: metrics
 
-on:
-  issue_comment:
-    types: [created, edited]
+# This workflow benchmarks Autosubmit performance and keeps a baseline of the
+# "last known good" results on the `benchmark-reference` branch.
+#
+# Trigger modes:
+#   * PR check: on every pull_request the `metrics` job runs as a REQUIRED
+#     status check. It is a cheap no-op unless the PR has the
+#     `perf-benchmark` label (which needs write/triage access to add), in which
+#     case it runs the FULL suite (`profilelong`) against the baseline and keeps
+#     the merge button disabled until the check completes. While the label is on, every
+#     push triggers a full run (~20 min) and the `benchmark` concurrency group
+#     serializes them, so remove the label once the check passes to avoid
+#     queuing extra runs. Fork and bot PRs always run as a no-op: their
+#     read-only token cannot push a baseline or post comments.
+#   * Manual: a maintainer comments on a PR whose head branch lives in
+#     this repository:
+#       - `/metrics`          quick suite
+#       - `/metrics_full`     full suite (adds the 10members_2chunks_75splits run scenario)
+#       - `/metrics_promote`  promote the last completed run as the new
+#                             baseline.
+#     Authorized commenters are the repository owner, organization members, or
+#     collaborators with write access. Fork PRs are rejected even for authorized
+#     commenters: the write-token jobs must never execute untrusted code.
+#
+# Baseline promotion is GUARDED for automatic runs: a run that regresses vs the
+# current baseline is never auto-promoted, so the baseline cannot drift
+# down. `/metrics_promote` is an explicit maintainer override that
+# re-baselines the last completed run even if it regressed. Set up branch
+# protection on the default branch to require the `performance-benchmark` check
+# (Settings > Branches > Require status checks).
+#
+# SECURITY: `issue_comment` runs the version of this file on the DEFAULT branch
+# (not the PR head), so a PR cannot self-authorize by editing this workflow.
+#
+# CONVENTION: all actions (including first-party actions/*) are pinned to a
+# full commit SHA.
+#
+# CAVEATS:
+#   * `metrics` runs PR code and keeps `issues: write` only for the status
+#     notices. Fork PRs never reach it (should_run=false), and same-repo PRs
+#     come from authors who already have write access, so this does not grant
+#     extra privileges. It deliberately has no `contents: write`.
+#   * `report` runs the PR-head `compare_results.py`, so `regressions_detected`
+#     is PR-controlled; baseline promotion can be manipulated for same-repo
+#     PRs and relies on review.
+#   * `report` installs the comparison script's dependencies explicitly; if
+#     `.benchmarks/compare_results.py` gains a dependency, add it there.
+#   * On `pull_request`, GitHub runs this workflow from the PR merge ref, so a
+#     same-repo PR could edit this file (including `concurrency`). Cross-run
+#     serialization is therefore only a soft guarantee; the hard protection is a
+#     branch ruleset on `benchmark-reference` limiting who can push it. Such a
+#     ruleset must allow the Actions bot, otherwise the workflow's own writes
+#     (createRef/commit/push) to the baseline will be rejected.
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  actions: write
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  issue_comment:
+    types: [created]
+
+# Workflow-level default: no permissions. Each job requests only what it needs,
+# so a job that executes untrusted (PR) code never inherits write access.
+permissions: {}
+
+# Only one benchmark workflow at a time: concurrent runs would race when
+# pushing the baseline branch.
+concurrency:
+  group: benchmark
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: '3.11'
+  # How many times the benchmark suite is run per workflow invocation; the
+  # sessions are merged into a single file (per-scenario medians) before the
+  # artifact upload.
+  BENCHMARK_RUNS: 3
 
 jobs:
-  metrics:
-    if: >
-      github.event.issue.pull_request &&
-      (
-      contains(github.event.comment.body, '/metrics_markdown') ||
-      contains(github.event.comment.body, '/metrics_plot') ||
-      contains(github.event.comment.body, '/metrics_full_markdown') ||
-      contains(github.event.comment.body, '/metrics_full_plot') ||
-      contains(github.event.comment.body, '/metrics') ||
-      contains(github.event.comment.body, '/metrics_upload') ||
-      contains(github.event.comment.body, '/metrics_full')
-      )
+  authorize:
     runs-on: ubuntu-latest
+    # Only manual comment commands need this check, and only on PRs: a comment
+    # on a plain issue would make pulls.get 404 and fail the run.
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
-      version: ${{ steps.autosubmit_version.outputs.version }}
-      head_ref: ${{ steps.pr.outputs.head_ref }}
-      head_repo: ${{ steps.pr.outputs.head_repo }}
-      head_sha: ${{ steps.pr.outputs.head_sha }}
-      test_type: ${{ steps.determine_test_type.outputs.test_type }}
-
+      allowed: ${{ steps.auth.outputs.allowed }}
+      is_fork: ${{ steps.auth.outputs.is_fork }}
     steps:
-      - name: Get PR info
-        id: pr
-        uses: actions/github-script@v9
+      - name: Check the comment author is allowed
+        id: auth
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          ACT: ${{ env.ACT }}
         with:
           script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
+            // Labeled runs are authorized by the label itself; only the manual
+            // comment commands need this check.
+            if (context.eventName !== 'issue_comment') {
+              core.setOutput('allowed', 'true');
+              core.setOutput('is_fork', 'false');
+              return;
+            }
+            // Local `act` runs must not hit the GitHub APIs.
+            if (process.env.ACT) {
+              core.setOutput('allowed', 'true');
+              core.setOutput('is_fork', 'false');
+              return;
+            }
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            // A missing head repo (e.g. a deleted fork) is treated as a fork.
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number: context.issue.number,
             });
-            core.setOutput('head_ref', pr.data.head.ref);
-            core.setOutput('head_repo', pr.data.head.repo.full_name);
-            core.setOutput('head_sha', pr.data.head.sha);
+            const headFullName = (pr.head.repo && pr.head.repo.full_name) || '';
+            const isFork = headFullName !== `${owner}/${repo}`;
+            core.setOutput('is_fork', String(isFork));
+            // Only same-repository PRs are eligible; fork code must never run
+            // with the write token.
+            let allowed = false;
+            if (!isFork) {
+              const association = context.payload.comment.author_association;
+              allowed = association === 'OWNER' || association === 'MEMBER';
+              // COLLABORATOR may be read-only; require write access for those.
+              if (!allowed && association === 'COLLABORATOR') {
+                try {
+                  const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                    owner, repo, username: context.payload.comment.user.login,
+                  });
+                  allowed = data.permission === 'admin' || data.permission === 'write';
+                } catch (e) {
+                  if (e.status !== 404) throw e;
+                }
+              }
+            }
+            core.setOutput('allowed', String(allowed));
 
-      - name: Determine test type
-        id: determine_test_type
+  metrics:
+    name: performance-benchmark
+    needs: authorize
+    if: >
+      github.event_name == 'pull_request' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        needs.authorize.outputs.allowed == 'true' &&
+        needs.authorize.outputs.is_fork == 'false'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    timeout-minutes: 360
+    outputs:
+      version: ${{ steps.as_version.outputs.version }}
+      head_repo: ${{ steps.pr.outputs.head_repo }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+      issue_number: ${{ steps.pr.outputs.issue_number }}
+      test_type: ${{ steps.scope.outputs.test_type }}
+      should_run: ${{ steps.scope.outputs.should_run }}
+      promote_last: ${{ steps.scope.outputs.promote_last }}
+
+    steps:
+      - name: Check for the perf-benchmark label
+        id: label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            // Fetch the live label state from the API instead of trusting the
+            // event payload: GitHub's `labeled` webhook payload can be stale or
+            // miss the label that was just added, which silently turns off the
+            // whole benchmark/report/baseline chain.
+            if (context.eventName === 'pull_request') {
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+              });
+              core.setOutput('label_present',
+                labels.some((l) => l.name === 'perf-benchmark') ? 'true' : 'false');
+            } else {
+              core.setOutput('label_present', 'false');
+            }
+
+      - name: Get PR / commit info
+        id: pr
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            let headRepo, headSha, issueNumber, prAuthor;
+            if (context.eventName === 'issue_comment') {
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+              });
+              headRepo = (pr.head.repo && pr.head.repo.full_name) || '';
+              headSha = pr.head.sha;
+              issueNumber = String(context.issue.number);
+              prAuthor = (pr.user && pr.user.login) || '';
+            } else {
+              const pr = context.payload.pull_request;
+              headRepo = (pr.head.repo && pr.head.repo.full_name) || '';
+              headSha = pr.head.sha;
+              issueNumber = String(pr.number);
+              prAuthor = (pr.user && pr.user.login) || '';
+            }
+            // A missing head repo (e.g. a deleted fork) is treated as a fork.
+            // Bot-authored PRs (e.g. Dependabot) also get a read-only token, so
+            // treat them the same: running as a no-op avoids 403s when posting
+            // the status comments.
+            const isFork = headRepo !== `${context.repo.owner}/${context.repo.repo}` || /\[bot\]$/.test(prAuthor);
+            core.setOutput('head_repo', headRepo);
+            core.setOutput('head_sha', headSha);
+            core.setOutput('issue_number', issueNumber);
+            core.setOutput('is_fork', String(isFork));
+
+      - name: Determine benchmark scope
+        id: scope
+        env:
+          # Passed through the environment so the (untrusted) comment body is
+          # never interpolated into the shell script source.
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK: ${{ steps.pr.outputs.is_fork }}
+          LABEL_PRESENT: ${{ steps.label.outputs.label_present }}
         run: |
-          comment_body="${{ github.event.comment.body }}"
-          if [[ "$comment_body" == *"/metrics_full"* ]]; then
+          # Exact command parsing.
+          cmd=""
+          if [ "$EVENT_NAME" == "issue_comment" ]; then
+            for tok in $COMMENT_BODY; do
+              case "$tok" in
+                "/metrics_full")    cmd="metrics_full" ;;
+                "/metrics_promote") cmd="metrics_promote" ;;
+                "/metrics")         cmd="metrics" ;;
+              esac
+              [ -n "$cmd" ] && break
+            done
+          fi
+          # Suite: full on labeled PRs and /metrics_full, quick on /metrics.
+          if [ "$EVENT_NAME" == "pull_request" ] || [ "$cmd" == "metrics_full" ]; then
             echo "test_type=profilelong" >> "$GITHUB_OUTPUT"
-            echo "Running full profile tests (profilelong)"
           else
             echo "test_type=profile" >> "$GITHUB_OUTPUT"
-            echo "Running quick profile tests (profile)"
+          fi
+          # Promote the last completed run without re-running: /metrics_promote.
+          if [ "$cmd" == "metrics_promote" ]; then
+            echo "promote_last=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "promote_last=false" >> "$GITHUB_OUTPUT"
+          fi
+          # Run the benchmark for labeled PRs and for manual commands, except
+          # /metrics_promote which only re-baselines the last run. Fork PRs run
+          # as a no-op success: the read-only token cannot push a baseline or
+          # post comments, and untrusted code must not run with the write token.
+          if [ "$IS_FORK" == "true" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          elif [ "$cmd" == "metrics_promote" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          elif [ "$cmd" == "metrics" ] || [ "$cmd" == "metrics_full" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" == "pull_request" ] && [ "$LABEL_PRESENT" == "true" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout PR code
-        uses: actions/checkout@v7
+      - name: Post benchmark started
+        id: started
+        if: steps.scope.outputs.should_run == 'true' && !env.ACT
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          # Untrusted context values never reach the script source: they are
+          # passed as environment variables instead.
+          ISSUE_NUMBER: ${{ steps.pr.outputs.issue_number }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = Number(process.env.ISSUE_NUMBER);
+            // Remove any leftover progress notices from previous runs so stale
+            // notices are removed automatically.
+            const stale = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number,
+            });
+            for (const c of stale.filter((c) => c.user.login === 'github-actions[bot]' && c.body.startsWith('> **Benchmark status:**'))) {
+              await github.rest.issues.deleteComment({ owner, repo, comment_id: c.id });
+            }
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const { data } = await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: `> **Benchmark status:** started - [follow the run](${runUrl})`
+            });
+            core.setOutput('comment_id', String(data.id));
+
+      - name: Checkout code
+        if: steps.scope.outputs.should_run == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ steps.pr.outputs.head_repo }}
-          ref: ${{ steps.pr.outputs.head_ref }}
+          # Pin to the exact commit that was authorized, not the mutable branch
+          # ref (avoids a force-push race between the check and the checkout).
+          ref: ${{ steps.pr.outputs.head_sha }}
           fetch-depth: 0
+          # This job runs PR code and never pushes, so do not leave the token
+          # in .git/config where it could be leaked.
+          persist-credentials: false
+
+      - name: Get Autosubmit version
+        id: as_version
+        if: steps.scope.outputs.should_run == 'true'
+        run: |
+          # The VERSION file comes from the PR checkout, so sanitize it before
+          # it is propagated to other jobs (shell/JS/artifact-name injection).
+          version="$(head -n1 VERSION | tr -d '\r')"
+          if [[ ! "$version" =~ ^[0-9A-Za-z][0-9A-Za-z._+-]*$ ]]; then
+            # Do not echo the raw value: it may contain workflow-command
+            # metacharacters.
+            echo "::error::VERSION file contains disallowed characters"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        if: steps.scope.outputs.should_run == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
       - name: Install dependencies
+        if: steps.scope.outputs.should_run == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -e .[all]
 
-      - name: Get Autosubmit version
-        id: autosubmit_version
+      - name: Fetch baseline results
+        if: steps.scope.outputs.should_run == 'true'
         run: |
-          version=$(cat VERSION)
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          # Populated only so the artifact keeps its `data/`+`reference/`
+          # layout; the trusted `report` job overwrites it from the branch
+          # before comparing, so this copy is never trusted.
+          git remote add base "https://github.com/${{ github.repository }}.git"
+          git fetch base benchmark-reference --depth 1 || echo "no baseline branch yet"
+          if git cat-file -e refs/remotes/base/benchmark-reference:.benchmarks/reference 2>/dev/null; then
+            git checkout refs/remotes/base/benchmark-reference -- .benchmarks/reference
+            echo "Using baseline from benchmark-reference branch"
+          else
+            echo "No baseline found, running without comparison"
+          fi
+          mkdir -p .benchmarks/reference
 
-      - name: Run profile tests
+      - name: Run benchmarks
+        if: steps.scope.outputs.should_run == 'true'
+        env:
+          AS_VERSION: ${{ steps.as_version.outputs.version }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          TEST_TYPE: ${{ steps.scope.outputs.test_type }}
         run: |
-          pytest -m "${{ steps.determine_test_type.outputs.test_type }}" -n 0 test/integration
-          # rename the file to include the enviroment used for testing
+          short_sha=$(echo "$HEAD_SHA" | cut -c1-7)
+          for i in $(seq 1 "${BENCHMARK_RUNS:-3}"); do
+            args=(
+              -m "$TEST_TYPE"
+              -n 0
+              --benchmark-storage=file://.benchmarks/data
+              --benchmark-save="${AS_VERSION}-${short_sha}-run${i}"
+              test/integration/commands/test_performance.py
+            )
+            # BENCHMARK_K is only set when running the workflow locally with act
+            # (e.g. -k create) to avoid the Docker-in-Docker slurm scenarios.
+            if [ -n "${BENCHMARK_K:-}" ]; then
+              args+=( -k "$BENCHMARK_K" )
+            fi
+            pytest "${args[@]}"
+          done
+          # Merge the BENCHMARK_RUNS sessions into a single file with
+          # per-scenario medians, then drop the raw session files (pytest
+          # stores them with a counter prefix, hence the find): the artifact
+          # holds exactly one file per run.
+          python .benchmarks/merge_runs.py \
+            --input .benchmarks/data \
+            --output ".benchmarks/data/${AS_VERSION}-${short_sha}.json"
+          find .benchmarks/data -name '*.json' \
+            ! -name "${AS_VERSION}-${short_sha}.json" -delete
 
-      - name: Upload test artifacts
-        uses: actions/upload-artifact@v7
+      - name: Upload benchmark artifacts
+        if: steps.scope.outputs.should_run == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: performance-metrics-${{ steps.autosubmit_version.outputs.version }}
+          name: performance-metrics-${{ steps.as_version.outputs.version }}
+          path: |
+            .benchmarks/data
+            .benchmarks/reference
+          retention-days: 7
+
+      - name: Post benchmark failed
+        if: always() && failure() && steps.started.outputs.comment_id && !env.ACT
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          COMMENT_ID: ${{ steps.started.outputs.comment_id }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const comment_id = Number(process.env.COMMENT_ID);
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.updateComment({
+              owner, repo, comment_id,
+              body: `> **Benchmark status:** failed - [follow the run](${runUrl})`
+            });
+
+  report:
+    needs: metrics
+    if: always() && needs.metrics.result == 'success' && needs.metrics.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # This job runs code from the PR head (the comparison script), so it is strictly read-only
+    permissions:
+      contents: read
+    outputs:
+      regressions_detected: ${{ steps.verdict.outputs.regressions_detected }}
+      cpu_slug: ${{ steps.verdict.outputs.cpu_slug }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ needs.metrics.outputs.head_repo }}
+          ref: ${{ needs.metrics.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          # The comparison script is standalone (numpy/pandas/matplotlib +
+          # ruamel.yaml + tabulate, used by DataFrame.to_markdown)
+          python -m pip install --upgrade pip
+          pip install numpy pandas matplotlib ruamel.yaml tabulate
+
+      - name: Download benchmark artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: performance-metrics-${{ needs.metrics.outputs.version }}
+          path: .benchmarks
+
+      - name: Fetch trusted baseline
+        run: |
+          # The baseline is a trust-critical input; fetch it straight from the
+          # `benchmark-reference` branch instead of trusting the PR-produced
+          # artifact.
+          git remote add base "https://github.com/${{ github.repository }}.git"
+          rm -rf .benchmarks/reference
+          mkdir -p .benchmarks/reference
+          # Distinguish "branch absent" (legitimate first run) from a fetch
+          # failure. `--exit-code` returns 2 when the ref does not exist; any
+          # other failure must abort, otherwise a transient error would be read
+          # as "no regressions" and silently auto-promote.
+          if git ls-remote --exit-code --heads base benchmark-reference >/dev/null 2>&1; then
+            git fetch base benchmark-reference --depth 1
+            if git cat-file -e refs/remotes/base/benchmark-reference:.benchmarks/reference 2>/dev/null; then
+              git checkout refs/remotes/base/benchmark-reference -- .benchmarks/reference
+              echo "Using baseline from benchmark-reference branch"
+            else
+              echo "Baseline branch has no .benchmarks/reference yet, running without comparison"
+            fi
+          else
+            rc=$?
+            if [ "$rc" -ne 2 ]; then
+              echo "::error::Could not check the baseline branch (git ls-remote exit $rc)"
+              exit 1
+            fi
+            echo "No baseline branch yet, running without comparison"
+          fi
+
+      - name: Generate comparison report
+        env:
+          VERSION: ${{ needs.metrics.outputs.version }}
+          ISSUE_NUMBER: ${{ needs.metrics.outputs.issue_number }}
+          HEAD_SHA: ${{ needs.metrics.outputs.head_sha }}
+        run: |
+          python .benchmarks/compare_results.py \
+            --current .benchmarks/data \
+            --previous .benchmarks/reference \
+            --thresholds .benchmarks/thresholds.yml \
+            --version "$VERSION" \
+            --current-label "PR #${ISSUE_NUMBER} (${HEAD_SHA})" \
+            --previous-label "master baseline" \
+            --output-dir .benchmarks/artifacts
+
+      - name: Read comparison verdict
+        id: verdict
+        env:
+          VERSION: ${{ needs.metrics.outputs.version }}
+        run: |
+          set -o pipefail
+          report=".benchmarks/artifacts/report_${VERSION}.json"
+          [ -f "$report" ] || { echo "::error::Missing report file"; exit 1; }
+          regressions=$(jq -r '.regressions_detected' "$report") \
+            || { echo "::error::Cannot read regressions_detected"; exit 1; }
+          [ -n "$regressions" ] || { echo "::error::Missing regressions_detected"; exit 1; }
+          cpu_slug=$(jq -r '.cpu_slug // empty' "$report") \
+            || { echo "::error::Cannot read cpu_slug"; exit 1; }
+          [ -n "$cpu_slug" ] || { echo "::error::Missing cpu_slug"; exit 1; }
+          # Restrict to a safe charset so a crafted JSON value cannot inject
+          # extra lines into $GITHUB_OUTPUT.
+          [[ "$regressions" =~ ^(true|false)$ ]] || { echo "::error::Invalid regressions_detected"; exit 1; }
+          [[ "$cpu_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "::error::Invalid cpu_slug"; exit 1; }
+          echo "regressions_detected=$regressions" >> "$GITHUB_OUTPUT"
+          echo "cpu_slug=$cpu_slug" >> "$GITHUB_OUTPUT"
+
+      - name: Upload report artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: performance-report-${{ needs.metrics.outputs.version }}
           path: .benchmarks/artifacts
           retention-days: 7
 
-      - name: Commit and push test results
-        if: >
-          github.event.issue.pull_request && contains(github.event.comment.body, '/metrics_upload')
+      - name: Display results (ACT)
+        if: ${{ env.ACT }}
+        env:
+          VERSION: ${{ needs.metrics.outputs.version }}
+          TEST_TYPE: ${{ needs.metrics.outputs.test_type }}
+        run: |
+          echo "Benchmark Results (Local Run - ${TEST_TYPE})"
+          echo "================================"
+          cat ".benchmarks/artifacts/summary_${VERSION}.md"
+          echo ""
+          echo "Plots saved to .benchmarks/artifacts/summary_${VERSION}_run.png"
+          echo "             and .benchmarks/artifacts/summary_${VERSION}_create_recovery_setstatus.png"
+          echo "             and .benchmarks/artifacts/summary_${VERSION}_memory.png"
+
+  publish-plots:
+    needs: [report, metrics]
+    if: >
+      always() && needs.metrics.result == 'success' &&
+      needs.report.result == 'success' &&
+      needs.metrics.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Download report artifacts
+        if: ${{ !env.ACT }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: performance-report-${{ needs.metrics.outputs.version }}
+          path: .benchmarks/artifacts
+
+      - name: Publish plots and comment results
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        if: ${{ !env.ACT }}
+        env:
+          VERSION: ${{ needs.metrics.outputs.version }}
+          TEST_TYPE: ${{ needs.metrics.outputs.test_type }}
+          ISSUE_NUMBER: ${{ needs.metrics.outputs.issue_number }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const version = process.env.VERSION;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const branch = 'benchmark-reference';
+            const dir = '.benchmarks/artifacts';
+            const expectedPlots = [
+              `summary_${version}_run.png`,
+              `summary_${version}_create_recovery_setstatus.png`,
+              `summary_${version}_memory.png`,
+            ];
+            const plotNames = expectedPlots
+              .filter(f => path.basename(f) === f && fs.existsSync(`${dir}/${f}`))
+              .sort();
+            const plotAlts = {
+              [expectedPlots[0]]: 'Run scenarios',
+              [expectedPlots[1]]: 'Create / Recovery / Setstatus',
+              [expectedPlots[2]]: 'Memory scenarios',
+            };
+
+            const summary = fs.readFileSync(`${dir}/summary_${version}.md`, 'utf8')
+              .replace(/@/g, '@\u200b')
+              .replace(/<\/?[a-zA-Z][^>]*>/g, '');
+
+            // GitHub strips data: URIs from comment images, so the plots are
+            // pushed to the benchmark-reference branch and linked over https.
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+            } catch (e) {
+              if (e.status !== 404) throw e;
+              const { data: info } = await github.rest.repos.get({ owner, repo });
+              const { data: head } = await github.rest.git.getRef({ owner, repo, ref: `heads/${info.default_branch}` });
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: head.object.sha });
+            }
+
+            let old = [];
+            try {
+              const { data } = await github.rest.repos.getContent({ owner, repo, path: dir, ref: branch });
+              old = Array.isArray(data)
+                ? data.filter(f => f.name.startsWith('summary_') && f.name.endsWith('.png') && !plotNames.includes(f.name))
+                : [];
+            } catch (e) { if (e.status !== 404) throw e; }
+            for (const f of old) {
+              await github.rest.repos.deleteFile({ owner, repo, path: `${dir}/${f.name}`,
+                message: `Remove outdated plot ${f.name}`, branch, sha: f.sha });
+            }
+
+            for (const pngName of plotNames) {
+              const pngPath = `${dir}/${pngName}`;
+              const pngB64 = fs.readFileSync(pngPath, { encoding: 'base64' });
+              let existingSha;
+              try {
+                const { data } = await github.rest.repos.getContent({ owner, repo, path: pngPath, ref: branch });
+                existingSha = data.sha;
+              } catch (e) { if (e.status !== 404) throw e; }
+              await github.rest.repos.createOrUpdateFileContents({ owner, repo, path: pngPath,
+                message: `Upload benchmark plot for ${version}`, content: pngB64, branch,
+                ...(existingSha ? { sha: existingSha } : {}) });
+            }
+
+            const [titleLine, ...restLines] = summary.split('\n');
+            const rest = restLines.join('\n').trim();
+
+            // Resolve direct download links for the raw data and the report
+            // artifacts, falling back to the run page.
+            let dataUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            let reportUrl = dataUrl;
+            try {
+              const { data: runs } = await github.rest.actions.listWorkflowRunArtifacts({
+                owner, repo, run_id: context.runId,
+              });
+              for (const a of (runs.artifacts || [])) {
+                if (a.name === `performance-metrics-${version}`) {
+                  dataUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}/artifacts/${a.id}`;
+                }
+                if (a.name === `performance-report-${version}`) {
+                  reportUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}/artifacts/${a.id}`;
+                }
+              }
+            } catch (e) { /* keep the run page as fallback */ }
+
+            const plotImages = plotNames.map(pngName =>
+              `![${plotAlts[pngName] || pngName}](https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dir}/${pngName})`
+            );
+
+            const body = [
+              `## Benchmark Results (${process.env.TEST_TYPE})`,
+              '',
+              ...plotImages,
+              '',
+              titleLine,
+              '',
+              '<details>',
+              '<summary>Click to expand — regressions and scenario tables</summary>',
+              '',
+              rest,
+              '',
+              '</details>',
+              '',
+              `[Download benchmark data](${dataUrl}) · [Download report (md, plots, json)](${reportUrl})`
+            ].join('\n');
+            const issue_number = Number(process.env.ISSUE_NUMBER);
+            // Update the existing benchmark comment in place so every run edits
+            // the first one instead of posting duplicates.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number,
+            });
+            const existing = comments.find((c) => c.user.login === 'github-actions[bot]' && c.body.startsWith('## Benchmark Results'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body,
+              });
+            }
+            // Remove the progress notice(s) now that the results are in.
+            const progress = comments.filter((c) => c.user.login === 'github-actions[bot]' && c.body.startsWith('> **Benchmark status:**'));
+            for (const p of progress) {
+              await github.rest.issues.deleteComment({ owner, repo, comment_id: p.id });
+            }
+
+  update-baseline:
+    needs: [report, metrics, publish-plots]
+    if: >
+      always() && needs.metrics.result == 'success' &&
+      (
+        needs.metrics.outputs.promote_last == 'true' ||
+        (needs.report.result == 'success' &&
+         needs.report.outputs.regressions_detected == 'false')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Find latest benchmark artifact
+        id: latest
+        if: needs.metrics.outputs.promote_last == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            let arts = [];
+            for (let page = 1; page <= 5; page++) {
+              const { data } = await github.rest.actions.listArtifactsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+                page,
+              });
+              arts.push(...(data.artifacts || []));
+              if (!(data.artifacts && data.artifacts.length === 100)) break;
+            }
+            const candidates = arts
+              .filter(a => a.name.startsWith('performance-metrics-') && a.expired === false && a.workflow_run && a.workflow_run.id)
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            if (!candidates.length) throw new Error('No benchmark artifact found to promote. Run /metrics first.');
+            // Prove the artifact came from THIS workflow
+            let art = null;
+            for (const a of candidates.slice(0, 20)) {
+              let run;
+              try {
+                const res = await github.rest.actions.getWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: a.workflow_run.id,
+                });
+                run = res.data;
+              } catch (e) {
+                if (e.status === 404) continue;
+                throw e;
+              }
+              const sameRepo = run.head_repository && run.head_repository.full_name === `${context.repo.owner}/${context.repo.repo}`;
+              const fromMetrics = run.path === '.github/workflows/metrics.yaml';
+              const validEvent = run.event === 'pull_request' || run.event === 'issue_comment';
+              if (sameRepo && fromMetrics && validEvent) { art = a; break; }
+            }
+            if (!art) throw new Error('No eligible benchmark artifact found to promote (origin check failed).');
+            core.setOutput('artifact_name', art.name);
+            core.setOutput('run_head_sha', (art.workflow_run && art.workflow_run.head_sha) || '');
+            core.setOutput('run_id', (art.workflow_run && String(art.workflow_run.id)) || '');
+
+      - name: Download benchmark artifacts
+        if: needs.metrics.outputs.promote_last != 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: performance-metrics-${{ needs.metrics.outputs.version }}
+          path: artifact
+
+      - name: Download latest benchmark artifact
+        if: needs.metrics.outputs.promote_last == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ steps.latest.outputs.artifact_name }}
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.latest.outputs.run_id }}
+          path: artifact
+
+      - name: Verify artifact belongs to this PR
+        if: needs.metrics.outputs.promote_last == 'true'
+        env:
+          HEAD_SHA: ${{ needs.metrics.outputs.head_sha }}
+        run: |
+          file=$(find artifact/data -type f -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)
+          short_expected=$(echo "$HEAD_SHA" | cut -c1-7)
+          base=$(basename "$file")
+          if [[ "$base" != *"-${short_expected}.json" ]]; then
+            echo "::error::Last benchmark artifact is not from the current PR head ($short_expected). Re-run /metrics (or /metrics_full) before /metrics_promote."
+            exit 1
+          fi
+          echo "Promoting artifact for PR head $short_expected"
+
+      - name: Detect benchmark CPU
+        id: cpu
+        env:
+          REPORT_CPU_SLUG: ${{ needs.report.outputs.cpu_slug }}
+        run: |
+          # The report is produced by PR-head code, so its cpu_slug is untrusted:
+          # normalize it before it is used to build a filesystem path.
+          slug=$(printf '%s' "${REPORT_CPU_SLUG}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//')
+          if [ -z "$slug" ]; then
+            file=$(find artifact/data -type f -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)
+            brand=$(jq -r '.machine_info.cpu.brand_raw // ""' "$file" 2>/dev/null || true)
+            slug=$(printf '%s' "$brand" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//')
+          fi
+          # Defensive: never allow a slug that could escape the reference dir.
+          if [[ ! "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            slug=unknown-cpu
+          fi
+          echo "cpu_slug=$slug" >> "$GITHUB_OUTPUT"
+
+      - name: Update the benchmark-reference branch
+        env:
+          CPU_SLUG: ${{ steps.cpu.outputs.cpu_slug }}
+          VERSION: ${{ needs.metrics.outputs.version }}
+          HEAD_SHA: ${{ needs.metrics.outputs.head_sha }}
+          PROMOTE_LAST: ${{ needs.metrics.outputs.promote_last }}
+          ART_NAME: ${{ steps.latest.outputs.artifact_name }}
+          ART_SHA: ${{ steps.latest.outputs.run_head_sha }}
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+          git remote add base "https://github.com/${{ github.repository }}.git"
+          git fetch base benchmark-reference --depth 1 || true
+          if git rev-parse --verify refs/remotes/base/benchmark-reference >/dev/null 2>&1; then
+            git checkout -B benchmark-reference refs/remotes/base/benchmark-reference
+          else
+            git checkout --orphan benchmark-reference
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
           mkdir -p .benchmarks/reference
-          cp .benchmarks/artifacts/* .benchmarks/reference/
-          git add .benchmarks/reference
-          git commit -m "Add benchmark results for version ${{ steps.autosubmit_version.outputs.version }} (${{ steps.determine_test_type.outputs.test_type }})"
-          git push
+          ref_dir=".benchmarks/reference/${CPU_SLUG}"
+          mkdir -p "$ref_dir"
+          new_baseline=$(find artifact/data -type f -name '*.json' -printf '%T@ %p\0' | sort -zrn | head -z -n1 | cut -z -d' ' -f2- | xargs -0 -r basename)
+          [ -n "$new_baseline" ] || { echo "::error::No benchmark file found in artifact/data"; exit 1; }
+          if [[ ! "$new_baseline" =~ ^[0-9A-Za-z][0-9A-Za-z._+-]*\.json$ ]]; then
+            echo "::error::Unexpected benchmark filename"
+            exit 1
+          fi
+          cp --no-dereference "artifact/data/$new_baseline" "$ref_dir/$new_baseline"
+          find "$ref_dir" -name '*.json' ! -name "$new_baseline" -delete
+          git add -f -- "$ref_dir"
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          if [ "$PROMOTE_LAST" == "true" ]; then
+            label="artifact ${ART_NAME} (${ART_SHA}) [${CPU_SLUG}]"
+          else
+            label="${VERSION} (${HEAD_SHA}) [${CPU_SLUG}]"
+          fi
+          git commit -m "Update benchmark baseline for ${label}"
+          git push origin benchmark-reference
 
-  metrics_markdown:
-    needs: metrics
-    if: >
-      github.event.issue.pull_request &&
-      (
-      contains(github.event.comment.body, '/metrics_markdown') ||
-      contains(github.event.comment.body, '/metrics_full_markdown') ||
-      contains(github.event.comment.body, '/metrics') ||
-      contains(github.event.comment.body, '/metrics_full')
-      )
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout PR code
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ needs.metrics.outputs.head_repo }}
-          ref: ${{ needs.metrics.outputs.head_ref }}
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[all]
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: performance-metrics-${{ needs.metrics.outputs.version }}
-          path: .benchmarks/artifacts
-
-      - name: Generate markdown summary
-        run: |
-          python .benchmarks/generate_markdown.py --version "${{ needs.metrics.outputs.version }}"
-
-      - name: Upload benchmark artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: summary_${{ needs.metrics.outputs.version }}_${{ needs.metrics.outputs.test_type }}.md
-          path: .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.md
-          retention-days: 7
-
-      - name: Comment results
-        uses: actions/github-script@v9
-        if: ${{ !env.ACT }}
+      - name: Post promotion confirmation
+        if: needs.metrics.outputs.promote_last == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          ART_NAME: ${{ steps.latest.outputs.artifact_name }}
+          ART_SHA: ${{ steps.latest.outputs.run_head_sha }}
+          ISSUE_NUMBER: ${{ needs.metrics.outputs.issue_number }}
         with:
           script: |
-            const fs = require('fs');
-            const version = '${{ needs.metrics.outputs.version }}';
-            const testType = '${{ needs.metrics.outputs.test_type }}';
-            const summaryPath = `.benchmarks/artifacts/summary_${version}.md`;
-            const summary = fs.readFileSync(summaryPath, 'utf8');
+            const name = String(process.env.ART_NAME || '').replace(/[`\r\n]/g, '');
+            const sha = String(process.env.ART_SHA || '').replace(/[^0-9a-f]/g, '');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: [
-                `## Benchmark Results (${testType})`,
-                '',
-                summary,
-                '',
-                'Artifacts: see the workflow run summary for download.'
-              ].join('\n')
+              issue_number: Number(process.env.ISSUE_NUMBER),
+              body: `Baseline promoted from the last completed benchmark run: \`${name}\`${sha ? ` (head ${sha})` : ''}.`
             });
-
-      - name: Display results (ACT)
-        if: ${{ env.ACT }}
-        run: |
-            echo "Benchmark Results (Local Run - ${{ needs.metrics.outputs.test_type }})"
-            echo "================================"
-            cat .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.md
-            echo ""
-
-  metrics_plot:
-    needs: metrics
-    if: >
-      github.event.issue.pull_request &&
-      (
-      contains(github.event.comment.body, '/metrics_plot') ||
-      contains(github.event.comment.body, '/metrics_full_plot') ||
-      contains(github.event.comment.body, '/metrics') ||
-      contains(github.event.comment.body, '/metrics_full')
-      )
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout PR code
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ needs.metrics.outputs.head_repo }}
-          ref: ${{ needs.metrics.outputs.head_ref }}
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[all]
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: performance-metrics-${{ needs.metrics.outputs.version }}
-          path: .benchmarks/artifacts
-
-      - name: Generate plot summary
-        run: |
-          python .benchmarks/generate_plot.py --version "${{ needs.metrics.outputs.version }}"
-
-      - name: Upload plot artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: summary_${{ needs.metrics.outputs.version }}_${{ needs.metrics.outputs.test_type }}.png
-          path: .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.png
-          retention-days: 7
-
-      - name: Comment results
-        uses: actions/github-script@v9
-        if: ${{ !env.ACT }}
-        with:
-          script: |
-            const fs = require('fs');
-            const version = '${{ needs.metrics.outputs.version }}';
-            const testType = '${{ needs.metrics.outputs.test_type }}';
-            const plotSummaryPath = `.benchmarks/artifacts/summary_${version}.png`;
-            const plotSummary = fs.readFileSync(plotSummaryPath, { encoding: 'base64' });
-            const plotUri = `![Plot Results](data:image/png;base64,${plotSummary})`;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: [
-                `## Plot Results (${testType})`,
-                '',
-                plotUri,
-                '',
-                'Artifacts: see the workflow run summary for download.'
-              ].join('\n')
-            });
-
-      - name: Display results (ACT)
-        if: ${{ env.ACT }}
-        run: |
-            echo "Plot Results (Local Run - ${{ needs.metrics.outputs.test_type }})"
-            echo "================================"
-            echo "plot image saved to .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.png"
-            echo "================================"

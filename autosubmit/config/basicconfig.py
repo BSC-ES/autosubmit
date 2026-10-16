@@ -64,6 +64,10 @@ class BasicConfig:
     CONFIG_FILE_FOUND = False
     DATABASE_BACKEND = "sqlite"
     DATABASE_CONN_URL = ""
+    # Defaults for the [config] section of the autosubmitrc; experiments can
+    # override them with CONFIG.MEMORY_RELEASE_*.
+    MEMORY_RELEASE_MODE = "off"
+    MEMORY_RELEASE_INTERVAL = 0
 
     @staticmethod
     def expid_dir(exp_id):
@@ -190,8 +194,15 @@ class BasicConfig:
         if parser.has_option('autosubmitapi', 'url'):
             BasicConfig.AUTOSUBMIT_API_URL = parser.get(
                 'autosubmitapi', 'url')
-        if parser.has_option('config', 'log_recovery_timeout'):
+        if parser.has_option('runtime', 'log_recovery_timeout'):
+            BasicConfig.LOG_RECOVERY_TIMEOUT = int(parser.get('runtime', 'log_recovery_timeout'))
+        elif parser.has_option('config', 'log_recovery_timeout'):
+            # Legacy location, kept for backward compatibility.
             BasicConfig.LOG_RECOVERY_TIMEOUT = int(parser.get('config', 'log_recovery_timeout'))
+        if parser.has_option('runtime', 'memory_release_mode'):
+            BasicConfig.MEMORY_RELEASE_MODE = parser.get('runtime', 'memory_release_mode')
+        if parser.has_option('runtime', 'memory_release_interval'):
+            BasicConfig.MEMORY_RELEASE_INTERVAL = int(parser.get('runtime', 'memory_release_interval'))
 
     @staticmethod
     def read():

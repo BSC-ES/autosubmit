@@ -32,10 +32,8 @@ from pstats import SortKey
 from psutil import Process
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.helpers.utils import bytes_to_unit
 from autosubmit.log.log import AutosubmitCritical, Log
-
-_UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
-"""File size units."""
 
 
 class ProfilerState(str, Enum):
@@ -86,6 +84,9 @@ class Profiler:
         self.max_checkpoints = max_checkpoints
         self.checkpoints = 0
 
+        # Memory the profiler itself keeps resident (see ``_capture_object_count``)
+        self._profiler_overhead_bytes = 0
+
         # Error handling
         self._state = ProfilerState.STOPPED
 
@@ -95,12 +96,12 @@ class Profiler:
 
         # Object profiling variables
         self._obj_iteration: list = []
-        self._obj_grow: list = []
+        self._obj_growth: list = []
 
         # File descriptor / handle profiling variables
         self._fd_iteration: list = []
         self._fd_names_iteration: list = []
-        self._fd_grow: list = []
+        self._fd_growth: list = []
 
         # Workflow stats
         self._jobs_iteration: list = []
@@ -113,10 +114,10 @@ class Profiler:
         self._trace_stats_by_iter: list = []
         self._obj_by_iter: list = []
 
-        self._mem_grow: list = []
-        self._mem_total_grow: float = 0.0
-        self._obj_total_grow: int = 0
-        self._fd_total_grow: int = 0
+        self._mem_growth: list = []
+        self._mem_total_growth: float = 0.0
+        self._obj_total_growth: int = 0
+        self._fd_total_growth: int = 0
         self._obj_diffs_between_iter: set = set()
 
     @property
@@ -147,7 +148,6 @@ class Profiler:
             )
 
         self._profiler.enable()
-
         gc.collect()
         self._mem_init = _get_current_memory()
 
@@ -168,7 +168,7 @@ class Profiler:
         gc.collect()
 
         self._mem_iteration.append(_get_current_memory())
-        self._obj_iteration.append(_get_current_object_count())
+        self._obj_iteration.append(self._capture_object_count())
 
         self._fd_iteration.append(_get_current_open_fds())
         self._fd_names_iteration.append(_get_current_open_fds_names())
@@ -192,6 +192,20 @@ class Profiler:
                 return True
         return False
 
+    def _capture_object_count(self) -> int:
+        """Return the tracked-object count, recording the profiler's memory overhead.
+
+        Recording it lets the benchmark subtract the overhead and
+        report what a plain run would have used.
+
+        :return: The number of tracked Python objects.
+        """
+        objects = gc.get_objects()
+        self._profiler_overhead_bytes = max(
+            self._profiler_overhead_bytes, sys.getsizeof(objects)
+        )
+        return len(objects)
+
     def stop(self) -> None:
         """Finish the profiling process and generate reports.
 
@@ -208,7 +222,7 @@ class Profiler:
         if self._mem_iteration:
             self._mem_init = self._mem_iteration[0]
             self._mem_final = self._mem_iteration[-1]
-            self._calculate_grow()
+            self._calculate_growth()
         else:
             self._mem_final = _get_current_memory()
 
@@ -220,27 +234,27 @@ class Profiler:
             tracemalloc.stop()
             self._trace_started = False
 
-    def _calculate_grow(self) -> None:
+    def _calculate_growth(self) -> None:
         """Calculate total growth metrics for objects and file descriptors."""
 
         # grow by iteration
-        self._mem_grow = [self._mem_iteration[i] - self._mem_iteration[i - 1]
+        self._mem_growth = [self._mem_iteration[i] - self._mem_iteration[i - 1]
                           for i in range(1, len(self._mem_iteration))]
-        self._obj_grow = [self._obj_iteration[i] - self._obj_iteration[i - 1]
+        self._obj_growth = [self._obj_iteration[i] - self._obj_iteration[i - 1]
                           for i in range(1, len(self._obj_iteration))]
-        self._fd_grow = [self._fd_iteration[i] - self._fd_iteration[i - 1]
+        self._fd_growth = [self._fd_iteration[i] - self._fd_iteration[i - 1]
                          for i in range(1, len(self._fd_iteration))]
 
         # total grow
-        self._mem_total_grow = self._mem_iteration[-1] - self._mem_iteration[0] if self._mem_iteration else 0
+        self._mem_total_growth = self._mem_iteration[-1] - self._mem_iteration[0] if self._mem_iteration else 0
         if self.checkpoints > 3:
-            self._obj_total_grow = self._obj_iteration[-1] - self._obj_iteration[3] if self._obj_iteration else 0
-            self._fd_total_grow = self._fd_iteration[-1] - self._fd_iteration[3] if self._fd_iteration else 0
+            self._obj_total_growth = self._obj_iteration[-1] - self._obj_iteration[3] if self._obj_iteration else 0
+            self._fd_total_growth = self._fd_iteration[-1] - self._fd_iteration[3] if self._fd_iteration else 0
         else:
-            self._obj_total_grow = self._obj_iteration[-1] - self._obj_iteration[0] if self._obj_iteration else 0
-            self._fd_total_grow = self._fd_iteration[-1] - self._fd_iteration[0] if self._fd_iteration else 0
+            self._obj_total_growth = self._obj_iteration[-1] - self._obj_iteration[0] if self._obj_iteration else 0
+            self._fd_total_growth = self._fd_iteration[-1] - self._fd_iteration[0] if self._fd_iteration else 0
 
-    def _report_grow(self) -> str:
+    def _report_growth(self) -> str:
         """Append growth metrics to the report.
 
         :return: The updated report string with growth metrics.
@@ -252,12 +266,9 @@ class Profiler:
             fd = self._fd_iteration[i]
             fd_names = self._fd_names_iteration[i]
 
-            mem_unit = 0
-            while mem >= 1024 and mem_unit <= len(_UNITS):
-                mem_unit += 1
-                mem /= 1024
+            mem, mem_unit_name = bytes_to_unit(mem)
             current_iter = f"Iteration {i + 1}:"
-            report += f"{current_iter} Memory: {mem:.2f} {_UNITS[mem_unit]}\n"
+            report += f"{current_iter} Memory: {mem:.2f} {mem_unit_name}\n"
             report += f"{current_iter} Objects: {obj}\n"
             report += f"{current_iter} File Descriptors: {fd}\n"
             report += f"{current_iter} Loaded jobs: {self._jobs_iteration[i]}\n"
@@ -385,41 +396,30 @@ class Profiler:
                 ""
             ])
             # Generate memory profiling results
-            if self._mem_grow and self._obj_grow and self._fd_grow:
+            if self._mem_growth and self._obj_growth and self._fd_growth:
                 report += "\n" + _generate_title("Memory, object and file descriptor by iteration") + "\n"
-                report += self._report_grow()
+                report += self._report_growth()
             report += "\n" + _generate_title("Overall Memory, Object and File Descriptor Growth") + "\n"
 
-            mem_total: float = self._mem_final - self._mem_init  # memory in Bytes
-            absolute_mem_total = abs(mem_total)
-            mem_init = self._mem_init
-            mem_final = self._mem_final
-            unit = 0
-            # reduces the value to its most suitable unit
-            while absolute_mem_total >= 1024 and unit <= len(_UNITS):
-                unit += 1
-                absolute_mem_total /= 1024
-                mem_total /= 1024
-            unit = 0
-            while mem_init >= 1024 and unit <= len(_UNITS):
-                unit += 1
-                mem_init /= 1024
-            unit = 0
-            while mem_final >= 1024 and unit <= len(_UNITS):
-                unit += 1
-                mem_final /= 1024
-            report += f"\nMEMORY GROW: {mem_total:.2f} {_UNITS[unit]}."
-            report += f"\nINITIAL MEMORY: {mem_init:.2f} {_UNITS[unit]}."
-            report += f"\nFINAL MEMORY: {mem_final:.2f} {_UNITS[unit]}."
-            if self._obj_grow and self._fd_grow:
-                report += f"\nOBJECTS GROW: {self._obj_total_grow} objects."
-                report += f"\nFILE DESCRIPTORS GROW: {self._fd_total_grow} file descriptors.\n"
+            growth_val, growth_unit = bytes_to_unit(self._mem_final - self._mem_init)
+            init_val, init_unit = bytes_to_unit(self._mem_init)
+            final_val, final_unit = bytes_to_unit(self._mem_final)
+            report += f"\nMEMORY GROWTH: {growth_val:.2f} {growth_unit}."
+            report += f"\nINITIAL MEMORY: {init_val:.2f} {init_unit}."
+            report += f"\nFINAL MEMORY: {final_val:.2f} {final_unit}."
+            if self._obj_growth and self._fd_growth:
+                report += f"\nOBJECTS GROWTH: {self._obj_total_growth} objects."
+                report += f"\nFILE DESCRIPTORS GROWTH: {self._fd_total_growth} file descriptors.\n"
+
+            overhead_val, overhead_unit = bytes_to_unit(self._profiler_overhead_bytes)
+            report += f"\nPROFILER OVERHEAD: {overhead_val:.2f} {overhead_unit}."
 
             # final list of fds opened.
             fd_names = _get_current_open_fds_names()
             report += "\nFINAL OPEN FILE DESCRIPTORS:\n"
             for fd in fd_names:
                 report += f"  {fd}\n"
+
 
             if self._trace_enabled:
                 report += "\n\nUnique object tracebacks between iterations:\n"
@@ -462,14 +462,6 @@ def _get_current_memory() -> int:
     :return: The current memory used by the process in Bytes.
     """
     return Process(os.getpid()).memory_info().rss
-
-
-def _get_current_object_count() -> int:
-    """Return total number of tracked Python objects.
-
-    :return: The count of all tracked objects.
-    """
-    return len(gc.get_objects())
 
 
 def _get_current_open_fds() -> int | None:

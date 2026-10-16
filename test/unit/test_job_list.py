@@ -504,6 +504,25 @@ def test_unload_after_confirmed_recovery(setup_job_list):
     assert job.name not in job_list.graph.nodes
 
 
+@pytest.mark.parametrize('mode,expected', [('off', 0), ('on_unload', 1), ('interval', 0)])
+def test_unload_finished_jobs_releases_memory_only_on_unload(
+    setup_job_list, mocker, mode, expected
+):
+    """Only CONFIG.MEMORY_RELEASE_MODE=on_unload triggers a heap release."""
+    jobs, _, job_list = setup_job_list
+    job = jobs[0]  # job1, COMPLETED
+    job.fail_count = 0
+    job.retrials = 0
+    job.log_recovery_call_count = 1
+    job.updated_log = 1  # Confirmed recovered
+    job.packed = False
+    job_list.job_package_map = {}
+    job_list._as_conf.experiment_data.setdefault('RUNTIME', {})['MEMORY_RELEASE_MODE'] = mode
+    release = mocker.patch('autosubmit.job.job_list.release_memory_to_os')
+    job_list.unload_finished_jobs()
+    assert release.call_count == expected
+
+
 def test_vertical_job_not_externally_retried(setup_job_list, as_conf):
     """Verify vertical wrapper inner jobs are not retried externally after wrapper finishes."""
     jobs, _, job_list = setup_job_list
