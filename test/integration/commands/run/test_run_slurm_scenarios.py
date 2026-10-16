@@ -44,6 +44,7 @@ from test.integration.commands.run.conftest import (
     _check_db_fields,
     _check_files_recovered,
     _check_wrapper_db_fields,
+    _remote_log_dir,
     assert_run_results,
     run_in_thread,
 )
@@ -825,6 +826,149 @@ def test_run_interrupted_multiple_vertical_wrappers(
     db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid, wrapper_type)
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     assert_run_results(db_check_list, files_check_list, run_tmpdir, as_exp.expid)
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+def test_vertical_wrapper_inner_job_reading_stdin_runs_to_end(
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        slurm_server: 'Container',
+        prepare_scratch,
+        general_data: dict,
+) -> None:
+    """A vertical wrapper must run the inner job script to completion.
+
+    The wrapper used to feed the script to ``bash -s`` on stdin, so any command
+    in the job body that reads stdin swallowed the rest of the script. bash then
+    reached EOF, exited 0, and the Autosubmit EXIT trap wrote ``COMPLETED``,
+    marking the job and the wrapper as successful even though the rest of the
+    script never ran.
+
+    The body here reads stdin and then echoes a sentinel, which only appears if
+    the script ran to the end.
+
+    :param autosubmit_exp: Fixture that creates and manages an Autosubmit experiment.
+    :param slurm_server: Docker container running the Slurm scheduler.
+    :param prepare_scratch: Fixture that sets up the scratch directory for the experiment.
+    :param general_data: Common experiment configuration shared across tests.
+    """
+    jobs_data = dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+    JOBS:
+        sim:
+            SCRIPT: |
+                echo "SIM_JOB_STARTED"
+                cat > /dev/null
+                echo "SIM_JOB_REACHED_END"
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:05
+
+    wrappers:
+        wrapper_sim:
+            JOBS_IN_WRAPPER: sim
+            TYPE: vertical
+            policy: flexible
+    """)
+    yaml = YAML(typ='rt')
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
+    as_conf = as_exp.as_conf
+    as_conf.set_last_as_command('run')
+
+    exit_code = run(expid=as_exp.expid)
+    # The wrapper reports success even with the bug, so the experiment status
+    # alone cannot detect it. The sentinel written after reading stdin is the
+    # real check.
+    _assert_exit_code("COMPLETED", exit_code)
+
+    remote_log_dir = _remote_log_dir(as_exp.expid)
+    # Only the stdout files (never the script or the stderr xtrace, which both
+    # contain the sentinel text regardless of execution) prove the job ran.
+    command = f"cat {remote_log_dir}/*.out 2>/dev/null || true"
+    _, output = slurm_server.exec_run(["bash", "-c", command])
+    assert b"SIM_JOB_REACHED_END" in output, (
+        "The vertical wrapper inner job did not run to completion: the sentinel "
+        "written after reading stdin is missing from the job stdout. The inner "
+        "script was most likely truncated by the wrapper. Job stdout was:\n"
+        f"{output.decode(errors='replace')}"
+    )
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+def test_vertical_wrapper_inner_job_killed_at_wallclock(
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        slurm_server: 'Container',
+        prepare_scratch,
+        general_data: dict,
+) -> None:
+    """A vertical wrapper must stop an inner job that outlives its wallclock.
+
+    The wrapper bounds each inner job with
+    ``timeout -k <grace> <wallclock> bash <script>``. A job that keeps running
+    past its wallclock must be killed (SIGTERM, then SIGKILL if it is ignored),
+    marked ``FAILED`` and not left running. ``EXTEND_WALLCLOCK`` is set so the
+    wrapper wallclock (2 min) is longer than the per-job wallclock (1 min), which
+    isolates the per-job timeout from the wrapper's own Slurm time limit.
+
+    :param autosubmit_exp: Fixture that creates and manages an Autosubmit experiment.
+    :param slurm_server: Docker container running the Slurm scheduler.
+    :param prepare_scratch: Fixture that sets up the scratch directory for the experiment.
+    :param general_data: Common experiment configuration shared across tests.
+    """
+    long_job_seconds = 120
+    per_job_wallclock_seconds = 60
+    kill_grace_seconds = 30
+    jobs_data = dedent(f"""\
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+    JOBS:
+        sim:
+            SCRIPT: |
+                sleep {long_job_seconds}
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+
+    wrappers:
+        wrapper_sim:
+            JOBS_IN_WRAPPER: sim
+            TYPE: vertical
+            policy: flexible
+            EXTEND_WALLCLOCK: 1
+    """)
+    yaml = YAML(typ='rt')
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
+    as_conf = as_exp.as_conf
+    as_conf.set_last_as_command('run')
+
+    start = time.monotonic()
+    exit_code = run(expid=as_exp.expid)
+    elapsed = time.monotonic() - start
+
+    # The job outlives its 00:01 wallclock, so the experiment must fail.
+    assert exit_code > 0, f"Expected the over-wallclock job to fail the experiment, got exit code {exit_code}."
+    # It must be stopped around the per-job wallclock plus the kill grace, not
+    # after the full sleep.
+    max_expected_seconds = per_job_wallclock_seconds + kill_grace_seconds + 20
+    assert elapsed < max_expected_seconds, (
+        f"The wrapper did not stop the over-wallclock job in time ({elapsed:.0f}s, "
+        f"expected < {max_expected_seconds}s)."
+    )
+
+    remote_log_dir = _remote_log_dir(as_exp.expid)
+    _, output = slurm_server.exec_run(["bash", "-c", (
+        f"tail -1 {remote_log_dir}/*_SIM_STAT_0 2>/dev/null; echo '---'; "
+        f"pgrep -af 'sleep {long_job_seconds}' || echo NO_ORPHAN"
+    )])
+    text = output.decode(errors="replace")
+    assert "FAILED" in text, f"Expected the killed job STAT to end with FAILED. Output:\n{text}"
+    assert "NO_ORPHAN" in text, f"The over-wallclock job left an orphan process. Output:\n{text}"
 
 
 def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture', general_data):
