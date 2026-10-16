@@ -270,6 +270,46 @@ def test_infinite_loop_dynamic_variable_unify_conf(
                 'QUEUE': '%PATTERN=%YYYY%MM%DD',
             }
         }),
+        (
+        {
+            "JOBS": {
+                "LOCAL_SETUP": {
+                    "SCRIPT": "echo $(date -u -d '${startdate} + $(( numchunks * chunksize )) month' +%Y%m%d)",
+                    "PLATFORM": "TEST_SLURM",
+                    "RUNNING": "once",
+                    "CHECK": "on_submission",
+                    "TEST": {
+                        "A": "%PATTERN=%YYYY%MM%DD",
+                        "B": "%CURRENT_C%",
+                        "C": "%CURRENT_B%",
+                    },
+                    "CUSTOM": (
+                        "a",
+                        "b",
+                        "c%d",
+                    )
+                }
+            }
+        },{
+            "JOBS": {
+                "LOCAL_SETUP": {
+                    "SCRIPT": "echo $(date -u -d '${startdate} + $(( numchunks * chunksize )) month' +%Y%m%d)",
+                    "PLATFORM": "TEST_SLURM",
+                    "RUNNING": "once",
+                    "CHECK": "on_submission",
+                    "TEST": {
+                        "A": "%PATTERN=%YYYY%MM%DD",
+                        "B": "%CURRENT_C%",
+                        "C": "%CURRENT_B%",
+                    },
+                    "CUSTOM": (
+                        "a",
+                        "b",
+                        "c%d",
+                    )
+                }
+            }
+        }),
     ],
     ids=[
         "Special Dynamic Variable",
@@ -278,6 +318,7 @@ def test_infinite_loop_dynamic_variable_unify_conf(
         "Non special Variable % at the start",
         "Non special Variable % at the end",
         "Data Format",
+        "No substitution",
     ],
 )
 def test_finite_loop_dynamic_variable_unify_conf(
