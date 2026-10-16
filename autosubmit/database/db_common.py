@@ -912,17 +912,34 @@ def check_db_path(db_path: Path | None, must_exists: bool = True) -> bool:
 
 def database_backup(expid):
     if BasicConfig.DATABASE_BACKEND == "sqlite":
+        if not BasicConfig.DATABASE_BACKUP:
+            Log.debug("Jobs_data database backup disabled in autosubmitrc, skipping.")
+            return
+        jobdata_dir = Path(BasicConfig.JOBDATA_DIR)
+        database_path = jobdata_dir / f"job_data_{expid}.db"
+        backup_path = jobdata_dir / f"job_data_{expid}.sql"
+        tmp_path = backup_path.with_name(f"{backup_path.name}.tmp")
+        if not database_path.exists():
+            Log.warning(f"Jobs_data database backup skipped, {database_path} not found.")
+            return
+        Log.debug("Backing up jobs_data...")
         try:
-            database_path = os.path.join(
-                BasicConfig.JOBDATA_DIR, f"job_data_{expid}.db"
-            )
-            backup_path = os.path.join(BasicConfig.JOBDATA_DIR, f"job_data_{expid}.sql")
-            command = f"sqlite3 {database_path} .dump > {backup_path} "
-            Log.debug("Backing up jobs_data...")
-            subprocess.call(command, shell=True)
-            Log.debug("Jobs_data database backup completed.")
-        except BaseException:
-            Log.debug("Jobs_data database backup failed.")
+            with open(tmp_path, "w") as backup:
+                subprocess.run(
+                    ["sqlite3", "-cmd", f".timeout {TIMEOUT * 1000}", str(database_path), ".dump"],
+                    stdout=backup,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=True,
+                )
+            tmp_path.replace(backup_path)
+        except (subprocess.CalledProcessError, OSError) as e:
+            tmp_path.unlink(missing_ok=True)
+            reason = getattr(e, "stderr", None) or e
+            Log.warning(f"Jobs_data database backup failed, previous backup kept at {backup_path}: {reason}")
+            return
+        Log.debug("Jobs_data database backup completed.")
     elif BasicConfig.DATABASE_BACKEND == "postgres":
         # TODO: Implement Postgres backup
         Log.debug("Postgres database backup not implemented yet.")
+
