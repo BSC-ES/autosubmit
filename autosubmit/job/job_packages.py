@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import datetime
 import json
 import locale
@@ -476,7 +477,7 @@ class JobPackageThread(JobPackageBase):
         if callable(self.platform.remove_multiple_files):
             filenames = ""
             for job in self.jobs:
-                filenames += " " + self.platform.remote_log_dir + "/" + job.name + ".cmd"
+                filenames += str(self.platform.remote_log_dir / f"{job.name}.cmd")
             self.platform.remove_multiple_files(filenames)
         tar_path = os.path.join(self._tmp_path, output_filepath)
         Log.debug("Compressing multiple_files")
@@ -490,7 +491,7 @@ class JobPackageThread(JobPackageBase):
         os.chmod(tar_path, 0o755)
         self.platform.send_file(tar_path, check=False)
         Log.debug("Uncompress - send_command")
-        self.platform.send_command(f"cd {self.platform.get_files_path()}; tar -xvf {output_filepath}")
+        self.platform.send_command(f"cd {self.platform.files_path}; tar -xvf {output_filepath}")
         Log.debug("Send_file: common_script")
         self.platform.send_file(self._common_script)
         for job in self.jobs:
