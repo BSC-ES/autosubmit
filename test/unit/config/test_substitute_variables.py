@@ -102,9 +102,9 @@ def test_substitute_dynamic_variables_long_format(autosubmit_config):
         experiment_data=ONE_DIM)
     as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
     as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
-    param = as_conf.substitute_dynamic_variables()
-    assert param['JOBS.JOB.VARIABLEX'] == 'VARIABLEX'
-    assert param['JOBS.JOB.VARIABLEY'] == 'VARIABLEY'
+    param = as_conf.substitute_dynamic_variables(parameters=as_conf.experiment_data)
+    assert param['JOBS']['JOB']['VARIABLEX'] == 'VARIABLEX'
+    assert param['JOBS']['JOB']['VARIABLEY'] == 'VARIABLEY'
 
 
 def test_substitute_keys_short_strings(autosubmit_config):
