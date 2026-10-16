@@ -24,7 +24,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_manager_job_list import _edge_satisfied
+from autosubmit.database.managers.job_list import _edge_satisfied
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
@@ -145,15 +145,9 @@ def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool,
     Test loading the job list with different full_load options.
 
     :param as_conf: Autosubmit configuration fixture.
-    :type as_conf: Any
     :param setup_job_list: Fixture to set up job list.
-    :type setup_job_list: Any
     :param tmp_path: Temporary path fixture.
-    :type tmp_path: Any
     :param full_load: Whether to fully load the graph.
-    :type full_load: bool
-    :return: None
-    :rtype: None
     """
     _jobs, _edges, job_list = setup_job_list
     job_list.save_jobs()
@@ -576,15 +570,10 @@ def test_is_wrapper_still_running(
     :param fake_job_list: Minimal JobList fixture.
     :param mocker: pytest-mock mocker fixture.
     :param job_id: Numeric job id.
-    :type job_id: int
     :param job_status: Status of the inner job.
-    :type job_status: Status
     :param wrapper_status: Status of the wrapper job in ``job_package_map``.
-    :type wrapper_status: Status
     :param in_map: Whether to place the wrapper in ``job_package_map``.
-    :type in_map: bool
     :param expected: Expected return value.
-    :type expected: bool
     """
     inner_job = Job('a000_20000101_fc0_1_SIM', job_id, job_status, 0)
     if in_map:

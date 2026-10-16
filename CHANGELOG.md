@@ -15,6 +15,13 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
+- Add per-target `schema_migrations` tracking and create the `job_data(job_name)` index in the SQLAlchemy history database manager #3114
+- Align the SQLAlchemy history manager lookups and bulk updates, and remove the temporary table from `select_jobs_data` #3114
+- Use SQLAlchemy for all history and experiment status database managers, dropping the legacy SQLite-only managers #3114
+- Fix log recovery skipping historical stats when the scheduler reuses job ids across chunks #3114
+- Record `schema_migrations` with a dialect upsert to avoid races when databases are written concurrently #3114
+- Make the general database and experiment details use only SQLAlchemy, dropping the last raw-sqlite3 code paths and the legacy `db_version` table #3114
+- Move every database manager into `autosubmit/database` (`models/` and `managers/` subpackages) #3114
 - Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295
 - Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
 - Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
