@@ -12,6 +12,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix multi-member PJM job lookup output parsing #3255 (thanks @1cbyc)
 - Remove the unrelated `--filter_status` option from `autosubmit expid` #3241 (thanks @1cbyc)
 - Fixed `DELAY_RETRY_TIME` not matching the documented `+N` and `*N` delay sequences #3138
+- Preserve platform `EXCLUSIVITY` when refreshing a job that does not define its own `EXCLUSIVE` value #3234 (thanks @1cbyc)
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
