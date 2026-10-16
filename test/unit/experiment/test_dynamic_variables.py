@@ -146,9 +146,7 @@ def test_dynamic_variable_deep_add_missing_starter_conf(
         "Full Cycle Current Dynamic Variable",
     ],
 )
-def test_infinite_loop_dynamic_variable_unify_conf(
-    autosubmit_config, mocker, new_data
-):
+def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, new_data):
     as_conf = autosubmit_config(
         "t000",
         {},
@@ -162,114 +160,176 @@ def test_infinite_loop_dynamic_variable_unify_conf(
 @pytest.mark.parametrize(
     "new_data,result",
     [
-        ({
-            "JOBS": {
-                "A": {
-                    "SCRIPT": "OK %TEST.TE_ME%",
-                    "B": 'OK'
+        (
+            {
+                "JOBS": {
+                    "A": {"SCRIPT": "OK %TEST.TE_ME%", "B": "OK"},
+                },
+                "TEST": {
+                    "NAME": "AUTOSUBMIT",
+                    "TE_ME": "Hi %JOBS.A.B%",
                 },
             },
-            "TEST": {
-                "NAME": "AUTOSUBMIT",
-                "TE_ME": "Hi %JOBS.A.B%",
-            },
-        },{
-            "JOBS": {
-                "A": {
-                    "SCRIPT": "OK Hi OK",
-                    "B": 'OK'
+            {
+                "JOBS": {
+                    "A": {"SCRIPT": "OK Hi OK", "B": "OK"},
+                },
+                "TEST": {
+                    "NAME": "AUTOSUBMIT",
+                    "TE_ME": "Hi OK",
                 },
             },
-            "TEST": {
-                "NAME": "AUTOSUBMIT",
-                "TE_ME": "Hi OK",
-            },
-        },),
-        ({
-            "JOBS": {
-                "A": {
-                    "SCRIPT": {
-                        "TEST": "OK %TEST.NAME%"
+        ),
+        (
+            {
+                "JOBS": {
+                    "A": {
+                        "SCRIPT": {"TEST": "OK %TEST.NAME%"},
+                    },
+                    "B": "Ok",
+                },
+                "TEST": {
+                    "NAME": "AUTOSUBMIT",
+                    "TEST_ME": {
+                        "TE_ME": "Hi %JOBS.B%",
                     },
                 },
-                "B": "Ok"
             },
-            "TEST": {
-                "NAME": "AUTOSUBMIT",
-                "TEST_ME": {
-                    "TE_ME": "Hi %JOBS.B%",
-                }
-            },
-        },{
-            "JOBS": {
-                "A": {
-                    "SCRIPT": {
-                        "TEST": "OK AUTOSUBMIT"
+            {
+                "JOBS": {
+                    "A": {
+                        "SCRIPT": {"TEST": "OK AUTOSUBMIT"},
+                    },
+                    "B": "Ok",
+                },
+                "TEST": {
+                    "NAME": "AUTOSUBMIT",
+                    "TEST_ME": {
+                        "TE_ME": "Hi Ok",
                     },
                 },
-                "B": "Ok"
             },
-            "TEST": {
-                "NAME": "AUTOSUBMIT",
-                "TEST_ME": {
-                    "TE_ME": "Hi Ok",
+        ),
+        (
+            {
+                "JOBS": {
+                    "A": {"SCRIPT": "OK %TEST.TEST.TE_ME%", "CHUNK": "%CHUNK%"},
+                },
+                "TEST": {
+                    "NAME": "AUTOSUBMIT",
+                    "TE_ME": "Hi %JOBS.A.SCRIPT%",
+                },
+            },
+            {
+                "JOBS": {
+                    "A": {"SCRIPT": "OK %TEST.TEST.TE_ME%", "CHUNK": "%CHUNK%"},
+                },
+                "TEST": {
+                    "NAME": "AUTOSUBMIT",
+                    "TE_ME": "Hi OK %TEST.TEST.TE_ME%",
+                },
+            },
+        ),
+        (
+            {
+                "TEST_SLURM": {
+                    "ANOTHER_QUEUE": "%CURRENT_ANOTHER_QUEUE",
+                },
+            },
+            {
+                "TEST_SLURM": {
+                    "ANOTHER_QUEUE": "%CURRENT_ANOTHER_QUEUE",
                 }
             },
-        },),
-        ({
-            "JOBS": {
-                "A": {
-                    "SCRIPT": "OK %TEST.TEST.TE_ME%",
-                    "CHUNK": "%CHUNK%"
+        ),
+        (
+            {
+                "TEST_SLURM": {
+                    "ANOTHER_QUEUE": "CURRENT_ANOTHER_QUEUE%",
                 },
             },
-            "TEST": {
-                "NAME": "AUTOSUBMIT",
-                "TE_ME": "Hi %JOBS.A.SCRIPT%",
-            },
-        },{
-            "JOBS": {
-                "A": {
-                    "SCRIPT": "OK %TEST.TEST.TE_ME%",
-                    "CHUNK": "%CHUNK%"
+            {
+                "TEST_SLURM": {
+                    "ANOTHER_QUEUE": "CURRENT_ANOTHER_QUEUE%",
                 },
             },
-            "TEST": {
-                "NAME": "AUTOSUBMIT",
-                "TE_ME": "Hi OK %TEST.TEST.TE_ME%",
-            },
-        },),
+        ),
         (
-        {
-            "TEST_SLURM": {
-                "ANOTHER_QUEUE": "%CURRENT_ANOTHER_QUEUE",
+            {
+                "TEST_SLURM": {
+                    "QUEUE": "%PATTERN=%YYYY%MM%DD",
+                    "ANOTHER_QUEUE": "%YYYY%MM%DD",
+                },
             },
-        },{
-            "TEST_SLURM": {
-                "ANOTHER_QUEUE": "%CURRENT_ANOTHER_QUEUE",
-            }
-        }),
+            {
+                "TEST_SLURM": {
+                    "ANOTHER_QUEUE": "%YYYY%MM%DD",
+                    "QUEUE": "%PATTERN=%YYYY%MM%DD",
+                }
+            },
+        ),
         (
-        {
-            "TEST_SLURM": {
-                "ANOTHER_QUEUE": "CURRENT_ANOTHER_QUEUE%",
+            {
+                "JOBS": {
+                    "LOCAL_SETUP": {
+                        "SCRIPT": "echo $(date -u -d '${startdate} + $(( numchunks * chunksize )) month' +%Y%m%d)",
+                        "PLATFORM": "TEST_SLURM",
+                        "RUNNING": "once",
+                        "CHECK": "on_submission",
+                        "TEST": {
+                            "A": "%PATTERN=%YYYY%MM%DD",
+                            "B": "%CURRENT_C%",
+                            "C": "%CURRENT_B%",
+                        },
+                        "CUSTOM": (
+                            "a",
+                            "b",
+                            "c%d",
+                        ),
+                    }
+                }
             },
-        },{
-            "TEST_SLURM": {
-                "ANOTHER_QUEUE": "CURRENT_ANOTHER_QUEUE%",
+            {
+                "JOBS": {
+                    "LOCAL_SETUP": {
+                        "SCRIPT": "echo $(date -u -d '${startdate} + $(( numchunks * chunksize )) month' +%Y%m%d)",
+                        "PLATFORM": "TEST_SLURM",
+                        "RUNNING": "once",
+                        "CHECK": "on_submission",
+                        "TEST": {
+                            "A": "%PATTERN=%YYYY%MM%DD",
+                            "B": "%CURRENT_C%",
+                            "C": "%CURRENT_B%",
+                        },
+                        "CUSTOM": (
+                            "a",
+                            "b",
+                            "c%d",
+                        ),
+                    }
+                }
             },
-        }),
-        ({
-            "TEST_SLURM": {
-                "QUEUE": "%PATTERN=%YYYY%MM%DD",
-                "ANOTHER_QUEUE": "%YYYY%MM%DD",
+        ),
+        (
+            {
+                "JOBS": {
+                    "LOCAL_SETUP": {
+                        "SCRIPT": "echo '%%KEY%%'",
+                        "PLATFORM": "LOCAL",
+                        "RUNNING": "once",
+                    },
+                },
             },
-        },{
-            'TEST_SLURM': {
-                'ANOTHER_QUEUE': '%YYYY%MM%DD',
-                'QUEUE': '%PATTERN=%YYYY%MM%DD',
-            }
-        }),
+            {
+                "JOBS": {
+                    "LOCAL_SETUP": {
+                        "SCRIPT": "echo '%%KEY%%'",
+                        "PLATFORM": "LOCAL",
+                        "RUNNING": "once",
+                    },
+                },
+            },
+        ),
     ],
     ids=[
         "Special Dynamic Variable",
@@ -278,11 +338,11 @@ def test_infinite_loop_dynamic_variable_unify_conf(
         "Non special Variable % at the start",
         "Non special Variable % at the end",
         "Data Format",
+        "No substitution",
+        "Double %% to variables",
     ],
 )
-def test_finite_loop_dynamic_variable_unify_conf(
-    autosubmit_config, new_data, result
-):
+def test_finite_loop_dynamic_variable_unify_conf(autosubmit_config, new_data, result):
     as_conf = autosubmit_config(
         "t000",
         {},
