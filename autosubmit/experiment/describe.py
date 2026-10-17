@@ -24,7 +24,7 @@ common code to another location -- if appropriately.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from pwd import getpwnam
 
@@ -36,6 +36,7 @@ from autosubmit.database.db_common import (
 )
 from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.experiment.utils import get_experiment_owner
+from autosubmit.helpers.datetime_utils import to_utc_iso
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
@@ -52,7 +53,7 @@ class ExperimentDescription:
     """Description information for an Autosubmit experiment."""
 
     user: str
-    created: datetime
+    created: str
     model: str
     branch: str
     hpc: str
@@ -128,7 +129,7 @@ def describe_experiment(experiment_id: str) -> ExperimentDescription:
         owner, owner_uid, _, _ = get_experiment_owner(experiment_id)
         user = owner if owner is not None else str(owner_uid)
 
-        created = datetime.fromtimestamp(stat.st_mtime)
+        created = to_utc_iso(datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc))
 
         svn_url = as_conf.get_svn_project_url()
         if svn_url:
