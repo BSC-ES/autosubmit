@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 # This file is part of Autosubmit.
 
 # Autosubmit is free software: you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 import collections
 
 JobDataRow = collections.namedtuple('JobDataRow', ['id', 'counter', 'job_name', 'created', 'modified', 'submit', 'start', 'finish',
-                                                   'status', 'rowtype', 'ncpus', 'wallclock', 'qos', 'energy', 'date', 'section', 'member',
+                                                   'status', 'rowtype', 'ncpus', 'wallclock', 'qos', 'energy',  'CPUTimeRAW', 'date', 'section', 'member',
                                                    'chunk', 'last', 'platform', 'job_id', 'extra_data', 'nnodes', 'run_id', 'MaxRSS', 'AveRSS',
                                                    'out', 'err', 'rowstatus', 'children', 'platform_output', 'workflow_commit',
                                                    'split', 'splits', 'fail_count'],

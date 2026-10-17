@@ -248,15 +248,16 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return f'squeue -o %A,%.50j -n {job_name}'
 
-    def get_job_energy_cmd(self, job_id: str) -> str:
-        """Generates a command to get data from a job
-        JobId, State, NCPUS, NNodes, Submit, Start, End, ConsumedEnergy, MaxRSS, AveRSS%25.
+    def get_job_data_cmd(self, job_id: str) -> str:
+        """Generates a command to get data from a job including JobId, State,
+        NCPUS, NNodes, Submit, Start, End, ConsumedEnergy, CPUTimeRAW, MaxRSS
+        and AveRSS.
 
         :param job_id: ID of a job.
-        :return: Command to get job energy.
+        :return: Command to get job data.
         """
         return (f'sacct -n --jobs {job_id} -o JobId%25,State,NCPUS,NNodes,Submit,'
-                f'Start,End,ConsumedEnergy,MaxRSS%25,AveRSS%25')
+                f'Start,End,ConsumedEnergy,CPUTimeRAW,MaxRSS%25,AveRSS%25')
 
     def parse_queue_reason(self, output: str, job_id: str) -> str:
         """Parses the queue reason from the output of the command.

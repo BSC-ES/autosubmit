@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -125,6 +125,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
             wallclock TEXT NOT NULL,
             qos TEXT NOT NULL,
             energy INTEGER NOT NULL,
+            CPUTimeRAW INTEGER NOT NULL DEFAULT 0,
             date TEXT NOT NULL,
             section TEXT NOT NULL,
             member TEXT NOT NULL,
@@ -191,6 +192,10 @@ class ExperimentHistoryDbManager(DatabaseManager):
         # Version 20
         self.version_schema_changes.extend([
             "ALTER TABLE job_data ADD COLUMN fail_count INTEGER NOT NULL DEFAULT 0"
+        ])
+        # Version 21
+        self.version_schema_changes.extend([
+            "ALTER TABLE job_data ADD COLUMN CPUTimeRAW INTEGER NOT NULL DEFAULT 0"
         ])
 
     def create_historical_database(self):
@@ -331,15 +336,15 @@ class ExperimentHistoryDbManager(DatabaseManager):
         """ Insert data class JobData into job_data table. """
         statement = ''' INSERT INTO job_data(counter, job_name, created, modified,
                 submit, start, finish, status, rowtype, ncpus,
-                wallclock, qos, energy, date, section, member, chunk, last,
+                wallclock, qos, energy, CPUTimeRAW, date, section, member, chunk, last,
                 platform, job_id, extra_data, nnodes, run_id, MaxRSS, AveRSS,
                 out, err, rowstatus, children, platform_output, workflow_commit,
                 split, splits, fail_count)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
         arguments = (job_data.counter, job_data.job_name, HUtils.get_current_datetime(), HUtils.get_current_datetime(),
                      job_data.submit, job_data.start, job_data.finish, job_data.status, job_data.rowtype,
                      job_data.ncpus,
-                     job_data.wallclock, job_data.qos, job_data.energy, job_data.date, job_data.section,
+                     job_data.wallclock, job_data.qos, job_data.energy, job_data.CPUTimeRAW, job_data.date, job_data.section,
                      job_data.member, job_data.chunk, job_data.last,
                      job_data.platform, job_data.job_id, job_data.extra_data, job_data.nnodes, job_data.run_id,
                      job_data.MaxRSS, job_data.AveRSS,
@@ -373,20 +378,20 @@ class ExperimentHistoryDbManager(DatabaseManager):
     def _update_job_data_by_id(self, job_data_dc: Any) -> None:
         """
         Update job_data table with data class JobData.
-        Update last, submit, start, finish, modified, job_id, status, energy, extra_data, nnodes, ncpus, rowstatus, out, err by id.
+        Update last, submit, start, finish, modified, job_id, status, energy, CPUTimeRAW, extra_data, nnodes, ncpus, rowstatus, out, err by id.
 
         :param job_data_dc: The JobData data class instance containing job data to be updated.
         :type job_data_dc: JobData
         """
         statement = ''' UPDATE job_data SET last=?, submit=?, start=?, finish=?, modified=?,
-                    job_id=?, status=?, energy=?, extra_data=?,
+                    job_id=?, status=?, energy=?, CPUTimeRAW=?, extra_data=?,
                     nnodes=?, ncpus=?, rowstatus=?, out=?, err=?,
                     children=?, platform_output=?, id=?, workflow_commit=?,
                     split=?, splits=?, fail_count=? WHERE id=?'''
         # noinspection PyProtectedMember
         arguments = (
             job_data_dc.last, job_data_dc.submit, job_data_dc.start, job_data_dc.finish, HUtils.get_current_datetime(),
-            job_data_dc.job_id, job_data_dc.status, job_data_dc.energy, job_data_dc.extra_data,
+            job_data_dc.job_id, job_data_dc.status, job_data_dc.energy, job_data_dc.CPUTimeRAW, job_data_dc.extra_data,
             job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus, job_data_dc.out, job_data_dc.err,
             job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc.workflow_commit,
             job_data_dc.split, job_data_dc.splits, job_data_dc.fail_count, job_data_dc._id
@@ -899,6 +904,7 @@ class SqlAlchemyExperimentHistoryDbManager:
                 wallclock=job_data.wallclock,
                 qos=job_data.qos,
                 energy=job_data.energy,
+                CPUTimeRAW=job_data.CPUTimeRAW,
                 date=job_data.date,
                 section=job_data.section,
                 member=job_data.member,

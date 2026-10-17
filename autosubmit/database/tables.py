@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -118,6 +118,7 @@ JobDataTable = Table(
     Column("wallclock", Text, nullable=False),
     Column("qos", Text, nullable=False),
     Column("energy", Integer, nullable=False),
+    Column("CPUTimeRAW", Integer, nullable=False),
     Column("date", Text, nullable=False),
     Column("section", Text, nullable=False),
     Column("member", Text, nullable=False),

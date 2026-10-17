@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -801,19 +801,20 @@ class ParamikoPlatform(Platform):
                 Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
                 return False
 
-    def get_job_energy_cmd(self, job_id):
+    def get_job_data_cmd(self, job_id):
         raise NotImplementedError  # pragma: no cover
 
-    def check_job_energy(self, job_id):
-        """Checks job energy and return values. Defined in child classes.
+    def get_job_data(self, job_id):
+        """Checks job data, such as the CPU or energy consumption,
+        and return the values. Defined in child classes.
 
         :param job_id: ID of Job.
         :type job_id: int
         :return: submit time, start time, finish time, energy.
         :rtype: (int, int, int, int)
         """
-        check_energy_cmd = self.get_job_energy_cmd(job_id)
-        self.send_command(check_energy_cmd)
+        check_data_cmd = self.get_job_data_cmd(job_id)
+        self.send_command(check_data_cmd)
         return self.get_ssh_output()
 
     def submit_multiple_jobs(self, script_names: dict[str, 'JobPackageBase']) -> list[int]:
