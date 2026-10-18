@@ -35,7 +35,8 @@ class SlurmMonitor(PlatformMonitor):
 
     @property
     def total_energy(self):
-        return max(self.header.energy, self.steps_energy + self.extern.energy)
+        extern_energy = self.extern.energy if self.extern else 0
+        return max(self.header.energy, self.steps_energy + extern_energy)
 
     @property
     def step_count(self):

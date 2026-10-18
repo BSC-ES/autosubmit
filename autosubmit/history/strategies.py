@@ -112,9 +112,10 @@ class StraightWrapperAssociationStrategy(Strategy):
                 return []
             result = []
             computational_weights = self.get_calculated_weights_of_jobs_in_wrapper(job_data_dcs_in_wrapper)
+            extern_energy = slurm_monitor.extern.energy if slurm_monitor.extern else 0
             for job_dc, step in zip(job_data_dcs_in_wrapper, slurm_monitor.steps):
                 job_dc.energy = step.energy + computational_weights.get(job_dc.job_name,
-                                                                        0) * slurm_monitor.extern.energy
+                                                                        0) * extern_energy
                 job_dc.AveRSS = step.AveRSS
                 job_dc.MaxRSS = step.MaxRSS
                 job_dc.platform_output = ""
@@ -173,9 +174,10 @@ class TwoDimWrapperDistributionStrategy(Strategy):
             if len(self.jobs_per_level) != slurm_monitor.step_count:
                 return []
             comp_weight_per_level = self.get_comp_weight_per_level(self.jobs_per_level)
+            extern_energy = slurm_monitor.extern.energy if slurm_monitor.extern else 0
             level_energy = []
             for i, step in enumerate(slurm_monitor.steps):
-                level_energy.append(step.energy + comp_weight_per_level[i] * slurm_monitor.extern.energy)
+                level_energy.append(step.energy + comp_weight_per_level[i] * extern_energy)
             for i, jobs in enumerate(self.jobs_per_level):
                 weights = self.get_comp_weight_per_group_of_job_dcs(jobs)
                 for j, job_dc in enumerate(jobs):
