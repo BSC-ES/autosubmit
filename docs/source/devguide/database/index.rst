@@ -31,7 +31,7 @@ messages among other things inside these files.
    :alt: High level view of the Autosubmit storage system
 
 Core databases
----------------
+--------------
 
 +-------------------+------------------------------------+----------------------------------------------------------------------------------------------------------+
 | Database          | Default location                   | Description                                                                                              |
@@ -42,7 +42,7 @@ Core databases
 +-------------------+------------------------------------+----------------------------------------------------------------------------------------------------------+
 
 Auxiliary databases
---------------------
+-------------------
 
 These databases complement the databases previously described for different purposes.
 Some of them are centralized in the ``$AS_METADATA`` directory (defined in the

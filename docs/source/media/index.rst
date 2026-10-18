@@ -33,7 +33,7 @@ Visual Identity Files
    :height: 30px
    :align: middle
    :alt: full autosubmit logo
-.. |img_as_short.png| image:: fig/as_short.png 
+.. |img_as_short.png| image:: fig/as_short.png
    :height: 30px
    :align: middle
    :alt: short autosubmit logo
@@ -41,28 +41,28 @@ Visual Identity Files
    :height: 30px
    :align: middle
    :alt: autosubmit API logo
-.. |img_as_gui.png| image:: fig/as_gui.png 
+.. |img_as_gui.png| image:: fig/as_gui.png
    :height: 30px
    :align: middle
    :alt: autosubmit GUI logo
-.. |img_as_short_icon.png| image:: fig/as_short_icon.png 
+.. |img_as_short_icon.png| image:: fig/as_short_icon.png
    :height: 30px
    :align: middle
    :alt: autosubmit short squared logo for icons
 
 Autosubmit logos in both SVG and PNG files are available for download:
 
-+-------------------------+---------------------+---------------------+ 
++-------------------------+---------------------+---------------------+
 | |img_autosubmit.png|    | |autosubmit.svg|    | |autosubmit.png|    |
-+-------------------------+---------------------+---------------------+ 
++-------------------------+---------------------+---------------------+
 | |img_as_short.png|      | |as_short.svg|      | |as_short.png|      |
-+-------------------------+---------------------+---------------------+  
-| |img_as_api.png|        | |as_api.svg|        | |as_api.png|        |  
-+-------------------------+---------------------+---------------------+  
-| |img_as_gui.png|        | |as_gui.svg|        | |as_gui.png|        |  
-+-------------------------+---------------------+---------------------+  
-| |img_as_short_icon.png| | |as_short_icon.svg| | |as_short_icon.png| |  
-+-------------------------+---------------------+---------------------+  
++-------------------------+---------------------+---------------------+
+| |img_as_api.png|        | |as_api.svg|        | |as_api.png|        |
++-------------------------+---------------------+---------------------+
+| |img_as_gui.png|        | |as_gui.svg|        | |as_gui.png|        |
++-------------------------+---------------------+---------------------+
+| |img_as_short_icon.png| | |as_short_icon.svg| | |as_short_icon.png| |
++-------------------------+---------------------+---------------------+
 
 Presentations
 =============

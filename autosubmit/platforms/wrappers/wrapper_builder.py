@@ -177,9 +177,9 @@ class PythonWrapperBuilder(WrapperBuilder):
         """Return a code snippet that records wrapper start time and registers an atexit handler."""
         # TODO: move atexit to def build_import
         return textwrap.dedent(f"""\
-        _as_job_id = next((os.environ[v] for v in ('SLURM_JOBID', 'PBS_JOBID', 'JOB_ID', 'LSB_JOBID', 'LOADL_STEP_ID', 'PJM_JOBID') if v in os.environ), str(os.getpid()))
-        sys.stdout.write('[INFO] JOBID=' + _as_job_id + '\\n')
-        sys.stderr.write('[INFO] JOBID=' + _as_job_id + '\\n')
+        AS_JOB_ID = next((os.environ[v] for v in ('SLURM_JOBID', 'PBS_JOBID', 'JOB_ID', 'LSB_JOBID', 'LOADL_STEP_ID', 'PJM_JOBID') if v in os.environ), str(os.getpid()))
+        sys.stdout.write('[INFO] JOBID=' + AS_JOB_ID + '\\n')
+        sys.stderr.write('[INFO] JOBID=' + AS_JOB_ID + '\\n')
         from pathlib import Path
         import atexit
         prev_count = {self.fail_count} - 1
@@ -534,10 +534,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
         failed_wrapper = os.path.join(os.getcwd(),wrapper_id)
         retrials = {self.retrials}
         total_steps = 0
-        try:
-            print("JOB.ID:"+ os.getenv('SLURM_JOBID'))
-        except:
-            print("JOB.ID")
+        print("JOB.ID:" + AS_JOB_ID)
         for i in range(len({jobs_list})):
             job_retrials = retrials
             completed = False
@@ -606,10 +603,13 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 print(f"Running job {{self.template}} with fail count {{self.fail_count}}")
                 if self.fail_count > 0:
                     filedata = filedata.replace('_STAT_0', f'_STAT_{{self.fail_count}}')
+                run_path = os.path.join(os.getcwd(), str(self.template) + ".run." + str(self.fail_count))
+                with open(run_path, 'w') as run_f:
+                    run_f.write(filedata)
                 with open(out_path, 'w') as out_f, open(err_path, 'w') as err_f:
                     proc = subprocess.run(
-                        ['timeout', '{str(self.wallclock_by_level)}', 'bash', '-s'],
-                        input=filedata,
+                        ['timeout', '-k', '30', '{str(self.wallclock_by_level)}', 'bash', run_path],
+                        stdin=subprocess.DEVNULL,
                         stdout=out_f,
                         stderr=err_f,
                         universal_newlines=True,
@@ -735,13 +735,13 @@ class BashWrapperBuilder(WrapperBuilder):
         """
         return textwrap.dedent(f"""\
         for _as_var in SLURM_JOBID PBS_JOBID JOB_ID LSB_JOBID LOADL_STEP_ID PJM_JOBID; do
-            _as_val=$(printenv "$_as_var" 2>/dev/null) || continue
-            echo "[INFO] JOBID=$_as_val"
-            echo "[INFO] JOBID=$_as_val" >&2
-            _as_jobid_set=1
+            AS_JOB_ID=$(printenv "$_as_var" 2>/dev/null) || continue
             break
         done
-        [ -z "${{_as_jobid_set:-}}" ] && echo "[INFO] JOBID=$$" && echo "[INFO] JOBID=$$" >&2
+        AS_JOB_ID="${{AS_JOB_ID:-$$}}"
+        export AS_JOB_ID
+        echo "[INFO] JOBID=$AS_JOB_ID"
+        echo "[INFO] JOBID=$AS_JOB_ID" >&2
         _wrapper_stat_file="$(pwd)/{self.name}_STAT_{self.fail_count}"
         if [ {self.fail_count} -gt 0 ]; then
             prev_stat="$(pwd)/{self.name}_STAT_$(({self.fail_count} - 1))"

@@ -2,8 +2,8 @@
 Script templates
 ################
 
-Autosubmit jobs require a ``FILE`` or ``SCRIPT`` property that points 
-to or defines a script template. Script templates can be written in Bash 
+Autosubmit jobs require a ``FILE`` or ``SCRIPT`` property that points
+to or defines a script template. Script templates can be written in Bash
 shell, R, or Python. By default, the ``TYPE`` property of a job is set
 to ``bash``. Template scripts can have any file extension,
 the generated script will have it replaced by ``.cmd``.
@@ -21,7 +21,7 @@ the generated script will have it replaced by ``.cmd``.
 
 In the example above, the script template ``print_expid.sh`` file must exist in the Autosubmit Project.
 When you run ``autosubmit create`` or ``autosubmit refresh``, Autosubmit will copy the Project files,
-including template scripts, to the experiment folder `proj`.
+including template scripts, to the experiment folder ``proj``.
 
 The first time the ``create`` command is run, it performs the equivalent of ``autosubmit refresh``, updating
 the Autosubmit project and it will plot and try to display a new graph. The template scripts are then
@@ -30,7 +30,8 @@ preprocessed and the final script is generated when an Autosubmit experiment is
 
 When Autosubmit preprocesses the template script, it replaces placeholders with configuration values.
 A placeholder is any configuration key enclosed in %% (in-place) or in %^% (postloaded).
-For example, ``%DEFAULT.EXPID%`` refers to the Autosubmit configuration value specified in the ``DEFAULT.EXPID`` key of the YAML configuration file.
+For example, ``%DEFAULT.EXPID%`` refers to the Autosubmit configuration value specified in the ``DEFAULT.EXPID`` key of
+the YAML configuration file.
 
 .. warning::
 
@@ -110,9 +111,10 @@ are appended after the default header and tailer scripts.
 Substitute placeholders after all files have been loaded
 ========================================================
 
-Autosubmit allows users to define placeholders that are substituted only after all files have been loaded. This is particularly useful when the value of a placeholder is mutable at the time of file loading.
+Autosubmit allows users to define placeholders that are substituted only after all files have been loaded. This is
+particularly useful when the value of a placeholder is mutable at the time of file loading.
 
-For instance, consider the following YAML files loaded in alphabetical order (`ca.yml`, `conf.yml`, `cz.yml`):
+For instance, consider the following YAML files loaded in alphabetical order (``ca.yml``, ``conf.yml``, ``cz.yml``):
 
 **ca.yml**:
 
@@ -137,34 +139,36 @@ For instance, consider the following YAML files loaded in alphabetical order (`c
   model:
     version: "last"
 
-If a placeholder is defined as `%model.version%` in `conf.yml`, the behavior differs based on the enclosing format:
+If a placeholder is defined as ``%model.version%`` in ``conf.yml``, the behavior differs based on the enclosing format:
 
-1. **In-place `%%` Enclosing**:
+1. **In-place ``%%`` Enclosing**:
 
-The placeholder's value will correspond to the key defined in the previously loaded file or the file currently being loaded.
-For example, `%model.version%` would resolve to `"first"` (from `ca.yml`) when `conf.yml` is loaded.
+The placeholder's value will correspond to the key defined in the previously loaded file
+or the file currently being loaded.
+For example, ``%model.version%`` would resolve to ``"first"`` (from ``ca.yml``) when ``conf.yml`` is loaded.
 
-2. **Postloaded `%^%` Enclosing**:
+2. **Postloaded ``%^%`` Enclosing**:
 
 The placeholder's value will always correspond to the key defined in the last loaded file.
-For example, `%^model.version%` in `conf.yml` would resolve to `"last"` (from `cz.yml`) after all files are loaded.
+For example, ``%^model.version%`` in ``conf.yml`` would resolve to ``"last"``
+(from ``cz.yml``) after all files are loaded.
 
-In this case, the value of `test_in_place` in `conf.yml` would resolve as: `"something/first/something"`
+In this case, the value of ``test_in_place`` in ``conf.yml`` would resolve as: ``"something/first/something"``
 
-And, the value of `test_at_the_end` would resolve as:  `"something/last/something"`
+And, the value of ``test_at_the_end`` would resolve as:  ``"something/last/something"``
 
 In-line Scripting
 =================
 
-It is also possible to define a script directly in the yaml configuration file. 
+It is also possible to define a script directly in the yaml configuration file.
 
-.. note:: If SCRIPT is defined, it will take precedence over FILE. 
+.. note:: If SCRIPT is defined, it will take precedence over FILE.
 
 If you wish to run only one liner script:
 
 .. code-block:: yaml
   :emphasize-lines: 6
-  :caption: Job ``JOB_IN_LINE_ONELINER`` that runs sleep 2 
+  :caption: Job ``JOB_IN_LINE_ONELINER`` that runs sleep 2
 
   JOBS:
     JOB_1:
@@ -173,11 +177,11 @@ If you wish to run only one liner script:
       TYPE: bash # default
       SCRIPT: sleep 2
 
-In case that your script needs lines, the yaml specification allows to do so with the PIPE character (|).  
+In case that your script needs lines, the yaml specification allows to do so with the PIPE character (|).
 
 .. code-block:: yaml
   :emphasize-lines: 7,8
-  :caption: Job ``JOB_IN_LINE_MULTILINE`` that runs hello world and sleep  
+  :caption: Job ``JOB_IN_LINE_MULTILINE`` that runs hello world and sleep
 
   JOBS:
     JOB_1:
@@ -188,12 +192,14 @@ In case that your script needs lines, the yaml specification allows to do so wit
         echo "hello world!"
         sleep 2
 
-Also, for debugging purposes, if PROJECT_TYPE is set to NONE (see :ref:`develproject`), the SCRIPT directive will overwrite Autosubmit's self-contained dummy templates.
+Also, for debugging purposes, if PROJECT_TYPE is set to NONE (see :ref:`develproject`), the SCRIPT directive will
+overwrite Autosubmit's self-contained dummy templates.
 
 Ensuring Data Integrity with I/O Sync
-======================================
+=====================================
 
-To ensure that all data generated by a job is safely written to disk, Autosubmit automatically forces an I/O sync at the end of each script's execution. This applies to jobs running Bash, Python, or R templates.
+To ensure that all data generated by a job is safely written to disk, Autosubmit automatically forces an I/O sync at the
+end of each script's execution. This applies to jobs running Bash, Python, or R templates.
 This measure prevents data loss in case of unexpected interruptions immediately after a job reports completion.
 
 Script error handling
@@ -237,3 +243,4 @@ is executing a long-running command (e.g., ``sleep 10000``, or compiling a model
 In these cases, neither ``_COMPLETED`` nor ``_STAT`` files are generated.
 
 .. _Bash shell trap functions: https://www.gnu.org/software/bash/manual/html_node/Bourne-Shell-Builtins.html#index-trap
+

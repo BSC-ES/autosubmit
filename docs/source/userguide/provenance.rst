@@ -24,7 +24,7 @@ RO-Crate
 RO-Crate is a community standard adopted by other workflow managers
 to package research data with their metadata. It is extensible, and contains
 profiles to package computational workflows. From the `RO-Crate`_ website,
-“What is RO-Crate?”:
+"What is RO-Crate?":
 
 .. pull-quote::
   RO-Crate is a community effort to establish a lightweight approach to
@@ -65,12 +65,14 @@ sections as workflow inputs.
 
 For example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    ROCRATE:
-      INPUTS:
-        - PLATFORMS
-      OUTPUTS:
+  .. code-block:: yaml
+
+      ROCRATE:
+        INPUTS:
+          - PLATFORMS
+        OUTPUTS:
 
 Each entry under ``INPUTS`` refers to a top-level section of the resolved
 Autosubmit configuration. The direct keys contained in that section are exported
@@ -78,13 +80,15 @@ as workflow inputs.
 
 For example, given the following platforms configuration:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    PLATFORMS:
-      PLATFORM_A:
-        ...
-      PLATFORM_B:
-        ...
+  .. code-block:: yaml
+
+      PLATFORMS:
+        PLATFORM_A:
+          ...
+        PLATFORM_B:
+          ...
 
 exporting ``PLATFORMS`` results in ``PLATFORM_A`` and ``PLATFORM_B`` being
 represented as separate workflow inputs, with identifiers such as
@@ -147,12 +151,14 @@ as workflow outputs.
 
 For example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    ROCRATE:
-      INPUTS:
-      OUTPUTS:
-        - "results/*.nc"
+  .. code-block:: yaml
+
+      ROCRATE:
+        INPUTS:
+        OUTPUTS:
+          - "results/*.nc"
 
 Output entries are file-name patterns evaluated recursively inside the project
 directory.
@@ -216,20 +222,22 @@ The patch must contain an ``@graph`` array.
 
 For example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    ROCRATE:
-      INPUTS:
-      OUTPUTS:
-      PATCH: |
-        {
-          "@graph": [
-            {
-              "@id": "./",
-              "license": "Confidential"
-            }
-          ]
-        }
+  .. code-block:: yaml
+
+      ROCRATE:
+        INPUTS:
+        OUTPUTS:
+        PATCH: |
+          {
+            "@graph": [
+              {
+                "@id": "./",
+                "license": "Confidential"
+              }
+            ]
+          }
 
 Updating an existing entity
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -262,18 +270,20 @@ a new JSON-LD entity is added.
 
 For example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    PATCH: |
-      {
-        "@graph": [
-          {
-            "@id": "https://example.org/organization",
-            "@type": "Organization",
-            "name": "Example Organization"
-          }
-        ]
-      }
+  .. code-block:: yaml
+
+      PATCH: |
+        {
+          "@graph": [
+            {
+              "@id": "https://example.org/organization",
+              "@type": "Organization",
+              "name": "Example Organization"
+            }
+          ]
+        }
 
 adds a new ``Organization`` entity to the JSON-LD graph.
 
@@ -295,24 +305,26 @@ Using INPUTS, OUTPUTS, and PATCH together
 
 For example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    ROCRATE:
-      INPUTS:
-        - PLATFORMS
+  .. code-block:: yaml
 
-      OUTPUTS:
-        - "results/*.nc"
+      ROCRATE:
+        INPUTS:
+          - PLATFORMS
 
-      PATCH: |
-        {
-          "@graph": [
-            {
-              "@id": "./",
-              "license": "Confidential"
-            }
-          ]
-        }
+        OUTPUTS:
+          - "results/*.nc"
+
+        PATCH: |
+          {
+            "@graph": [
+              {
+                "@id": "./",
+                "license": "Confidential"
+              }
+            ]
+          }
 
 In this case:
 

@@ -55,7 +55,7 @@ dependencies = [
     "psutil<=7.2.2",
     "py3dotplus==1.1.0",
     "numpy<3",
-    "rocrate==0.15.1",
+    "rocrate==0.16.0",
     "setproctitle",
     "invoke>=2.0",
     "SQLAlchemy~=2.0.23",
@@ -72,7 +72,7 @@ Documentation = "https://autosubmit.readthedocs.io/"
 [project.optional-dependencies]
 postgres = ["psycopg", "psycopg2"]
 lint = [
-    "ruff==0.16.9",
+    "ruff==0.17.0",
 ]
 tests = [
     # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
@@ -103,8 +103,8 @@ benchmark = [
 ]
 docs = [
     "livereload",
-    "pydata-sphinx-theme>=0.16.1,<0.20",
-    "sphinx>=5,<10",
+    "pydata-sphinx-theme>=0.22,<0.23; python_version >= '3.11'",
+    "sphinx>=8.2,<10; python_version >= '3.11'",
     "sphinx-autobuild>=2021.3,<2025.9",
     "sphinx_rtd_theme",
     "sphinx-reredirects>=0.1,<1.2",
@@ -197,7 +197,6 @@ ignore = [
     "B005",
     "B006",
     "B008",
-    "B015",
     "B017",
     "B019",
     "B025",
@@ -210,12 +209,10 @@ ignore = [
     "D419",
     "DTZ001",
     "DTZ002",
-    "DTZ004",
     "DTZ005",
     "DTZ006",
     "DTZ007",
     "EXE001",
-    "EXE002",
     "FLY002",
     "ISC004",
     "LOG001",
@@ -223,7 +220,6 @@ ignore = [
     "PERF402",
     "PLC0206",
     "PLR0124",
-    "PLR1704",
     "PLR1722",
     "PLW0127",
     "PLW1510",

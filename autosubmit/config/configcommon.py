@@ -2086,14 +2086,6 @@ class AutosubmitConfig:
         """
         return self.get_section(["project", "project_type"], "none", must_exists=False).lower()
 
-    def get_parse_two_step_start(self) -> str:
-        """Returns two-step start jobs
-
-        :return: jobs_list
-        :rtype: str
-        """
-        return self.get_section(['EXPERIMENT', 'TWO_STEP_START'], "")
-
     def get_rerun_jobs(self) -> str:
         """Returns rerun jobs
 

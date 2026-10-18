@@ -68,7 +68,6 @@ class JobList:
         self.job_package_map = {}
         self.sections_checked = set()
         self._run_members = None
-        self.jobs_to_run_first = []
         self.rerun_job_list = []
         self.graph = DiGraph()
         self.depends_on_previous_chunk = {}
@@ -2230,6 +2229,19 @@ class JobList:
         """
         return self.job_list
 
+    def get_status_counts(self) -> dict[str, int]:
+        """Return status counts of ALL jobs from the database.
+
+        The counts are computed from the persisted ``jobs`` table, which keeps
+        every job (including finished jobs unloaded from memory), so they are
+        complete. Keys follow the same convention as
+        ``ExperimentHistory.get_status_counts_from_job_list``.
+        """
+        statuses = ["COMPLETED", "FAILED", "QUEUING", "SUBMITTED", "RUNNING", "SUSPENDED"]
+        counts = {status: self.dbmanager.count_where("jobs", {"status": status}) for status in statuses}
+        counts["TOTAL"] = self.dbmanager.count("jobs")
+        return counts
+
     def get_date_format(self):
         date_format = ''
         for date in self.get_date_list():
@@ -2373,23 +2385,7 @@ class JobList:
         else:
             return all_jobs
 
-    def update_two_step_jobs(self):
-        if len(self.jobs_to_run_first) > 0:
-            self.jobs_to_run_first = [job for job in self.jobs_to_run_first
-                                      if job.status != Status.COMPLETED]
-            keep_running = False
-            for job in self.jobs_to_run_first:
-                # job is parent of itself
-                running_parents = [parent for parent in job.parents if parent.status !=
-                                   Status.WAITING and parent.status != Status.FAILED]
-                if len(running_parents) == len(job.parents):
-                    keep_running = True
-            if len(self.jobs_to_run_first) > 0 and keep_running is False:
-                raise AutosubmitCritical("No more jobs to run first, there were still pending jobs "
-                                         "but they're unable to run without their parents or there are failed jobs.",
-                                         7014)
-
-    def parse_jobs_by_filter(self, unparsed_jobs, two_step_start=True):
+    def parse_jobs_by_filter(self, unparsed_jobs):
         select_jobs_by_name = ""  # job_name
         if "&" in unparsed_jobs:  # If there are explicit jobs add them
             jobs_to_check = unparsed_jobs.split("&")
@@ -2406,27 +2402,15 @@ class JobList:
             aux = unparsed_jobs.split(';')
             select_all_jobs_by_section = aux[0]
             filter_jobs_by_section = aux[1]
-        if two_step_start:
-            try:
-                self.jobs_to_run_first = self.get_job_related(
-                    select_jobs_by_name=select_jobs_by_name,
-                    select_all_jobs_by_section=select_all_jobs_by_section,
-                    filter_jobs_by_section=filter_jobs_by_section)
-            except Exception:
-                raise AutosubmitCritical(f"Check the {unparsed_jobs} format."
-                                         "\nFirst filter is optional ends with '&'."
-                                         "\nSecond filter ends with ';'."
-                                         "\nThird filter must contain '['. ")
-        else:
-            try:
-                self.rerun_job_list = self.get_job_related(select_jobs_by_name=select_jobs_by_name,
-                                                           select_all_jobs_by_section=select_all_jobs_by_section,
-                                                           filter_jobs_by_section=filter_jobs_by_section)
-            except Exception:
-                raise AutosubmitCritical(f"Check the {unparsed_jobs} format."
-                                         "\nFirst filter is optional ends with '&'."
-                                         "\nSecond filter ends with ';'."
-                                         "\nThird filter must contain '['. ")
+        try:
+            self.rerun_job_list = self.get_job_related(select_jobs_by_name=select_jobs_by_name,
+                                                       select_all_jobs_by_section=select_all_jobs_by_section,
+                                                       filter_jobs_by_section=filter_jobs_by_section)
+        except Exception:
+            raise AutosubmitCritical(f"Check the {unparsed_jobs} format."
+                                     "\nFirst filter is optional ends with '&'."
+                                     "\nSecond filter ends with ';'."
+                                     "\nThird filter must contain '['. ")
 
     def get_job_related(self, select_jobs_by_name="", select_all_jobs_by_section="",
                         filter_jobs_by_section="") -> list:
@@ -2500,7 +2484,7 @@ class JobList:
                 ultimate_jobs_list.extend(jobs_final)
         # Duplicates out
         ultimate_jobs_list = list(set(ultimate_jobs_list))
-        Log.debug(f"List of jobs filtered by TWO_STEP_START parameter:\n{[job.name for job in ultimate_jobs_list]}")
+        Log.debug(f"List of jobs filtered by the rerun parameter:\n{[job.name for job in ultimate_jobs_list]}")
         return ultimate_jobs_list
 
     def get_ready(self, platform=None, hold=False, wrapper=False) -> list:
@@ -3310,8 +3294,6 @@ class JobList:
         for job in [job for job in self.get_ready() if not self.is_wrapper_still_running(job)]:
             job.set_ready_date()
 
-        self.update_two_step_jobs()
-
         if not self.disable_save:
             for job in self.job_list:
                 if job.status in (Status.COMPLETED, Status.FAILED, Status.SKIPPED):
@@ -3757,7 +3739,7 @@ class JobList:
         :param as_conf: experiment configuration
         :param monitor: if True, the job list will be monitored
         """
-        self.parse_jobs_by_filter(job_list_unparsed, two_step_start=False)
+        self.parse_jobs_by_filter(job_list_unparsed)
         member_list = set()
         chunk_list = set()
         date_list = set()
@@ -4257,6 +4239,7 @@ def load_job_list(
     submitter=None,
     check_failed_jobs=False,
     run_mode=False,
+    run_members: list[str] | None = None,
 ) -> JobList:
     """Load the JobList for a given experiment.
 
@@ -4268,12 +4251,17 @@ def load_job_list(
     :param submitter: submitter to be used
     :param check_failed_jobs: whether to check failed jobs or not
     :param run_mode: whether to load the job list in run mode or not
+    :param run_members: optional list of members to restrict the run to. Set
+        before loading the job graph so that only the allowed members are
+        loaded into memory and therefore submitted.
     :return: JobList object
     """
     rerun = as_conf.get_rerun()
     job_list = JobList(
         expid, as_conf, YAMLParserFactory(), run_mode=run_mode, submitter=submitter
     )
+    if run_members:
+        job_list.run_members = run_members
     date_list = as_conf.get_date_list()
     date_format = ""
     if as_conf.get_chunk_size_unit() == ChunkUnit.HOUR:

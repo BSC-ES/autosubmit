@@ -21,7 +21,8 @@ Install Autosubmit
 ==================
 
 Autosubmit is distributed via `PyPI`_ and as source on `GitHub`_. Choose one of the methods below.
-The commands use ``apt`` and assume Ubuntu 22.04 LTS or 24.04 LTS, whose default ``python3`` falls within the supported range; adjust for other distributions.
+The commands use ``apt`` and assume Ubuntu 22.04 LTS or 24.04 LTS, whose default ``python3`` falls within the supported
+range; adjust for other distributions.
 
 .. _install-with-pip:
 
@@ -81,7 +82,8 @@ Verify the install
 Quick setup
 ===========
 
-For a personal test with a user-level database. This creates ``$HOME/.autosubmitrc`` and puts everything under ``$HOME/autosubmit/``.
+For a personal test with a user-level database. This creates ``$HOME/.autosubmitrc`` and puts everything under
+``$HOME/autosubmit/``.
 
 .. code-block:: bash
 
@@ -160,13 +162,15 @@ Example: user-level ``.autosubmitrc``
 Full setup
 ==========
 
-Use this setup for production. Configuration goes in ``/etc/autosubmitrc``, which points every user on the machine at the same experiment database, so they can see and work with each other's experiments.
+Use this setup for production. Configuration goes in ``/etc/autosubmitrc``, which points every user on the machine at
+the same experiment database, so they can see and work with each other's experiments.
 
 Priority order of configuration files:
 
 ``AUTOSUBMIT_CONFIGURATION`` > ``$HOME/.autosubmitrc`` > ``/etc/autosubmitrc``
 
-Set the ``AUTOSUBMIT_CONFIGURATION`` environment variable to the path of an ``autosubmitrc`` file to override everything else.
+Set the ``AUTOSUBMIT_CONFIGURATION`` environment variable to the path of an ``autosubmitrc`` file to override everything
+else.
 
 .. warning:: If you already have ``$HOME/.autosubmitrc`` from :ref:`quick-setup`, delete or rename it before doing the full setup, or it will shadow ``/etc/autosubmitrc``.
 
@@ -176,7 +180,8 @@ Set the ``AUTOSUBMIT_CONFIGURATION`` environment variable to the path of an ``au
 ------------------------
 
 Create ``/etc/autosubmitrc`` with the sections below, or move an existing ``$HOME/.autosubmitrc`` there.
-Any of the locations listed above will do — ``/etc/autosubmitrc`` is the usual choice for a shared installation because every user on the machine picks it up.
+Any of the locations listed above will do — ``/etc/autosubmitrc`` is the usual choice for a shared installation 
+because every user on the machine picks it up.
 
 Mandatory parameters
 ~~~~~~~~~~~~~~~~~~~~
@@ -205,7 +210,8 @@ Mandatory parameters
 Recommended parameters
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The following parameters are the Autosubmit metadata. They are not mandatory, but it is recommended to have them set up, as some of them can positively affect the Autosubmit performance.
+The following parameters are the Autosubmit metadata. They are not mandatory, but it is recommended to have them set up,
+as some of them can positively affect the Autosubmit performance.
 
 .. code-block:: ini
 
@@ -243,7 +249,8 @@ These parameters provide extra functionalities to Autosubmit.
 
 About hosts parameters:
 
-From ``3.14+`` onwards, the users can tailor Autosubmit commands to run on specific machines. Previously, only the run was affected by the deprecated ``whitelist`` parameter.
+From ``3.14+`` onwards, the users can tailor Autosubmit commands to run on specific machines. Previously, only the run
+was affected by the deprecated ``whitelist`` parameter.
 
 * ``authorized = [<command1,commandN> <machine1,machineN>]`` list of machines that can run given autosubmit commands. If the list is empty, all machines are allowed.
 * ``forbidden = [<command1,commandN> <machine1,machineN>]`` list of machines that cannot run given autosubmit commands. If the list is empty, no machine is forbidden.
@@ -269,8 +276,8 @@ Example: BSC ``/etc/autosubmitrc``
    mail_from = automail@bsc.es
 
    [hosts]
-   authorized = [run bscearth000,bscesautosubmit01,bscesautosubmit02] [stats, clean, describe, check, report,dbfix,pklfix, upgrade,updateversion all]
-   forbidden = [expid, create, recovery, delete, inspect, monitor, recovery, configure,setstatus,testcase, test, refresh, archive, unarchive bscearth000,bscesautosubmit01,bscesautosubmit02]
+   authorized = [run bscearth000,bscesautosubmit01,bscesautosubmit02] [stats, clean, describe, check, report, dbfix, upgrade, updateversion all]
+   forbidden = [expid, create, recovery, delete, inspect, monitor, recovery, configure, setstatus, testcase, test, refresh, archive, unarchive bscearth000, bscesautosubmit01, bscesautosubmit02]
 
 ``autosubmit install``
 ----------------------

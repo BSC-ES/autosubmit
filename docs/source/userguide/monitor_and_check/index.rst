@@ -8,21 +8,23 @@ Monitor and Check Experiments
    Runtime validation during ``autosubmit run`` is still controlled by the
    ``CHECK:`` job attribute (see below).
 
-How to use check in running time:
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using check at run time
+~~~~~~~~~~~~~~~~~~~~~~~
 
 In ``jobs_<EXPID>.yml``, you can set check (default true) to check the scripts during autosubmit run.
 
 There are two parameters related to check:
 
-* CHECK: Controls the mechanism that allows replacing an unused variable with an empty string ( %_% substitution). It is TRUE by default.
+* CHECK: Controls the mechanism that allows replacing an unused variable with an empty string (%_% substitution). It is TRUE by default.
 
 * SHOW_CHECK_WARNINGS: For debugging purposes. It will print a lot of information regarding variables and substitution if it is set to TRUE.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    CHECK: TRUE or FALSE or ON_SUBMISSION # Default is TRUE
-    SHOW_CHECK_WARNINGS: TRUE or FALSE # Default is FALSE
+    .. code-block:: yaml
+
+        CHECK: TRUE or FALSE or ON_SUBMISSION # Default is TRUE
+        SHOW_CHECK_WARNINGS: TRUE or FALSE # Default is FALSE
 
 
 
@@ -41,31 +43,33 @@ There are two parameters related to check:
 
 For example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    LOCAL_SETUP:
-        FILE: filepath_that_exists
-        PLATFORM: LOCAL
-        WALLCLOCK: 05:00
-        CHECK: TRUE
-        SHOW_CHECK_WARNINGS: TRUE
-        ...
-    SIM:
-        FILE: filepath_that_no_exists_until_setup_is_processed
-        PLATFORM: bsc_es
-        DEPENDENCIES: LOCAL_SETUP SIM-1
-        RUNNING: chunk
-        WALLCLOCK: 05:00
-        CHECK: ON_SUBMISSION
-        SHOW_CHECK_WARNINGS: FALSE
-        ...
+    .. code-block:: yaml
+
+        LOCAL_SETUP:
+            FILE: filepath_that_exists
+            PLATFORM: LOCAL
+            WALLCLOCK: 05:00
+            CHECK: TRUE
+            SHOW_CHECK_WARNINGS: TRUE
+            ...
+        SIM:
+            FILE: filepath_that_no_exists_until_setup_is_processed
+            PLATFORM: bsc_es
+            DEPENDENCIES: LOCAL_SETUP SIM-1
+            RUNNING: chunk
+            WALLCLOCK: 05:00
+            CHECK: ON_SUBMISSION
+            SHOW_CHECK_WARNINGS: FALSE
+            ...
 
 .. _inspect_cmd:
 
-How to generate cmd files
--------------------------
+Generating cmd files
+--------------------
 
-The `inspect` command generates the ``.cmd`` files for jobs in an experiment without
+The ``inspect`` command generates the ``.cmd`` files for jobs in an experiment without
 submitting them. This allows you to preview the rendered scripts and verify that all
 parameters are correctly substituted prior to submission.
 
@@ -121,7 +125,8 @@ The following filters can be combined to select jobs to inspect.
 | -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
 +--------+----------------------------------------------+----------------------------------------------+
 
-If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will be selected for inspection.
+If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs
+matching ALL specified filters will be selected for inspection.
 
 To combine multiple filters:
 ::
@@ -139,10 +144,10 @@ To generate cmd only for one job per section:
     autosubmit inspect <EXPID> -q
 
 
-How to monitor an experiment
-----------------------------
+Monitoring an experiment
+------------------------
 
-The `monitor` command allows you to visualize the experiment workflow and shows each job's status (color coded)
+The ``monitor`` command allows you to visualize the experiment workflow and shows each job's status (color coded)
 or stores a text file with the status of each job. You can select which jobs to monitor by using optional filters
 and grouping options.
 
@@ -169,7 +174,8 @@ The location where the user can find the generated plots with date and timestamp
 
     <experiments_directory>/<EXPID>/plot/<EXPID>_<DATE>_<TIME>.pdf
 
-The location where the user can find the txt output containing the status of each job and the path to out and err log files.
+The location where the user can find the txt output containing
+the status of each job and the path to out and err log files.
 
 ::
 
@@ -190,7 +196,8 @@ The following filters can be combined to select jobs to monitor.
 | -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
 +--------+----------------------------------------------+----------------------------------------------+
 
-If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will be selected for monitoring.
+If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs
+matching ALL specified filters will be selected for monitoring.
 
 Example of combined filters:
 
@@ -234,11 +241,14 @@ In order to understand more the grouping options, please check :ref:`grouping`.
 Grouping jobs
 -------------
 
-Other than the filters, another option for large workflows is to group jobs. This option is available with the ``group_by`` keyword, which can receive the values ``{date,member,chunk,split,automatic}``.
+Other than the filters, another option for large workflows is to group jobs. This option is available with the
+``group_by`` keyword, which can receive the values ``{date,member,chunk,split,automatic}``.
 
 For the first 4 options, the grouping criteria is explicitly defined ``{date,member,chunk,split}``.
-In addition to that, it is possible to expand some dates/members/chunks that would be grouped either/both by status or/and by specifying the date/member/chunk not to group.
-The syntax used in this option is almost the same as for the filters, in the format of ``[ date1 [ member1 [ chunk1 chunk2 ] member2 [ chunk3 ... ] ... ] date2 [ member3 [ chunk1 ] ] ... ]``
+In addition to that, it is possible to expand some dates/members/chunks that would be grouped either/both by status
+or/and by specifying the date/member/chunk not to group.
+The syntax used in this option is almost the same as for the filters, in the format of
+``[ date1 [ member1 [ chunk1 chunk2 ] member2 [ chunk3 ... ] ... ] date2 [ member3 [ chunk1 ] ] ... ]``
 
 .. important:: The grouping option is also in autosubmit monitor, create, setstatus and recovery
 
@@ -415,13 +425,18 @@ If there are chunk jobs that are split, the splits can also be grouped.
 **Understanding the group status**
 
 If there are jobs with different status grouped together, the status of the group is determined as follows:
-If there is at least one job that failed, the status of the group will be FAILED. If there are no failures but there is at least one job running, the status will be RUNNING.
-The same idea applies following the hierarchy: SUBMITTED, QUEUING, READY, WAITING, SUSPENDED, UNKNOWN. If the group status is COMPLETED, it means that all jobs in the group were completed.
+If there is at least one job that failed, the status of the group will be FAILED. If there are no failures but there is
+at least one job running, the status will be RUNNING.
+The same idea applies following the hierarchy: SUBMITTED, QUEUING, READY, WAITING, SUSPENDED, UNKNOWN. If the group
+status is COMPLETED, it means that all jobs in the group were completed.
 
 **Automatic grouping**
 
-For the automatic grouping, the groups are created by collapsing the split->chunk->member->date that share the same status (following this hierarchy).
-The following workflow automatic created the groups 20000101_fc0, since all the jobs for this date and member were completed, 20000101_fc1_3, 20000202_fc0_2, 20000202_fc0_3 and 20000202_fc1, as all the jobs up to the respective group granularity share the same - waiting - status.
+For the automatic grouping, the groups are created by collapsing the split->chunk->member->date that share the same
+status (following this hierarchy).
+The following workflow automatic created the groups 20000101_fc0, since all the jobs for this date and member were
+completed, 20000101_fc1_3, 20000202_fc0_2, 20000202_fc0_3 and 20000202_fc1, as all the jobs up to the respective group
+granularity share the same - waiting - status.
 
 For example:
 
@@ -431,7 +446,10 @@ For example:
    :align: center
    :alt: group automatic
 
-Especially in the case of monitoring an experiment with a very large number of chunks, it might be useful to hide the groups created automatically. This allows to better visualize the chunks in which there are jobs with different status, which can be a good indication that there is something currently happening within such chunks (jobs ready, submitted, running, queueing or failed).
+Especially in the case of monitoring an experiment with a very large number of chunks, it might be useful to hide the
+groups created automatically. This allows to better visualize the chunks in which there are jobs with different status,
+which can be a good indication that there is something currently happening within such chunks (jobs ready, submitted,
+running, queueing or failed).
 
 ::
 
@@ -439,8 +457,8 @@ Especially in the case of monitoring an experiment with a very large number of c
 
 .. _monitor_profiling:
 
-How to profile Autosubmit while monitoring an experiment
---------------------------------------------------------
+Profiling Autosubmit while monitoring
+-------------------------------------
 
 Autosubmit offers the possibility to profile the execution of the monitoring process. To enable the
 profiler, just add the ``--profile`` flag to your ``autosubmit monitor`` command, as in
@@ -452,8 +470,8 @@ the following example:
 
 .. include:: ../../_include/profiler_common.rst
 
-How to get details about the experiment
----------------------------------------
+Getting experiment details
+--------------------------
 
 To get details about the experiment, use the command:
 ::
@@ -482,10 +500,11 @@ Examples:
 
 .. _autoStatistics:
 
-How to monitor job statistics
------------------------------
+Monitoring job statistics
+-------------------------
 
-The following command could be adopted to generate the plots for visualizing the jobs statistics of the experiment at any instance:
+The following command could be adopted to generate the plots for visualizing the jobs statistics of the experiment at
+any instance:
 ::
 
     autosubmit stats EXPID
@@ -549,12 +568,12 @@ Where:
 - Expected consumption CPU time (h): Sum of the products of wallclock value and number of requested processors for each job, in hours.
 - Consumption real (h): Sum of the time spent running by all attempts of jobs, in hours.
 - Consumption CPU time (h): Sum of the products of the time spent running and number of requested processors for each job, in hours.
-- Consumption (%): Percentage of `Consumption CPU time` relative to `Expected consumption CPU time`.
+- Consumption (%): Percentage of ``Consumption CPU time`` relative to ``Expected consumption CPU time``.
 
 Diagram output description
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The main `stats` output is a bar diagram. On this diagram, each job presents these values:
+The main ``stats`` output is a bar diagram. On this diagram, each job presents these values:
 
 - Queued (h): Sum of time spent queuing for COMPLETED attempts, in hours.
 - Run (h): Sum of time spent running for COMPLETED attempts, in hours.
@@ -563,7 +582,8 @@ The main `stats` output is a bar diagram. On this diagram, each job presents the
 - Fail Run (h): Sum of time spent running for FAILED attempts, in hours.
 - Max wallclock (h): Maximum wallclock value for all jobs in the plot.
 
-Notice that the left scale of the diagram measures the time in hours, and the right scale measures the number of attempts.
+Notice that the left scale of the diagram measures the time in hours, and the right scale measures the number of
+attempts.
 
 Summaries output description
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -592,8 +612,10 @@ CSV files are also generated with the same information, in the same directory as
 Custom statistics
 ~~~~~~~~~~~~~~~~~
 
-Although Autosubmit saves several statistics about your experiment, such as the queueing time for each job, how many failures per job, etc.,
-The user also might be interested in adding his particular statistics to the Autosubmit stats report (```autosubmit stats EXPID```).
+Although Autosubmit saves several statistics about your experiment, such as the queueing time for each job, how many
+failures per job, etc.,
+The user also might be interested in adding his particular statistics to the Autosubmit stats report
+(``autosubmit stats EXPID``).
 The allowed format for this feature is the same as the Autosubmit configuration files: INI style. For example:
 ::
 
@@ -611,8 +633,8 @@ The location where user can put this stats is in the file:
 
 .. _report:
 
-How to extract information about the experiment parameters
-------------------------------------------------------------
+Extracting experiment parameters
+--------------------------------
 
 The ``autosubmit report`` command extracts the parameters and resolved values
 of an experiment. It has two modes, each generating their own file, and they can be used together:
@@ -646,7 +668,7 @@ Options:
 .. runcmd:: autosubmit report -h
 
 What goes into the parameter list
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The flat ``-all`` output contains, in order:
 
@@ -666,7 +688,7 @@ For the full catalogue of variables, see the
 :doc:`Variables reference <../variables>`.
 
 Template syntax
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 Autosubmit parameters are encapsulated by ``%KEY%``, where ``KEY`` is any
 parameter name from the ``-all`` output. Keys are case-insensitive, so
@@ -741,7 +763,7 @@ If the parameter does not exist, it will be returned as ``-``, while if the
 parameter is declared but empty, it will remain empty.
 
 Starter template
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
 
 The template below covers the most common parameters from ``CONFIG``,
 ``EXPERIMENT``, ``PLATFORMS``, and the top-level namespace. It is a starting
@@ -791,7 +813,7 @@ point: add, remove, or reorder lines freely.
     === TOP_LEVEL ===
     HPCARCH        : %HPCARCH%
     HPCROOTDIR     : %HPCROOTDIR%
-    HPCSCRATCH_DIR : %HPCSCRATCH_DIR%
+    HPCSCRATCH_DIR: %HPCSCRATCH_DIR%
     ROOTDIR        : %ROOTDIR%
     PROJDIR        : %PROJDIR%
 
@@ -825,7 +847,7 @@ Example output of ``-all``:
     ...
 
 Tips
-~~~~~
+~~~~
 
 * If a row in the rendered output contains ``-`` where you expected a value,
   re-run with ``--placeholders`` to see exactly which key the renderer could

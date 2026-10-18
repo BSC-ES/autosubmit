@@ -1314,7 +1314,6 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
 
     It ignores what happens to the experiment history object."""
     mocker.patch('autosubmit.job.job.ExperimentHistory')
-    mocker.patch('autosubmit.job.job.Job._get_submit_data_dc_from_db', return_value=None)
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
@@ -2424,32 +2423,6 @@ def test_datestr_to_epoch():
     result = Job._datestr_to_epoch("20250101120000")
     expected = int(datetime(2025, 1, 1, 12, 0, 0).timestamp())
     assert result == expected
-
-
-
-
-
-
-def test_get_submit_data_dc_from_db(mocker):
-    mock_job_data = mocker.MagicMock()
-    mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    mock_exp_hist.return_value.get_submit_data_dc.return_value = mock_job_data
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.expid = "t000"
-    result = job._get_submit_data_dc_from_db(2)
-    assert result == mock_job_data
-    mock_exp_hist.return_value.get_submit_data_dc.assert_called_once_with("dummy", 2)
-
-
-def test_get_finish_time_from_db(mocker):
-    mock_job_data = mocker.MagicMock()
-    mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    mock_exp_hist.return_value.get_finish_data_dc.return_value = mock_job_data
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.expid = "t000"
-    result = job._get_finish_time_from_db(2)
-    assert result == mock_job_data
-    mock_exp_hist.return_value.get_finish_data_dc.assert_called_once_with("dummy", 2)
 
 
 @pytest.mark.parametrize(

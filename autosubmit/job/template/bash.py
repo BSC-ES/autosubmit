@@ -49,13 +49,13 @@ stat_file="${job_name_ptrn}_STAT_%FAIL_COUNT%"
 [ -f "$stat_file" ] || echo "$(date +%s)" > "$stat_file"
 echo "$(date +%s)" >> "$stat_file"
 for _as_var in SLURM_JOBID PBS_JOBID JOB_ID LSB_JOBID LOADL_STEP_ID PJM_JOBID; do
-    _as_val=$(printenv "$_as_var" 2>/dev/null) || continue
-    echo "[INFO] JOBID=$_as_val"
-    echo "[INFO] JOBID=$_as_val" >&2
-    _as_jobid_set=1
+    AS_JOB_ID=$(printenv "$_as_var" 2>/dev/null) || continue
     break
 done
-[ -z "${_as_jobid_set:-}" ] && echo "[INFO] JOBID=$$" && echo "[INFO] JOBID=$$" >&2
+AS_JOB_ID="${AS_JOB_ID:-$$}"
+export AS_JOB_ID
+echo "[INFO] JOBID=$AS_JOB_ID"
+echo "[INFO] JOBID=$AS_JOB_ID" >&2
 
 ################### 
 # AS TRAP FUNCTIONS

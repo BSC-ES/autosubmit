@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, cast
+from zipfile import ZIP_STORED, ZipFile
 
 from rocrate.model.contextentity import ContextEntity
 from rocrate.rocrate import File, ROCrate
@@ -110,17 +111,19 @@ def _add_files(crate: ROCrate, base_path: Path, relative_path: str, expid: str,
     :param expid: The experiment identifier, used to exclude previously created RO-Crate archives.
     :param encoding_format: The encoding format (if any).
     """
+    existing_ids = {x['@id'] for x in crate.data_entities}
+
     folder = Path(base_path, relative_path)
     for root, dirs, files in os.walk(folder, topdown=True):
         for file in files:
             file_path = Path(root, file)
             if file.startswith(f'{expid}-crate') and file.endswith('.zip'):
                 continue
-            _add_file(crate, base_path, file_path, encoding_format)
+            _add_file(crate, base_path, file_path, encoding_format, existing_ids=existing_ids)
 
 
 def _add_file(crate: ROCrate, base_path: Path | None, file_path: Path, encoding_format: str | None = None,
-              use_uri: bool = False, **args: Any) -> Any:
+              use_uri: bool = False, existing_ids: set[str] | None = None, **args: Any) -> Any:
     """Add a file into the RO-Crate.
 
     :param crate: The RO-Crate instance.
@@ -128,6 +131,7 @@ def _add_file(crate: ROCrate, base_path: Path | None, file_path: Path, encoding_
     :param file_path: The path for the file being added.
     :param encoding_format: The encoding format (if any).
     :param use_uri: Whether to use the Path as a URI or as a source directly. Defaults to ``False``.
+    :param existing_ids: Optional set of existing entity identifiers, used to avoid adding duplicate files. Updated when a file is added.
     :return: The object returned by ro-crate-py
     :rtype: Any
     """
@@ -167,7 +171,18 @@ def _add_file(crate: ROCrate, base_path: Path | None, file_path: Path, encoding_
     # Once as the workflow main file and twice when scanning the experiment
     # ``conf`` folder for YAML files.
     # See: https://github.com/ResearchObject/ro-crate-py/issues/165
-    if file.id not in [x['@id'] for x in crate.data_entities]:
+    if existing_ids is not None:
+        if file.id not in existing_ids:
+            added_file = crate.add_file(
+                source=source,
+                dest_path=dest_path,
+                fetch_remote=False,
+                validate_url=False,
+                properties=properties
+            )
+            existing_ids.add(added_file.id)
+            return added_file
+    elif file.id not in [x['@id'] for x in crate.data_entities]:
         return crate.add_file(
             source=source,
             dest_path=dest_path,
@@ -330,6 +345,37 @@ def _guess_mime(path: Path) -> str | None:
 
     mime, _ = mimetypes.guess_type(path)
     return mime
+
+
+def _write_zip_uncompressed(crate: ROCrate, out_path: Path) -> None:
+    """Write the crate directly to disk as an uncompressed ZIP.
+
+    :param crate: The RO-Crate instance.
+    :param out_path: The path where the ZIP archive will be written.
+    """
+    with ZipFile(
+        out_path,
+        mode='w',
+        compression=ZIP_STORED,
+        allowZip64=True,
+    ) as archive:
+        for writeable_entity in crate.data_entities + crate.default_entities:
+            current_file_path, current_out_file = None, None
+
+            for path, chunk in writeable_entity.stream(chunk_size=1024 * 1024):
+                if current_out_file is None or path != current_file_path:
+                    if current_out_file is not None:
+                        current_out_file.close()
+
+                    current_file_path = path
+                    current_out_file = archive.open(
+                        path, mode='w', force_zip64=True
+                    )
+
+                current_out_file.write(chunk)
+
+            if current_out_file is not None:
+                current_out_file.close()
 
 
 def create_rocrate_archive(
@@ -592,6 +638,9 @@ def create_rocrate_archive(
     date = datetime.today().strftime('%Y%m%d-%H%M%S-%f')
     crate_path = Path(path, f"{expid}-crate-{date}.zip")
     crate.source = crate_path
-    crate.write_zip(crate_path)
+    # TODO: Use ro-crate-py's ZIP writer again once its performance issues
+    #       with large projects are resolved. For now, write an uncompressed
+    #       ZIP directly to reduce archive creation time.
+    _write_zip_uncompressed(crate, crate_path)
     Log.info(f'RO-Crate archive written to {experiment_path}')
     return crate

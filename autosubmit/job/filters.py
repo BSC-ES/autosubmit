@@ -127,7 +127,7 @@ def filter_sections_splits(
     :param jobs: list of jobs
     :return: list of jobs matching the filter
     """
-    section_matching_jobs: list["Job"] = []
+    section_matching_jobs: list[Job] = []
     all_splits = list(
         {
             str(job.split).upper()

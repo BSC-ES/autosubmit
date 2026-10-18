@@ -24,12 +24,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from autosubmit.job.template import python3
 from autosubmit.job.template.python3 import (
     _DEFAULT_EXECUTABLE,
     as_body,
     as_header,
     as_tailer,
 )
+
+from ._helpers import build_script
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -40,22 +43,10 @@ _FAIL_COUNT = '0'
 
 def _build_script(tmp_path: 'Path', body: str, executable: str | None = None) -> 'Path':
     """Assemble and write a runnable Python 3 script, returning its path."""
-    executable = executable or sys.executable
-    h = as_header(platform_header='', executable=executable)
-    b = as_body(dedent(body))
-    t = as_tailer()
-
-    script = '\n'.join([h, b, t])
-    script = script.replace('%EXTENDED_HEADER%', '')
-    script = script.replace('%EXTENDED_TAILER%', '')
-    script = script.replace('%CURRENT_LOGDIR%', str(tmp_path))
-    script = script.replace('%JOBNAME%', _JOBNAME)
-    script = script.replace('%FAIL_COUNT%', _FAIL_COUNT)
-
-    script_path = tmp_path / 'the_script.py'
-    script_path.write_text(script)
-    script_path.chmod(0o755)
-    return script_path
+    return build_script(
+        tmp_path, python3, body, 'the_script.py',
+        executable=executable or sys.executable, job_name=_JOBNAME, fail_count=_FAIL_COUNT,
+    )
 
 
 def test_header_default_executable_used_when_empty():

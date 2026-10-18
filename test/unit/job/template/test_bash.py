@@ -23,12 +23,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from autosubmit.job.template import bash
 from autosubmit.job.template.bash import (
     _DEFAULT_EXECUTABLE,
     as_body,
     as_header,
     as_tailer,
 )
+
+from ._helpers import build_script
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -39,21 +42,7 @@ if TYPE_CHECKING:
 
 def _build_script(tmp_path: 'Path', body: str, executable: str = '/bin/bash') -> 'Path':
     """Assemble and write a runnable Bash script, returning its path."""
-    h = as_header(platform_header='', executable=executable)
-    b = as_body(dedent(body))
-    t = as_tailer()
-
-    script = '\n'.join([h, b, t])
-    script = script.replace('%EXTENDED_HEADER%', '')
-    script = script.replace('%EXTENDED_TAILER%', '')
-    script = script.replace('%CURRENT_LOGDIR%', str(tmp_path))
-    script = script.replace('%JOBNAME%', 't000_test')
-    script = script.replace('%FAIL_COUNT%', '0')
-
-    script_path = tmp_path / 'the_script.sh'
-    script_path.write_text(script)
-    script_path.chmod(0o755)
-    return script_path
+    return build_script(tmp_path, bash, body, 'the_script.sh', executable=executable)
 
 
 def test_header_default_executable_used_when_empty():

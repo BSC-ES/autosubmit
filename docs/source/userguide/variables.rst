@@ -31,11 +31,13 @@ detailed in the next sections on this page.
     Custom configuration files (e.g. ``my-file.yml``) may contain
     configuration like this example:
 
-    .. code-block:: yaml
+    .. tab-set-code::
 
-        MYAPP:
-          MYPARAMETER: 42
-          ANOTHER_PARAMETER: 1984
+      .. code-block:: yaml
+
+          MYAPP:
+            MYPARAMETER: 42
+            ANOTHER_PARAMETER: 1984
 
     If you configure Autosubmit to include this file with the
     rest of your configuration, then those variables will be
@@ -74,6 +76,42 @@ your target platform. For instance, to set the number of GPU's in a Slurm
 job, you can use ``CUSTOM_DIRECTIVES=--gpus-per-node=10``.
 
 
+Runtime template variables
+==========================
+
+The ``%VARIABLE%`` substitutions described above are resolved before the job
+script is submitted. Some values, however, are only known once the job is
+actually running on the platform. Autosubmit injects those values directly
+into the generated script, so they are available from your template code at
+runtime, but they **cannot** be used with the ``%VARIABLE%`` syntax.
+
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
+
+    * - Variable
+      - Description
+    * - ``AS_JOB_ID``
+      - Identifier assigned by the batch scheduler to the running job.
+
+Example:
+
+.. code-block:: bash
+    :caption: Bash
+
+    echo "This job runs with AS_JOB_ID=$AS_JOB_ID"
+
+.. code-block:: python
+    :caption: Python
+
+    print(f"This job runs with AS_JOB_ID={AS_JOB_ID}")
+
+.. code-block:: r
+    :caption: R
+
+    cat("This job runs with AS_JOB_ID=", AS_JOB_ID, "\n", sep = "")
+
+
 Platform variables
 ==================
 
@@ -82,7 +120,7 @@ files. Each ``JOBS`` entry can reference any of these platforms via its
 ``PLATFORM`` key. If no platform is specified, the job uses the experiment's
 default platform (``DEFAULT.HPCARCH``).
 
-There are three ways platform variables reach your job templates: raw keys, 
+There are three ways platform variables reach your job templates: raw keys,
 ``HPC``-prefixed keys, and ``CURRENT_``-prefixed keys.
 
 Example configuration
@@ -90,46 +128,48 @@ Example configuration
 
 Consider the following experiment configuration:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    DEFAULT:
-      EXPID: a000
-      HPCARCH: PS
+  .. code-block:: yaml
 
-    PLATFORMS:
-      MARENOSTRUM5:
-        TYPE: slurm
-        HOST: glogin1.bsc.es, glogin2.bsc.es
-        USER: root
-        PROJECT: bsc32
-        SCRATCH_DIR: /gpfs/scratch
-      SLURM:
-        TYPE: slurm
-        HOST: slurm-test
-        USER: root
-        PROJECT: group
-        SCRATCH_DIR: /tmp/scratch
-      PS:
-        TYPE: pbs
-        HOST: ps-test
-        USER: root
-        PROJECT: bsc-es
-        SCRATCH_DIR: /tmp/scratch
+      DEFAULT:
+        EXPID: a000
+        HPCARCH: PS
+
+      PLATFORMS:
+        MARENOSTRUM5:
+          TYPE: slurm
+          HOST: glogin1.bsc.es, glogin2.bsc.es
+          USER: root
+          PROJECT: bsc32
+          SCRATCH_DIR: /gpfs/scratch
+        SLURM:
+          TYPE: slurm
+          HOST: slurm-test
+          USER: root
+          PROJECT: group
+          SCRATCH_DIR: /tmp/scratch
+        PS:
+          TYPE: pbs
+          HOST: ps-test
+          USER: root
+          PROJECT: bsc-es
+          SCRATCH_DIR: /tmp/scratch
 
 
-    JOBS:
-      SIM:
-        FILE: sim.sh
-        RUNNING: once
-        PLATFORM: MARENOSTRUM5
-      POST:
-        FILE: post.sh
-        RUNNING: once
-        PLATFORM: SLURM
-      LOCAL_JOB:
-        FILE: local_test.sh
-        RUNNING: once
-         # No PLATFORM key, uses DEFAULT.HPCARCH (PS)
+      JOBS:
+        SIM:
+          FILE: sim.sh
+          RUNNING: once
+          PLATFORM: MARENOSTRUM5
+        POST:
+          FILE: post.sh
+          RUNNING: once
+          PLATFORM: SLURM
+        LOCAL_JOB:
+          FILE: local_test.sh
+          RUNNING: once
+          # No PLATFORM key, uses DEFAULT.HPCARCH (PS)
 
 In this example:
 
@@ -147,7 +187,7 @@ In this example:
 Every key under a platform is available globally as ``PLATFORMS.<PLATFORM_ID>.<KEY>``.
 You can reference them in templates as ``%PLATFORMS.MARENOSTRUM5.HOST%`` for example.
 
-In the output of :ref:`report <report>` you will find them with the pattern 
+In the output of :ref:`report <report>` you will find them with the pattern
 ``PLATFORMS.<PLATFORM_ID>.<KEY>=<VALUE>``.
 
 .. code-block:: text
@@ -269,8 +309,8 @@ Continuing with the example above:
     JOBS.SIM.CURRENT_HOST=glogin1.bsc.es, glogin2.bsc.es
     JOBS.SIM.CURRENT_PROJECT=bsc32
 
-The ``CURRENT_`` prefix is also populated from the job's section keys 
-(``JOBS.<section>``). This allows you to inject job-specific information 
+The ``CURRENT_`` prefix is also populated from the job's section keys
+(``JOBS.<section>``). This allows you to inject job-specific information
 into your templates.
 
 **Auto-generated CURRENT_ variables**
@@ -282,7 +322,7 @@ These are always available regardless of the raw YAML keys defined.
 
 
 .. note::
-    The table above lists the ``CURRENT_`` variables that Autosubmit 
+    The table above lists the ``CURRENT_`` variables that Autosubmit
     exposes from the platform section. Not all of them are always
     populated. Some are filled automatically by Autosubmit, others
     come from the YAML configuration, and a few are only used by certain
@@ -292,7 +332,7 @@ These are always available regardless of the raw YAML keys defined.
       ``CURRENT_SCRATCH_DIR``, ``CURRENT_ROOTDIR``,
       ``CURRENT_LOGDIR`` and ``CURRENT_HYPERTHREADING`` are
       **automatically** filled by Autosubmit.
-    
+
     * ``CURRENT_USER``, ``CURRENT_PROJ``, ``CURRENT_QUEUE``,
       ``CURRENT_PARTITION`` and ``CURRENT_TEMP_DIR`` are only
       filled if the corresponding YAML key (``USER``,
@@ -304,13 +344,13 @@ These are always available regardless of the raw YAML keys defined.
       ``CURRENT_EXCLUSIVITY`` are only populated if the
       corresponding YAML keys (``BUDGET``, ``RESERVATION``,
       ``EXCLUSIVITY``) are defined in the platform configuration.
-      They are only used by certain schedulers: ``CURRENT_BUDG`` 
-      is used by the ECMWF header, ``CURRENT_RESERVATION`` by 
+      They are only used by certain schedulers: ``CURRENT_BUDG``
+      is used by the ECMWF header, ``CURRENT_RESERVATION`` by
       SLURM and PBS, and ``CURRENT_EXCLUSIVITY`` by SLURM.
 
 
 Other variables
-=================
+===============
 
 .. autosubmit-variables:: config
 

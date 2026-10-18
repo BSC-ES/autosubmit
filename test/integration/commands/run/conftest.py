@@ -27,6 +27,7 @@ import os
 import pwd
 import sqlite3
 from collections.abc import Callable
+from getpass import getuser
 from pathlib import Path
 from threading import Event, Thread
 from typing import Any
@@ -62,6 +63,17 @@ def prepare_scratch(tmp_path: Path) -> Any:
 
 
 # --- Internal utility functions.
+def _remote_log_dir(expid: str, user: str | None = None) -> str:
+    """Return the LOG directory of an experiment inside the Slurm container.
+
+    :param expid: Experiment id.
+    :param user: Remote user holding the experiment scratch directory. Defaults to the current user.
+    :return: Absolute path of the experiment LOG directory on the remote.
+    """
+    user = user if user is not None else getuser()
+    return f"/tmp/scratch/group/{user}/{expid}/LOG_{expid}"
+
+
 def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
     """
     Print the database check results.

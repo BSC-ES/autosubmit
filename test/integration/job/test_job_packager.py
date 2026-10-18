@@ -167,30 +167,6 @@ def test_check_if_packages_are_ready_to_build_max_waiting_time(create_packager: 
     assert not flag
 
 
-def test_check_if_packages_are_ready_to_build_jobs_to_run_first(create_packager: CreatePackagerFixture):
-    """TODO: Looks like this might be removed when two_way_step is removed? Old auto-monarch was using that?"""
-    job_packager = create_packager(
-        experiment_data={
-            'JOBS': {
-                'A': {
-                    'running': 'once',
-                    'platform': 'local',
-                    'script': '"sleep 0"',
-                    'max_waiting_jobs': '1984'
-                }
-            }
-        }
-    )
-
-    jobs = job_packager._jobs_list.get_job_list()
-    job_packager._jobs_list.jobs_to_run_first = jobs
-
-    jobs, flag = job_packager.check_if_packages_are_ready_to_build()
-
-    assert jobs
-    assert flag
-
-
 @pytest.mark.parametrize(
     "total_jobs, max_jobs_to_submit",
     [
