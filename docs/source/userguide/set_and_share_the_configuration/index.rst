@@ -189,6 +189,24 @@ It has two different syntaxes:
 
 .. warning:: Keep in mind that no parameters are disabled when custom_config is activated, including the jobs definitions.
 
+CUSTOM_CONFIG: Loading a folder
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A path in ``CUSTOM_CONFIG`` can be a folder instead of a file, in both syntaxes. Autosubmit then loads
+every file directly inside that folder whose name ends in ``.yml`` or ``.yaml``, sorted by name, so a
+file loaded later overrides the parameters it shares with the ones before it. Other files are ignored.
+
+.. code-block:: yaml
+
+    DEFAULT:
+        CUSTOM_CONFIG:
+            # Loads the .yml and .yaml files in %PROJDIR%/conf/model, e.g. jobs.yml before platforms.yml
+            PRE: "%PROJDIR%/conf/model"
+            POST: "/home/<user>/as_user_conf"
+
+Subfolders are not loaded: only the first level of the folder is read. To include a subfolder, add it as
+a path of its own, for example ``PRE: "%PROJDIR%/conf/model,%PROJDIR%/conf/model/platforms"``.
+
 Advanced configuration - Full dummy example (reproducible)
 ----------------------------------------------------------
 
