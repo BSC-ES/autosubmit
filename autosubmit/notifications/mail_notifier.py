@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS 
+ # Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 # 
 # This file is part of Autosubmit. 
 # 
@@ -44,11 +44,8 @@ def _compress_file(
     The function returns a ``Path`` of the archive file.
 
     :param temporary_directory: The temporary directory.
-    :type temporary_directory: TemporaryDirectory
     :param file_path: The path of the file to be compressed.
-    :type file_path: Path
     :return: The Path object of the compressed file.
-    :rtype: str
     :raises AutosubmitError: The file cannot be compressed.
     """
     try:
@@ -69,9 +66,7 @@ def _attach_file(file_path: Path, message: MIMEMultipart) -> None:
     The attachment file name will be the same name of the ``file_path``.
 
     :param file_path: The path of the file to be attached.
-    :type file_path: Path
     :param message: The message for the file to be attached to.
-    :type message: MIMEMultipart
     :raises AutosubmitError: The file cannot be attached.
     """
     try:
@@ -97,13 +92,9 @@ def _generate_message_text(
     """Generate email body to notify about status change.
 
     :param exp_id: The experiment id.
-    :type exp_id: str
     :param job_name: The name of the job.
-    :type job_name: str
     :param prev_status: The previous status.
-    :type prev_status: str
     :param status: The current status.
-    :type status: str
     :return: The body of the email message.
     """
     return dedent(f'''\
@@ -121,11 +112,8 @@ def _generate_message_experiment_status(
     """Generate email body for the experiment status notification.
 
     :param exp_id: The experiment id.
-    :type exp_id: str
     :param platform: The platform.
-    :type platform: Platform
     :return: The email body for the experiment status notification.
-    :rtype: str
     """
     return dedent(f'''\
         Autosubmit notification: Remote Platform issues\n
@@ -148,15 +136,11 @@ def _generate_message_cpmip_threshold_violations(
     """Generate email body for CPMIP threshold violations.
     
     :param exp_id: The experiment id.
-    :type exp_id: str
     :param job_name: The name of the job.
-    :type job_name: str
     :param violations: A dictionary containing the CPMIP threshold violations.
                        Each violation dict contains 'threshold', 'accepted_error', 
                        'comparison', 'bound', and 'real_value' keys.
-    :type violations: dict[str, dict]
     :return: The email body for CPMIP threshold violations.
-    :rtype: str
     """
     
     details = []
@@ -197,40 +181,60 @@ def _generate_message_cpmip_threshold_violations(
 
 def _check_mail_address(mail_to: list[str]) -> None:
     if not isinstance(mail_to, list):
-        raise ValueError('Recipients of mail notifications must be a list of emails!')
+        raise TypeError('Recipients of mail notifications must be a list of emails!')
     elif not mail_to:
         raise ValueError('Empty recipient list')
-    elif any([not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$', mail) for mail in mail_to]):
+    elif any(not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$', mail) for mail in mail_to):
         raise ValueError('Invalid email in recipient list')
 
 
 class MailNotifier:
 
+    def _collect_logfiles(self, message: MIMEMultipart, exp_id: str):
+        """Collect the logfiles of an experiment to attach to the mail message.
+
+        :param message: Message to have the files attached to.
+        :param exp_id: expid of the experiment that has a report.
+        :raises AutosubmitError: The file cannot be attached.
+        """
+        run_log_files = [f for f in BasicConfig.expid_aslog_dir(exp_id).glob('*_run.log') if Path(f).is_file()]
+        if run_log_files:
+            latest_run_log: Path = max(run_log_files)
+            temp_dir = TemporaryDirectory()
+            try:
+                compressed_run_log = _compress_file(temp_dir, latest_run_log)
+                _attach_file(compressed_run_log, message)
+                Log.info("File was successfully compressed!")
+            except AutosubmitError as e:
+                Log.printlog(code=e.code, message=e.message)
+            finally:
+                if temp_dir:
+                    temp_dir.cleanup()
+        else:
+            Log.info(f"No Log files for the experiment {exp_id} were found")
+
     def notify_experiment_status(
-            self,
-            exp_id: str,
-            mail_to: list[str],
-            platform: "Platform") -> None:
+        self, exp_id: str, mail_to: list[str], platform: "Platform", attach_to_mail: bool = False,
+    ) -> None:
         """Send email notifications.
 
         The latest run_log file (we consider latest the last one sorting
         the listing by name).
 
         :param exp_id: The experiment id.
-        :type exp_id: str
         :param mail_to: The email address.
-        :type mail_to: list[str]
         :param platform: The platform.
-        :type platform: Platform
+        :param attach_to_mail: flag to add or ignore attachments
         """
         _check_mail_address(mail_to)
         message_text = _generate_message_experiment_status(exp_id, platform)
         message = MIMEMultipart()
-        message['From'] = email.utils.formataddr(
-            ('Autosubmit', BasicConfig.MAIL_FROM))
+        message['From'] = email.utils.formataddr(('Autosubmit', BasicConfig.MAIL_FROM))
         message['Subject'] = '[Autosubmit] Warning: a remote platform is malfunctioning'
         message['Date'] = email.utils.formatdate(localtime=True)
         message.attach(MIMEText(message_text))
+        if attach_to_mail:
+            self._collect_logfiles(message, exp_id)
 
         run_log_files = [f for f in BasicConfig.expid_aslog_dir(
             exp_id).glob('*_run.log') if Path(f).is_file()]
@@ -249,21 +253,34 @@ class MailNotifier:
         self._send_message(mail_to, BasicConfig.MAIL_FROM, message)
 
     def notify_status_change(
-            self,
-            exp_id: str,
-            job_name: str,
-            prev_status: str,
-            status: str,
-            mail_to: list[str]) -> None:
+        self,
+        exp_id: str,
+        job_name: str,
+        prev_status: str,
+        status: str,
+        mail_to: list[str],
+        attach_to_mail: bool = False,
+    ) -> None:
 
         _check_mail_address(mail_to)
-        message_text = _generate_message_text(
-            exp_id, job_name, prev_status, status)
-        message = MIMEText(message_text)
+        message_text = _generate_message_text(exp_id, job_name, prev_status, status)
+        message = MIMEMultipart()
         message['From'] = email.utils.formataddr(
             ('Autosubmit', BasicConfig.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {status}'
         message['Date'] = email.utils.formatdate(localtime=True)
+        if status == "FAILED" and attach_to_mail:
+            message.attach(MIMEText(message_text))
+            self._collect_logfiles(message, exp_id)
+
+        for mail in mail_to:  # expects a list
+            message['To'] = email.utils.formataddr((mail, mail))
+            try:
+                self._send_mail(BasicConfig.MAIL_FROM, mail, message)
+            except BaseException as e:
+                Log.printlog(
+                    f'Trace:{str(e)}\nAn error has occurred while sending a mail '
+                    f'for the job {job_name}', 6011)
 
         self._send_message(mail_to, BasicConfig.MAIL_FROM, message)
 

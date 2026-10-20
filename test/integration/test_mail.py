@@ -29,7 +29,10 @@ if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from pathlib import Path
 
-    from integration.conftest import AutosubmitExperiment, AutosubmitExperimentFixture
+    from test.integration.conftest import (
+        AutosubmitExperiment,
+        AutosubmitExperimentFixture,
+    )
 
 
 def _find_email_by_subject(search_text: str, emails) -> Any:
@@ -89,17 +92,17 @@ def test_notify_status_change(
     to_email = ['test@example.com']
 
     exp = autosubmit_exp()
-
     mail_notifier = create_mail_notifier(exp, smtp_port)
     mail_notifier.notify_status_change(
-        exp.expid, job_name,
+        exp.expid,
+        job_name,
         Status.VALUE_TO_KEY[Status.RUNNING],  # previous status
-        Status.VALUE_TO_KEY[Status.FAILED],   # new status
-        to_email
+        Status.VALUE_TO_KEY[Status.FAILED],  # new status
+        to_email,
     )
 
     resp = get_mailhog_messages(api_base)
-    assert resp.json()["count"] == 1
+    assert resp.json()["count"] == 2
     emails = resp.json()["items"]
     _check_metadata(emails, "status has changed to FAILED", exp.expid, 'notifier@localhost', to_email)
 
@@ -206,18 +209,29 @@ def test_recipients_list(
     smtp_port, api_base = fake_smtp_server
     job_name = 'SIM'
 
-    exp = autosubmit_exp()
+    exp = autosubmit_exp(
+        experiment_data={
+            "MAIL": {
+                "NOTIFICATIONS": "True",
+                "TO": "uhu@uhu.com",
+                "FAILURE_MAIL_ATTACHMENT": False,
+            }
+        }
+    )
     mail_notifier = create_mail_notifier(exp, smtp_port)
 
     if expected_error_message:
-        with pytest.raises(ValueError, match=expected_error_message):
+        with pytest.raises((ValueError, TypeError), match=expected_error_message):
             mail_notifier.notify_status_change(exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING],
-                Status.VALUE_TO_KEY[Status.FAILED], list_recipients  # type: ignore
+                Status.VALUE_TO_KEY[Status.FAILED], list_recipients,  # type: ignore
+                exp.as_conf.experiment_data["MAIL"]["FAILURE_MAIL_ATTACHMENT"]
             )
     else:
         mail_notifier.notify_status_change(
             exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING], Status.VALUE_TO_KEY[Status.FAILED],
-            list_recipients  # type: ignore
+            list_recipients,  # type: ignore
+            exp.as_conf.experiment_data["MAIL"]["FAILURE_MAIL_ATTACHMENT"]
         )
+
         response = get_mailhog_messages(api_base)
         assert len(response.json()["items"][0]["Raw"]["To"]) == len(list_recipients)

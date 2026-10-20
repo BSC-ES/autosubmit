@@ -72,10 +72,9 @@ def restore_platforms(
             try:
                 if mail_notify:
                     email = as_conf.get_mails_to()
+                    attach_to_mail = as_conf.experiment_data["MAIL"]["FAILURE_MAIL_ATTACHMENT"]
                     if "@" in email[0]:
-                        Notifier.notify_experiment_status(
-                            MailNotifier(), expid, email, platform_to_test
-                        )
+                        Notifier.notify_experiment_status(MailNotifier(), expid, email, platform_to_test, attach_to_mail)
             except Exception as e2:
                 Log.debug(f"Unexpected exception sending email notification: {str(e2)}")
             platform_issues += f"\n[{platform_to_test.name}] Connection Unsuccessful to host {platform_to_test.host} "

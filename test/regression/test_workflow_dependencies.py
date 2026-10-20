@@ -200,7 +200,7 @@ def remove_noise_from_list(lines: list[str]) -> list[str]:
     :param lines: List of lines to process.
     :return: List of cleaned lines.
     """
-    lines = [line.strip().rstrip(' [WAITING]').rstrip(' [READY]').strip() for line in lines]
+    lines = [line.strip().removesuffix(' [WAITING]').removesuffix(' [READY]') for line in lines]
     lines = [line.replace("child", "children") if "child" in line and "children" not in line else line for line in
              lines]
     if lines and lines[0].strip() == '':

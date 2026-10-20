@@ -67,7 +67,7 @@ class BasicConfig:
     #       used right now as it already existed, but it should be moved to a proper place later.
     #       Validation of expids must also be centralised, as this is not the only place where it is done.
     @staticmethod
-    def expid_dir(exp_id):
+    def expid_dir(exp_id) -> Path:
         """Return the experiment directory.
 
         Fails if the experiment ID is not valid. The expid must be a string,
@@ -83,7 +83,7 @@ class BasicConfig:
         return Path(BasicConfig.LOCAL_ROOT_DIR, exp_id)
 
     @staticmethod
-    def expid_tmp_dir(exp_id):
+    def expid_tmp_dir(exp_id) -> Path:
         return BasicConfig.expid_dir(exp_id).joinpath(BasicConfig.LOCAL_TMP_DIR)
 
     @staticmethod
@@ -91,11 +91,11 @@ class BasicConfig:
         return BasicConfig.expid_tmp_dir(exp_id).joinpath('autosubmit.lock')
 
     @staticmethod
-    def expid_log_dir(exp_id):
+    def expid_log_dir(exp_id) -> Path:
         return BasicConfig.expid_tmp_dir(exp_id).joinpath(f'LOG_{exp_id}')
 
     @staticmethod
-    def expid_aslog_dir(exp_id):
+    def expid_aslog_dir(exp_id) -> Path:
         return BasicConfig.expid_tmp_dir(exp_id).joinpath(BasicConfig.LOCAL_ASLOG_DIR)
 
     @staticmethod
@@ -108,13 +108,12 @@ class BasicConfig:
             BasicConfig.DB_DIR, BasicConfig.DB_FILE)
 
     @staticmethod
-    def __read_file_config(file_path):
+    def __read_file_config(file_path: str):
         """
         Reads configuration file. If configuration file does not exist in given path,
         no error is raised. Configuration options also are not required to exist
 
         :param file_path: configuration file to read
-        :type file_path: str
         """
         if not os.path.isfile(file_path):
             return
