@@ -1,0 +1,19 @@
+[local]
+path = /app/experiments/
+
+[globallogs]
+path = /app/logs
+
+[structures]
+path = /app/metadata/structures
+
+[historicdb]
+path = /app/metadata/data
+
+[historiclog]
+path = /app/metadata/logs
+
+[database]
+backend = postgres
+connection_url = postgresql://autosubmit:autosubmit@postgres:5432/autosubmit
+path = /app/database/

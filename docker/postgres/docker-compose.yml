@@ -1,0 +1,72 @@
+name: autosubmit_pg
+
+services:
+  autosubmit:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+      args:
+        NEW_MAMBA_USER_ID: ${HOST_UID:-1000}
+        NEW_MAMBA_USER_GID: ${HOST_GID:-1000}
+        # This setting below enables the local editable installation of autosubmit.
+        INSTALL_LOCAL_AUTOSUBMIT: "1"
+
+    working_dir: /app/src
+
+    volumes:
+      # The current source code used for development.
+      - ../..:/app/src
+      # Configuration file.
+      - ./autosubmitrc:/etc/autosubmitrc:ro
+      # Experiment data and other directories.
+      - ./experiments:/app/experiments
+      - ./database:/app/database
+      - ./logs:/app/logs
+      - ./metadata:/app/metadata
+
+    environment:
+      AUTOSUBMIT_CONFIGURATION: /etc/autosubmitrc
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+    # Install AS and then keep the container running...
+    command:
+      - /bin/bash
+      - -lc
+      - |
+        set -e
+        eval "$(/bin/micromamba shell hook --shell=bash)"
+        micromamba activate base
+        autosubmit install
+        exec sleep infinity
+
+  postgres:
+    image: postgres:16
+
+    environment:
+      POSTGRES_DB: autosubmit
+      POSTGRES_USER: autosubmit
+      POSTGRES_PASSWORD: autosubmit
+
+    volumes:
+      - as_postgres_data:/var/lib/postgresql/data
+
+    ports:
+      # Expose PostgreSQL to the host for development tools.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+    restart: unless-stopped
+
+volumes:
+  as_postgres_data:

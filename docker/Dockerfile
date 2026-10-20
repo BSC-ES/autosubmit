@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 FROM mambaorg/micromamba:debian13-slim  AS micromamba
 
 # The micromamba image is referenced in a multi-stage build.
@@ -123,34 +125,58 @@ USER $MAMBA_USER
 
 # Install and configure Autosubmit.
 
-# Install Python
+# Install Python and pip; pip is necessary if we want to re-use this image to
+# install other versions of Autosubmit, or install only an editable version.
 RUN micromamba install --yes --name base --channel conda-forge \
       git=2.41.0 \
-      python=3.10.20 && \
+      psycopg2 \
+      python=3.10.20 \
+      pip && \
     micromamba clean --all --yes && \
-    /usr/local/bin/_activate_current_env.sh
+    /usr/local/bin/_activate_current_env.sh && \
+    python --version && \
+    python -m pip --version
 
 # Install Autosubmit.
 # If GIT_REF is set, it will install from the specified branch/tag/commit.
 # Otherwise, if AUTOSUBMIT_VERSION is set, it will install the specified version from pypi.
+# Otherwise, if INSTALL_LOCAL_AUTOSUBMIT is set, it will do a local editable pip-installation.
 # Otherwise, it will install the latest version from pypi.
+#
+# Note that with INSTALL_LOCAL_AUTOSUBMIT, the user of this Dockerfile is responsible for
+# mounting the source directory somewhere before the build.
 ARG GIT_REF
 ARG AUTOSUBMIT_VERSION
-RUN if [ -n "${GIT_REF}" ] ; then \
+ARG INSTALL_LOCAL_AUTOSUBMIT=0
+
+RUN --mount=type=bind,source=.,target=/tmp/autosubmit-source \
+    if [ "${INSTALL_LOCAL_AUTOSUBMIT}" = "1" ]; then \
+      echo "Installing local Autosubmit in editable mode"; \
+      mkdir -p /app/src && \
+      cp -a /tmp/autosubmit-source/. /app/src/ && \
+      pip install --no-cache-dir --no-build-isolation --editable /app/src; \
+    elif [ -n "${GIT_REF}" ]; then \
+      echo "Installing Autosubmit from Git ref: ${GIT_REF}"; \
       pip install --no-cache-dir git+https://github.com/BSC-ES/autosubmit.git@${GIT_REF}; \
-    elif [ -n "${AUTOSUBMIT_VERSION}" ] ; then \
+    elif [ -n "${AUTOSUBMIT_VERSION}" ]; then \
+      echo "Installing Autosubmit ${AUTOSUBMIT_VERSION} from PyPI"; \
       pip install --no-cache-dir autosubmit==${AUTOSUBMIT_VERSION}; \
     else \
+      echo "Installing latest Autosubmit from PyPI"; \
       pip install --no-cache-dir autosubmit; \
     fi
 
 # Configure Autosubmit and copy config in single layer
-RUN autosubmit configure \
-      -db "${AUTOSUBMIT_ROOT_DIR}/database/" \
-      -dbf autosubmit.db \
-      -lr "${AUTOSUBMIT_ROOT_DIR}/experiments/" && \
-    cp "/home/${MAMBA_USER}/.autosubmitrc" "${AUTOSUBMIT_ROOT_DIR}/autosubmitrc" && \
-    chown -R "${MAMBA_USER}:${MAMBA_USER}" "${AUTOSUBMIT_ROOT_DIR}"
+RUN if [ "${INSTALL_LOCAL_AUTOSUBMIT}" != "1" ]; then \
+      autosubmit configure \
+        -db "${AUTOSUBMIT_ROOT_DIR}/database/" \
+        -dbf autosubmit.db \
+        -lr "${AUTOSUBMIT_ROOT_DIR}/experiments/" && \
+      cp "/home/${MAMBA_USER}/.autosubmitrc" "${AUTOSUBMIT_ROOT_DIR}/autosubmitrc" && \
+      chown -R "${MAMBA_USER}:${MAMBA_USER}" "${AUTOSUBMIT_ROOT_DIR}"; \
+    else \
+      echo "Skipping Autosubmit configuration for development"; \
+    fi
 
 # Set AUTOSUBMIT_CONFIGURATION to the path of the Autosubmit configuration file.
 ENV AUTOSUBMIT_CONFIGURATION="${AUTOSUBMIT_ROOT_DIR}/autosubmitrc"
