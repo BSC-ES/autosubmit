@@ -741,7 +741,7 @@ def test_generate_output_unexpected_error(error_msg: str, mocker):
 
     monitor = Monitor()
     mocked_create_tree_list = mocker.patch.object(monitor, 'create_tree_list', autospec=True)
-    mocked_create_tree_list.side_effect = BaseException(error_msg)
+    mocked_create_tree_list.side_effect = Exception(error_msg)
     monitor.generate_output(_EXPID, None, None, None, None, False, None, None, None)
 
     assert mocked_create_tree_list.call_count == 1
