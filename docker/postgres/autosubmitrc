@@ -1,0 +1,21 @@
+[local]
+path = /as/
+
+[globallogs]
+path = /as/logs
+
+[structures]
+path = /as/metadata/structures
+
+[historicdb]
+path = /as/metadata/data
+
+[historiclog]
+path = /as/metadata/logs
+
+[database]
+backend = postgres
+connection_url = postgresql://autosubmit:autosubmit@postgres:5432/autosubmit
+# path = /workspace/autosubmit
+# filename = autosubmit.db
+
