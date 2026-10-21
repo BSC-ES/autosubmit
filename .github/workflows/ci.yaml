@@ -100,6 +100,9 @@ jobs:
         #       and 3.11 is the current version used at the BSC ES department.
         python-version: ["3.10", "3.12"]
         pytest-markers: ["not postgres and not slurm and not profile and not profilelong and not benchmark"]
+        # Split into two tests due to the time to run all integration tests.
+        split-group: [ 1, 2 ]
+        split-count: [ 2 ]
         # Here we include an extra build with the lowest version of Python and Postgres.
         # We do it this way to avoid wasting CICD resources since we already tested the
         # code with SQLite. So we run just one build with Postgres (normally newer versions
@@ -109,6 +112,8 @@ jobs:
         include:
           - python-version: '3.10'
             pytest-markers: 'postgres and not slurm and not profile and not profilelong and not benchmark'
+            split-group: 1
+            split-count: 1
 
     steps:
       - name: Checkout code
@@ -150,7 +155,9 @@ jobs:
           pytest \
             -n $(nproc) \
             test/integration \
-            -m "${{ matrix.pytest-markers }}"
+            -m "${{ matrix.pytest-markers }}" \
+            --splits ${{ matrix.split-count }} \
+            --group ${{ matrix.split-group }}
 
       - name: Coverage report
         run: |
@@ -176,7 +183,7 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
         with:
-          name: coverage_integration_py-${{ matrix.python-version }}-${{ matrix.pytest-markers }}
+          name: coverage_integration_py-${{ matrix.python-version }}-${{ matrix.pytest-markers }}-group-${{ matrix.split-group }}
           path: coverage.xml
           retention-days: 7
 
