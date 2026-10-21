@@ -60,6 +60,7 @@ class BasicConfig:
     CONFIG_FILE_FOUND = False
     DATABASE_BACKEND = "sqlite"
     DATABASE_CONN_URL = ""
+    DATABASE_BACKUP = True
     LOG_RECOVERY_TIMEOUT: int = 60 * 5
 
     # TODO: BasicConfig contains site configuration, but this function returns the experiment directory.
@@ -132,6 +133,8 @@ class BasicConfig:
             BasicConfig.DATABASE_BACKEND = parser.get('database', 'backend')
         if parser.has_option('database', 'connection_url'):
             BasicConfig.DATABASE_CONN_URL = parser.get('database', 'connection_url')
+        if parser.has_option('database', 'backup'):
+            BasicConfig.DATABASE_BACKUP = parser.getboolean('database', 'backup')
         if parser.has_option('local', 'path'):
             BasicConfig.LOCAL_ROOT_DIR = parser.get('local', 'path')
         if parser.has_option('conf', 'platforms'):

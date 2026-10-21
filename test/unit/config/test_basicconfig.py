@@ -135,3 +135,25 @@ def test_expid_dir_structure(foo, dir_func, autosubmit_config):
     expected_path = dir_func(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid)
     result = foo(as_conf.expid)
     assert result == expected_path
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        pytest.param("true", True, id="enabled"),
+        pytest.param("false", False, id="disabled"),
+    ],
+)
+def test_read_database_backup_option(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str, expected: bool
+) -> None:
+    """The ``[database] backup`` option is read from ``autosubmitrc`` as a boolean."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text(f"[database]\nbackup = {value}\n")
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKUP", not expected)
+
+    BasicConfig.read()
+
+    assert BasicConfig.DATABASE_BACKUP is expected
+
