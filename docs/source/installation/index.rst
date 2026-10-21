@@ -266,7 +266,8 @@ Autosubmit backs up the jobs historical database ``job_data_<EXPID>.db`` to ``jo
 job statuses change.
 
 * ``backup = true`` (default) keeps the backups. The default applies when the option is not set.
-* ``backup = false`` disables them, which saves disk space and I/O for large experiments.
+* ``backup = false`` disables them, which saves disk space and I/O for large experiments. Existing 
+  ``job_data_<EXPID>.sql`` files are not deleted; remove them manually to reclaim the disk space.
 * Only applies to the SQLite backend.
 * If a backup fails, Autosubmit logs a warning and keeps the previous backup.
 

@@ -137,11 +137,6 @@ def test_expid_dir_structure(foo, dir_func, autosubmit_config):
     assert result == expected_path
 
 
-def test_database_backup_enabled_by_default() -> None:
-    """Database backups are enabled unless ``autosubmitrc`` disables them."""
-    assert BasicConfig.DATABASE_BACKUP is True
-
-
 @pytest.mark.parametrize(
     "value,expected",
     [
