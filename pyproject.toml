@@ -48,7 +48,7 @@ dependencies = [
     "bscearth.utils<=0.5.2",
     "requests<=2.34.2",
     "networkx<=3.6.1",
-    "portalocker<=4.4.0",
+    "portalocker<=4.4.1",
     "paramiko>=3.5.0",
     "pyparsing==3.3.3",
     "matplotlib<=3.10.9",
@@ -72,7 +72,7 @@ Documentation = "https://autosubmit.readthedocs.io/"
 [project.optional-dependencies]
 postgres = ["psycopg", "psycopg2"]
 lint = [
-    "ruff==0.17.0",
+    "ruff==0.17.1",
 ]
 tests = [
     # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
@@ -197,7 +197,6 @@ ignore = [
     "B005",
     "B006",
     "B008",
-    "B015",
     "B017",
     "B019",
     "B025",
@@ -210,12 +209,10 @@ ignore = [
     "D419",
     "DTZ001",
     "DTZ002",
-    "DTZ004",
     "DTZ005",
     "DTZ006",
     "DTZ007",
     "EXE001",
-    "EXE002",
     "FLY002",
     "ISC004",
     "LOG001",
@@ -223,7 +220,6 @@ ignore = [
     "PERF402",
     "PLC0206",
     "PLR0124",
-    "PLR1704",
     "PLR1722",
     "PLW0127",
     "PLW1510",

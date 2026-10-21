@@ -33,8 +33,7 @@ import paramiko
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.config.registry import load_config
 from autosubmit.database.db_common import database_backup
 from autosubmit.database.db_manager_historical import HistoricalDbManager
 from autosubmit.database.db_manager_job_list import JobsDbManager
@@ -70,6 +69,7 @@ from autosubmit.scheduler import (
 )
 
 if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.platforms.paramiko_platform import ParamikoPlatform
     from autosubmit.platforms.platform import Platform
     from autosubmit.profiler.profiler import Profiler
@@ -104,7 +104,7 @@ def _prepare_run(
     ParamikoSubmitter,
     ExperimentHistory | None,
     str | None,
-    AutosubmitConfig,
+    "AutosubmitConfig",
     set["Platform"],
     bool,
 ]:
@@ -121,7 +121,7 @@ def _prepare_run(
     """
     host = platform.node()
     # Init the AutosubmitConfig and check that every file exists, and it is a valid configuration.
-    as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+    as_conf = load_config(expid)
     as_conf.check_conf_files(running_time=True, force_load=True)
     if not recover:
         # Database stuff, to check if the experiment is active or not.
@@ -399,7 +399,7 @@ def monitor(
 
     try:
         Log.info("Getting job list...")
-        as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+        as_conf = load_config(expid)
         as_conf.check_conf_files(False)
         # Getting output type from configuration
         output_type = as_conf.get_output_type()
@@ -746,7 +746,7 @@ def run(
             Log.error(f"{ae.message} [eCode={ae.code}]")
             # No need to wait until the remote platform reconnection
             recovery = False
-            as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+            as_conf = load_config(expid)
             consecutive_retrials = 1
             failed_names = {}
             Log.info("Storing failed job count...")
@@ -887,7 +887,7 @@ def run(
 
 
 def _online_recovery(
-    as_conf: AutosubmitConfig,
+    as_conf: "AutosubmitConfig",
     platforms: Iterable["ParamikoPlatform"],
     job_list: JobList,
     offline: bool = False,
@@ -988,7 +988,7 @@ def recover(
     if not save:
         Log.warning("Changes will be NOT saved to the jobList. Use -s option to save")
 
-    as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+    as_conf = load_config(expid)
     as_conf.check_conf_files(True)
     Log.info(f"Recovering experiment {expid}")
     job_list = load_job_list(expid, as_conf, new=False, monitor=True)
@@ -1227,7 +1227,7 @@ def inspect(
     Log.info("Starting inspect command")
     os.system("clear")
     signal.signal(signal.SIGINT, _signal_handler)
-    as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+    as_conf = load_config(expid)
     as_conf.check_conf_files(True)
     as_conf.get_project_type()
     safetysleeptime = as_conf.get_safetysleeptime()
@@ -1363,7 +1363,6 @@ def statistics(
     :param hide: Hide the window with the plot.
     """
     import autosubmit.statistics.utils as StatisticsUtils
-    from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job_common import Status
     from autosubmit.job.job_list import JobList
     from autosubmit.job.job_utils import SubJob, SubJobManager
@@ -1371,7 +1370,7 @@ def statistics(
 
     try:
         Log.info("Loading jobs...")
-        as_conf = AutosubmitConfig(expid)
+        as_conf = load_config(expid)
         as_conf.check_conf_files(False)
 
         os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "db")

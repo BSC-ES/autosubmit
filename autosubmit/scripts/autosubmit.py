@@ -296,7 +296,8 @@ def _autosubmit(command_line_args: list[str]) -> int:
     # Display traceability information.
     log_command_context(argv=argv)
 
-    # TODO: AS4.x was doing it; is it really necessary? Can it be moved elsewhere?
+    # This initialises the site configuration. Later, in the ``@cli_function`` decorator
+    # it will create an ``AutosubmitConfig`` object that uses the ``BasicConfig``.
     BasicConfig.read()
 
     entry_point = commands[command]

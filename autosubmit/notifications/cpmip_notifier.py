@@ -34,7 +34,6 @@ from dataclasses import dataclass
 
 from bscearth.utils.date import chunk_end_date, chunk_start_date, subs_dates
 
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_utils import is_leap_year
 from autosubmit.log.log import Log
@@ -98,7 +97,7 @@ class CPMIPNotifier:
             return
 
         Notifier.notify_cpmip_threshold_violations(
-            MailNotifier(BasicConfig),
+            MailNotifier(),
             expid,
             job.name,
             violations,

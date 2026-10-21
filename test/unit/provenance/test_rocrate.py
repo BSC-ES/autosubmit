@@ -291,7 +291,7 @@ def test_rocrate_main_fail_missing_rocrate(mocker, tmp_path):
     mocked_as_conf = mocker.Mock(autospec=AutosubmitConfig)
     mocked_as_conf.experiment_data = {}
     mocked_log = mocker.patch('autosubmit.experiment.manage.Log')
-    mocked_autosubmit_config = mocker.patch('autosubmit.experiment.manage.AutosubmitConfig')
+    mocked_autosubmit_config = mocker.patch('autosubmit.experiment.manage.load_config')
     mocked_autosubmit_config.return_value = mocked_as_conf
 
     with pytest.raises(AutosubmitCritical) as cm:

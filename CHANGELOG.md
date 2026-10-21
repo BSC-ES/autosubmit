@@ -6,6 +6,12 @@ introduction of a new database backend for the joblist using SQLAlchemy, which
 allows for better scalability in handling large workflows. This release also includes
 several bug fixes and enhancements to improve the overall user experience.
 
+> [!WARNING]
+> Downgrading experiment versions is not recommended, in general, unless really needed.
+> If you try to downgrade experiments from 4.2.0 to an older version, you will need to
+> recreate the workflow jobs (e.g., `autosubmit create -f`) as this version drops the
+> Pickle `pkl` file.
+
 **Bug fixes:**
 
 - Fix `autosubmit.lock` not being deleted after `create` and `run`; `archive` and `delete` now acquire it too #3033 #3055
@@ -21,6 +27,8 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
 - Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
 - Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
+- Fixed vertical wrappers silently reporting jobs as `COMPLETED` when the inner job script was truncated. The wrapper ran the script through `bash -s` on stdin, so any command in the job body that read stdin swallowed the rest of the script. The inner script now runs as a regular file, with its stdin detached from the wrapper. jira-external#1494
+- Fixed vertical wrappers not stopping an inner job that ignored `SIGTERM`, which could let the job outlive its wallclock inside the wrapper. The per-job `timeout` now also forces a `SIGKILL` after a grace period. jira-external#1494
 
 **New Features:**
 
@@ -84,6 +92,9 @@ several bug fixes and enhancements to improve the overall user experience.
   5 minutes in tests with an operational experiment containing over 500,000 files.
   ZIP archives are now written without compression. #3307
 - Removed `PRESUBMISSION` from documentation, removed in 4.x #3320 (thanks @vansh-nagar)
+- The ``AutosubmitConfig`` instances are now centralised in a registry, to avoid re-loading the YAML files
+  multiple times, partially addressing #3326. #3327
+- Updating the Autosubmit version of an experiment (e.g., `create -v`) now creates the `db` folder #3293
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 

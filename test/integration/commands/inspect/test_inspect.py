@@ -27,12 +27,11 @@ from autosubmit.job.job_list import load_job_list
 from autosubmit.workflow.manage import inspect
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def templates_dir(as_exp) -> Path:
     """Return the path to the templates directory for the given experiment."""
-    as_conf = as_exp.as_conf
     return (
-        Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+        Path(BasicConfig.LOCAL_ROOT_DIR)
         / as_exp.expid
         / BasicConfig.LOCAL_TMP_DIR
     )
@@ -54,7 +53,7 @@ def do_inspect(
     """Call the inspect command with the given filters and return the list of generated .cmd files."""
     as_exp.as_conf.set_last_as_command("inspect")
     templates = (
-        Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+        Path(BasicConfig.LOCAL_ROOT_DIR)
         / as_exp.expid
         / BasicConfig.LOCAL_TMP_DIR
     )
