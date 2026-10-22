@@ -20,6 +20,8 @@ from subprocess import DEVNULL
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
+
 # noinspection PyProtectedMember
 from autosubmit.log.catlog import _view_file, cat_log
 from autosubmit.log.log import AutosubmitCritical
@@ -36,20 +38,20 @@ def as_conf(autosubmit_config):
 
 @pytest.fixture
 def exp_path(as_conf) -> Path:
-    return Path(as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
+    return Path(BasicConfig.LOCAL_ROOT_DIR) / _EXPID
 
 
 @pytest.fixture
 def exp_logs_dir(exp_path, as_conf):
-    exp_tmp_dir = exp_path / as_conf.basic_config.LOCAL_TMP_DIR
+    exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
     exp_logs_dir = exp_tmp_dir / f"LOG_{_EXPID}"
     return exp_logs_dir
 
 
 @pytest.fixture
 def aslogs_dir(exp_path, as_conf):
-    exp_tmp_dir = exp_path / as_conf.basic_config.LOCAL_TMP_DIR
-    aslogs_dir = exp_tmp_dir / as_conf.basic_config.LOCAL_ASLOG_DIR
+    exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
+    aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
     return aslogs_dir
 
 

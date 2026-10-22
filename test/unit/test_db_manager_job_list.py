@@ -219,3 +219,44 @@ def test_remaining_blocked_by_package(tmp_path):
 
         # COMPLETED parent is allowed → blocked
         assert mgr.remaining_blocked_by_package({"rem_job"}, {"pkg_job"}) is True
+
+
+def test_save_jobs_persists_platform_name(tmp_path):
+    """save_jobs writes platform_name to the jobs table (#3176)."""
+    with patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path)):
+        from autosubmit.job.job import Job
+        from autosubmit.job.job_common import Status
+        mgr = JobsDbManager(schema="test_schema_platform_name")
+        mgr.create_table(JobsTable.name)
+
+        job = Job("dummy", 1, Status.COMPLETED, 0)
+        job.platform_name = "LOCAL"
+        mgr.save_jobs([job])
+
+        loaded = mgr.load_job_by_name("dummy")
+        assert loaded["platform_name"] == "LOCAL"
+
+
+def test_save_jobs_persists_local_logs_on_insert_and_update(tmp_path):
+    """save_jobs writes local_logs_out/err both for new rows and existing rows (#3176)."""
+    with patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path)):
+        from autosubmit.job.job import Job
+        from autosubmit.job.job_common import Status
+        mgr = JobsDbManager(schema="test_schema_local_logs")
+        mgr.create_table(JobsTable.name)
+
+        job = Job("dummy", 1, Status.COMPLETED, 0)
+        job.local_logs = ("dummy.1.out", "dummy.1.err")
+        mgr.save_jobs([job])
+
+        loaded = mgr.load_job_by_name("dummy")
+        assert loaded["local_logs_out"] == "dummy.1.out"
+        assert loaded["local_logs_err"] == "dummy.1.err"
+
+        job.local_logs = ("dummy.2.out", "dummy.2.err")
+        mgr.save_jobs([job])
+
+        loaded = mgr.load_job_by_name("dummy")
+        assert loaded["local_logs_out"] == "dummy.2.out"
+        assert loaded["local_logs_err"] == "dummy.2.err"
+

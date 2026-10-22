@@ -119,6 +119,7 @@ PERSISTENT_ATTRIBUTES = (
     "packed",
     "log_recovery_call_count",
     "wrapper_type",
+    "platform_name",
 )
 
 

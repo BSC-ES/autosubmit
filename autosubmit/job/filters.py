@@ -127,7 +127,7 @@ def filter_sections_splits(
     :param jobs: list of jobs
     :return: list of jobs matching the filter
     """
-    section_matching_jobs: list["Job"] = []
+    section_matching_jobs: list[Job] = []
     all_splits = list(
         {
             str(job.split).upper()
@@ -237,7 +237,7 @@ def filter_chunks(
     selected_dates: set[str] = set()
     selected_members: set[str] = set()
 
-    # Prune first to reduce the amount of jobs that the chunk filter (last one) has to interate with
+    # Prune first to reduce the amount of jobs that the chunk filter (last one) has to interact with
     # Here we want a reduced list of jobs that matches any date or member selected and remove the rest.
     for date_json in data[dates]:
         selected_dates.update(expand_values(date_json[date], all_dates))

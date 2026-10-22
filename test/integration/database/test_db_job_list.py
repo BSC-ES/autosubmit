@@ -22,6 +22,7 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.registry import clear_registry
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.database.tables import WrapperJobsTable
@@ -156,12 +157,6 @@ raw_graph_edges = [
 # --- Fixtures.
 
 
-@pytest.fixture(scope="function")
-def as_exp(autosubmit_exp):
-    """Creates a new expid and returns the EXPID."""
-    return autosubmit_exp(include_jobs=False)
-
-
 def _modify_data(expid, conf_dir, data) -> Path:
     data_path = conf_dir / f"{expid}.yml"
     yaml = YAML()
@@ -176,6 +171,8 @@ def _init_test(as_exp, conf_dir, data) -> Path:
 
     for f in (Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid / "db").glob("*.db"):
         f.unlink()
+
+    clear_registry()
 
     return _modify_data(as_exp.expid, conf_dir, data)
 
@@ -288,18 +285,11 @@ def generate_job_list(as_conf, db_manager) -> JobList:
     return job_list
 
 
-def _create_db_manager(schema: str | None = None) -> JobsDbManager:
-    assert schema
-    db_path = Path(BasicConfig.LOCAL_ROOT_DIR) / schema / "db"
-    db_path.mkdir(parents=True, exist_ok=True)
-    return JobsDbManager(schema=schema)
-
-
 @pytest.mark.postgres
 @pytest.mark.parametrize("full_load", [True, False])
-def test_db_job_list_edges(tmp_path: Path, full_load: bool, as_db: str, as_exp):
-
-    db_manager = _create_db_manager(schema=as_exp.expid)
+def test_db_job_list_edges(full_load: bool, as_db: str, autosubmit_exp):
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     raw_graph_edges_local = raw_graph_edges
 
@@ -346,7 +336,7 @@ def test_db_job_list_edges(tmp_path: Path, full_load: bool, as_db: str, as_exp):
 def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmit_exp):
     as_exp = autosubmit_exp()
 
-    db_manager = _create_db_manager(as_exp.expid)
+    db_manager = JobsDbManager(as_exp.expid)
 
     job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
@@ -408,18 +398,19 @@ def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmi
 @pytest.mark.postgres
 @pytest.mark.parametrize("full_load", [True, False])
 def test_db_job_list_jobs_and_edges_together(
-    tmp_path: Path, full_load: bool, as_db: str, as_exp: Any
+    tmp_path: Path, full_load: bool, as_db: str, autosubmit_exp
 ):
     """Test loading and saving both jobs and edges together with different full_load options.
 
     This test verifies that JobList's database manager can correctly save and load
     both jobs and graph edges in a coordinated way.
-    :param tmp_path: Temporary directory path
-    :param full_load: Whether to perform a full load of jobs and edges
-    :param as_exp: Autosubmit experiment.
-    """
 
-    db_manager = _create_db_manager(schema=as_exp.expid)
+    :param tmp_path: Temporary directory path.
+    :param full_load: Whether to perform a full load of jobs and edges.
+    :param autosubmit_exp: Fixture to create an Autosubmit experiment.
+    """
+    as_exp = autosubmit_exp()
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     # Create and save original job list with jobs and edges
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -497,14 +488,12 @@ def test_db_job_list_jobs_and_edges_together(
 @pytest.mark.postgres
 @pytest.mark.parametrize("full_load", [True, False])
 def test_select_latest_inner_jobs(
-    tmp_path: Path,
-    as_db: str,
-    full_load: bool,
-    as_exp: Any,
+    tmp_path: Path, as_db: str, full_load: bool, autosubmit_exp
 ):
+    as_exp = autosubmit_exp()
     Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
 
-    db_manager = _create_db_manager(schema=as_exp.expid)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
@@ -580,15 +569,11 @@ def test_select_latest_inner_jobs(
 
 @pytest.mark.postgres
 @pytest.mark.parametrize("full_load", [True, False])
-def test_load_job_by_name(
-    tmp_path: Path,
-    full_load: bool,
-    as_db: str,
-    as_exp: Any,
-):
+def test_load_job_by_name(tmp_path: Path, full_load: bool, as_db: str, autosubmit_exp):
+    as_exp = autosubmit_exp(include_jobs=False)
     Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
 
-    db_manager = _create_db_manager(schema=as_exp.expid)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     # Generate and save some jobs
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -614,16 +599,12 @@ def test_load_job_by_name(
 
 @pytest.mark.postgres
 @pytest.mark.parametrize("preview", [True, False])
-def test_load_wrapper(
-    tmp_path: Path,
-    preview: bool,
-    as_db: str,
-    as_exp: Any,
-):
+def test_load_wrapper(tmp_path: Path, preview: bool, as_db: str, autosubmit_exp):
+    as_exp = autosubmit_exp(include_jobs=False)
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
     exp_path / "db"
 
-    db_manager = _create_db_manager(schema=as_exp.expid)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     # Generate and save some jobs
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -695,16 +676,13 @@ def test_load_wrapper(
 
 
 @pytest.mark.postgres
-def test_clear_unused_nodes(tmp_path: Path, as_db: str, as_exp: Any):
-    """
-    Test the clear_unused_nodes method which removes jobs from the database based on configuration differences.
+def test_clear_unused_nodes(tmp_path: Path, as_db: str, autosubmit_exp):
+    """Test the clear_unused_nodes method which removes jobs from the database based on configuration differences."""
+    as_exp = autosubmit_exp(include_jobs=False)
 
-    :param tmp_path: Temporary directory path
-    :param as_exp.as_conf: Fixture to create a test configuration
-    """
     Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
 
-    db_manager = _create_db_manager(schema=as_exp.expid)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     job_list = generate_job_list(as_exp.as_conf, db_manager)
 
@@ -1382,28 +1360,26 @@ DEPENDENCIES_IDS = [
         for i in range(len(DEPENDENCIES_CHANGED_DATA))
     ],
 )
-def test_with_createcw_command_differences(
-    as_exp: Any,
-    changed_data: dict[str, Any],
-    tmp_path: Path,
-    as_db: str,
+def test_with_create_cw_command_differences(
+    changed_data: dict[str, Any], tmp_path: Path, as_db: str, autosubmit_exp
 ) -> None:
-    """
-    Integration test to verify database updates.
-    The experiment is created with an initial configuration, and then recreated with modifications to test
-    So we're testing the Autosubmit ability to detect and handle changes.
-    :param as_exp: new expid
+    """Integration test to verify database updates.
+
+    The experiment is created with an initial configuration, and then recreated with modifications to test.
+    We test the ability of Autosubmit to detect and handle changes.
+
     :param changed_data: Dictionary containing configuration changes to be applied
     :param tmp_path: Temporary directory path
     :param as_db: Fixture to set up the database
-
+    :param autosubmit_exp: Fixture to set up the autosubmit experiment.
     """
+    as_exp = autosubmit_exp(include_jobs=False)
     fixed_data = {
         "CONFIG": {
             "AUTOSUBMIT_VERSION": 4.2,
             "MAXWAITINGJOBS": 100,
             "TOTALJOBS": 100,
-            "SAFETYSLEEPTIME": 0,
+            "SAFETYSLEEPTIME": 3,
             "RETRIALS": 0,
         },
         "MAIL": {
@@ -1518,13 +1494,12 @@ def test_with_createcw_command_differences(
             },
         }
     }
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
-    conf_dir = exp_path / "conf"
+    conf_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid / "conf"
     unified_data: dict[str, dict] = (
         fixed_data | mutable_experiment_wrappers | mutable_jobs
     )
     _init_test(as_exp, conf_dir, unified_data)
-    db_manager = _create_db_manager(schema=as_exp.expid)
+    db_manager = JobsDbManager(schema=as_exp.expid)
     exit_code = create(
         as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=True
     )
@@ -1642,12 +1617,9 @@ def _inner_job(
 
 
 @pytest.mark.postgres
-def test_clear_wrappers(
-    tmp_path: Path,
-    as_db: str,
-    as_exp: Any,
-):
-    db_manager = _create_db_manager(schema=as_exp.expid)
+def test_clear_wrappers(tmp_path: Path, as_db: str, autosubmit_exp):
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     wrapper_info = [_wrapper_info("pkg_a", 1)]
     inner_jobs = [_inner_job(1, "pkg_a", "j1"), _inner_job(1, "pkg_a", "j2")]
@@ -1675,12 +1647,13 @@ def test_clear_wrappers(
 def test_update_wrapper_status(
     tmp_path: Path,
     as_db: str,
-    as_exp: Any,
     packages: list,
     initial_status: int,
     new_status: int,
+    autosubmit_exp,
 ):
-    db_manager = _create_db_manager(schema=as_exp.expid)
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     for pkg in packages:
         wrapper_info = [_wrapper_info(pkg["name"], pkg["id"], status=initial_status)]
@@ -1699,12 +1672,9 @@ def test_update_wrapper_status(
 
 
 @pytest.mark.postgres
-def test_get_wrappers_id_from_db(
-    tmp_path: Path,
-    as_db: str,
-    as_exp: Any,
-):
-    db_manager = _create_db_manager(schema=as_exp.expid)
+def test_get_wrappers_id_from_db(tmp_path: Path, as_db: str, autosubmit_exp):
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     ids = db_manager.get_wrappers_id_from_db()
     assert ids == []
@@ -1723,12 +1693,9 @@ def test_get_wrappers_id_from_db(
 
 
 @pytest.mark.postgres
-def test_save_wrappers_empty(
-    tmp_path: Path,
-    as_db: str,
-    as_exp: Any,
-):
-    db_manager = _create_db_manager(schema=as_exp.expid)
+def test_save_wrappers_empty(tmp_path: Path, as_db: str, autosubmit_exp):
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     db_manager.save_wrappers([])
 
@@ -1739,11 +1706,10 @@ def test_save_wrappers_empty(
 
 @pytest.mark.postgres
 def test_save_wrappers_multiple_wrapper_infos(
-    tmp_path: Path,
-    as_db: str,
-    as_exp: Any,
+    tmp_path: Path, as_db: str, autosubmit_exp
 ):
-    db_manager = _create_db_manager(schema=as_exp.expid)
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     wrapper_infos = [_wrapper_info("pkg_a", 1), _wrapper_info("pkg_b", 2)]
     inner_jobs = [
@@ -1760,11 +1726,10 @@ def test_save_wrappers_multiple_wrapper_infos(
 
 @pytest.mark.postgres
 def test_save_wrappers_integrity_error_logged(
-    tmp_path: Path,
-    as_db: str,
-    as_exp: Any,
+    tmp_path: Path, as_db: str, autosubmit_exp
 ):
-    db_manager = _create_db_manager(schema=as_exp.expid)
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
 
     wrapper_info = [_wrapper_info("pkg_a", 1)]
     inner_jobs = [_inner_job(1, "pkg_a", "j1")]

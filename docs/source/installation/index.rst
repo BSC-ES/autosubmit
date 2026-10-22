@@ -231,6 +231,10 @@ These parameters provide extra functionalities to Autosubmit.
 
 .. code-block:: ini
 
+    # Enables or disables the jobs historical database backup. Defaults to true.
+    [database]
+    backup = false
+
     [conf]
     # Allows using a different jobs_<EXPID>.yml default template on `autosubmit expid`
     jobs = <path_jobs>/jobs_<EXPID>.yml
@@ -247,13 +251,26 @@ These parameters provide extra functionalities to Autosubmit.
     authorized = [<command1,commandN> <machine1,machineN>]
     forbidden = [<command1,commandN> <machine1,machineN>]
 
-About hosts parameters:
+About ``hosts`` parameters:
 
 From ``3.14+`` onwards, the users can tailor Autosubmit commands to run on specific machines. Previously, only the run
 was affected by the deprecated ``whitelist`` parameter.
 
 * ``authorized = [<command1,commandN> <machine1,machineN>]`` list of machines that can run given autosubmit commands. If the list is empty, all machines are allowed.
 * ``forbidden = [<command1,commandN> <machine1,machineN>]`` list of machines that cannot run given autosubmit commands. If the list is empty, no machine is forbidden.
+
+About ``backup`` parameter:
+
+Autosubmit backs up the jobs historical database ``job_data_<EXPID>.db`` to ``job_data_<EXPID>.sql`` in the
+``historicdb`` path. The backup is taken during ``autosubmit create``, and during ``autosubmit run`` whenever
+job statuses change.
+
+* ``backup = true`` (default) keeps the backups. The default applies when the option is not set.
+* ``backup = false`` disables them, which saves disk space and I/O for large experiments. Existing 
+  ``job_data_<EXPID>.sql`` files are not deleted; remove them manually to reclaim the disk space.
+* Only applies to the SQLite backend.
+* If a backup fails, Autosubmit logs a warning and keeps the previous backup.
+
 
 Example: BSC ``/etc/autosubmitrc``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

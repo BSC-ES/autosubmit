@@ -210,26 +210,6 @@ def do_not_touch_user_home(tmp_path_factory: 'TempPathFactory') -> Generator[Non
     mp.undo()
 
 
-@pytest.fixture(scope='session', autouse=True)
-def avoid_long_sleep_time(session_mocker):
-    """Avoid long sleep time in Autosubmit.
-
-    Debugging a test in Autosubmit that was taking 1 minute, 83.5% of the time was
-    spent in ``time.sleep``. Even though we have the safety sleep time very low in
-    our fixtures, there are other parts of the code in Autosubmit that call it too.
-
-    This fixture will call the real sleep function with a maximum of 1 second.
-    """
-    import time
-    real_sleep = time.sleep
-
-    def my_sleep(s):
-        s = min(1, s)
-        real_sleep(s)
-
-    session_mocker.patch('time.sleep', side_effect=my_sleep)
-
-
 @pytest.fixture
 def experiment_config_fixture(session_mocker):
     # TODO: There are unit and regression tests that fail without this fixture.

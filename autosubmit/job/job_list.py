@@ -4170,8 +4170,7 @@ class JobList:
             data = jobs_data.get(job.name)
             if data:
                 job.id = int(data["job_id"])
-                job.local_logs = data["out"]
-                job.remote_logs = data["err"]
+                job.local_logs = (data["out"], data["err"])
                 if data.get("submit", 0) > 0:
                     job.submit_time_timestamp = datetime.datetime.fromtimestamp(
                         int(data["submit"])).strftime("%Y%m%d%H%M%S")

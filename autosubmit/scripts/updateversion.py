@@ -48,4 +48,6 @@ def args_parser() -> ArgumentParser:
 def main(opts: UpdateversionOptions) -> int | bool | None:
     from autosubmit.experiment.manage import update_version
 
-    return update_version(opts.expid)
+    update_version(opts.expid)
+
+    return True

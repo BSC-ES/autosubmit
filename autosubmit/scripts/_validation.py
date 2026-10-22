@@ -210,10 +210,7 @@ def validate_expid(command: str, opts: ExpidOptions) -> None:
                 # TODO: Non-SQLite experiments may not have their local directory structure yet.
                 #       Create it as a compatibility workaround until experiment configuration can
                 #       be loaded directly from version control. See #1352.
-                create_required_folders(
-                    expid,
-                    Path(BasicConfig.LOCAL_ROOT_DIR, expid),
-                )
+                create_required_folders(expid)
 
             Log.error(f"Experiment '{expid}' was not found.")
             exit(1)
