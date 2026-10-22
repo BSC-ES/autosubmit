@@ -754,7 +754,7 @@ class ParamikoPlatform(Platform):
         :param wrapper_failed:
         :return: True if file is copied successfully, false otherwise
         """
-        local_path = self.tmp_path / relative_path
+        local_path = Path(self.tmp_path) / relative_path
         if not local_path.exists():
             local_path.mkdir(parents=True, exist_ok=True)
 
@@ -831,8 +831,8 @@ class ParamikoPlatform(Platform):
         path_root = Path("")
         try:
             path_root = self.files_path
-            src = path_root / src
-            dest = path_root / dest
+            src = str(path_root / src)
+            dest = str(path_root / dest)
             try:
                 self._ftpChannel.stat(dest)
             except OSError:
@@ -1974,7 +1974,7 @@ class ParamikoPlatform(Platform):
         :return: ``True`` on success, ``False`` otherwise.
         """
         try:
-            path = Path(self.scratch) / self.project_dir / self.user / "permission_checker_azxbyc"
+            path = str(Path(self.scratch) / self.project_dir / self.user / "permission_checker_azxbyc")
             try:
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
