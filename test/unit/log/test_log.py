@@ -426,3 +426,41 @@ def test_global_log_name():
     assert _global_log_name("archive", []) == "archive"
     assert _global_log_name("delete", ["a001"]) == "delete_a001"
     assert _global_log_name("jacaranda", ["a001", "a002"]) == "jacaranda_a001_a002"
+
+
+@pytest.mark.parametrize('_type', ['out', 'err', 'status', 'status_failed'])
+@pytest.mark.parametrize('sub_dirs', [['logs'], ['nested', 'logs']], ids=['missing_dir', 'missing_parent_dirs'])
+def test_set_file_creates_missing_directories(_type, sub_dirs, tmp_path, mocker):
+    """The log directory, including missing parents, is created and the log file opened in it.
+
+    No log file needs to exist beforehand, as the ``FileHandler`` creates it.
+    """
+    date = '20100309_'
+    mocked_log = mocker.patch('autosubmit.log.log.Log.log')
+    mocker.patch('autosubmit.log.log.Log.date', date)
+    sleep = mocker.patch('autosubmit.log.log.sleep')
+
+    log_dir = tmp_path.joinpath(*sub_dirs)
+    file_path = log_dir / 'test.tmp'
+
+    Log.set_file(file_path=str(file_path), type=_type)
+
+    assert mocked_log.addHandler.called
+    assert not sleep.called
+    expected_name = 'test.tmp' if _type in ('status', 'status_failed') else f'{date}test.tmp'
+    assert (log_dir / expected_name).is_file()
+
+
+def test_set_file_bare_file_name(tmp_path, mocker, monkeypatch):
+    """A file name without a directory is created in the current working directory."""
+    date = '20100309_'
+    monkeypatch.chdir(tmp_path)
+    mocked_log = mocker.patch('autosubmit.log.log.Log.log')
+    mocker.patch('autosubmit.log.log.Log.date', date)
+    sleep = mocker.patch('autosubmit.log.log.sleep')
+
+    Log.set_file(file_path='test.tmp', type='out')
+
+    assert mocked_log.addHandler.called
+    assert not sleep.called
+    assert (tmp_path / f'{date}test.tmp').is_file()
