@@ -978,23 +978,14 @@ class AutosubmitConfig:
         Substitute dynamic variables in the given keys.
 
         :param keys: List of keys to be processed.
-        :type keys: list[str]
         :param dynamic_var: Tuple containing the dynamic variable and its value.
-        :type dynamic_var: tuple[str, Any]
         :param parameters: Dictionary containing the parameters to be substituted.
-        :type parameters: dict[str, Any]
         :param pattern: Regex pattern to identify dynamic variables.
-        :type pattern: str
         :param start_long: Start index for long key format.
-        :type start_long: int
         :param dict_keys_type: Type of keys in the parameters dictionary, either "long" or "short".
-        :type dict_keys_type: str
         :param processed_dynamic_variables: Dictionary of already processed dynamic variables.
-        :type processed_dynamic_variables: dict[str, Any]
         :param in_the_end: Flag indicating whether to include special dynamic variables for substitution.
-        :type in_the_end: bool
         :return: A tuple containing the updated processed dynamic variables and parameters.
-        :rtype: tuple[dict[str, Any], dict[str, Any]]
         """
         for i, key in enumerate(filter(None, keys)):
             key = str(key)

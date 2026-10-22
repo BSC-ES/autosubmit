@@ -179,7 +179,7 @@ def test_run_interrupted(
     prepare_scratch(expid=as_exp.expid)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
-    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
     as_conf.set_last_as_command('run')
 

@@ -109,13 +109,12 @@ class BasicConfig:
             BasicConfig.DB_DIR, BasicConfig.DB_FILE)
 
     @staticmethod
-    def __read_file_config(file_path):
+    def __read_file_config(file_path: Path | str):
         """
         Reads configuration file. If configuration file does not exist in given path,
         no error is raised. Configuration options also are not required to exist
 
         :param file_path: configuration file to read
-        :type file_path: str
         """
         if not os.path.isfile(file_path):
             return

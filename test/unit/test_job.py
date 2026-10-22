@@ -1314,7 +1314,7 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
     job.submit_time_timestamp = date2str(datetime.now(), 'S')
     job.platform = local
 
-    total_stats = Path(tmp_path, f'{job.name}_TOTAL_STATS')
+    total_stats = tmp_path / f'{job.name}_TOTAL_STATS'
     if total_stats_exists:
         total_stats.touch()
         total_stats.write_text('First line')
@@ -1361,7 +1361,7 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     job = Job(f'{_EXPID}_dummy', 1, status, 0)
     job.platform = local
 
-    total_stats = Path(tmp_path, f'{job.name}_TOTAL_STATS')
+    total_stats = tmp_path / f'{job.name}_TOTAL_STATS'
     if existing_lines:
         total_stats.touch()
         total_stats.write_text(existing_lines)
@@ -1536,12 +1536,7 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
     mocked_log = mocker.patch('autosubmit.job.job.Log')
 
     if has_completed_files:
-        job_completed_file = Path(
-            local.root_dir,
-            local.config.get('LOCAL_TMP_DIR'),
-            f'LOG_{as_conf.expid}',
-            f'{job.name}_COMPLETED'
-        )
+        job_completed_file = local.root_dir / local.config.get('LOCAL_TMP_DIR') / f'LOG_{as_conf.expid}' / f'{job.name}_COMPLETED'
         job_completed_file.parent.mkdir(parents=True, exist_ok=True)
         job_completed_file.touch()
         job.update_status(as_conf=as_conf)
