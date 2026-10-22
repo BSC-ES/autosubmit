@@ -81,11 +81,11 @@ def test_command_err_script(tmp_path: 'LocalPath'):
     r = run([str(bash_script)], shell=True, capture_output=True, cwd=str(tmp_path))
     assert r.returncode == 1
 
-    assert Path(tmp_path, 'ERR').exists()
-    stat_file = Path(tmp_path, 'test_job_STAT_1')
+    assert (tmp_path / 'ERR').exists()
+    stat_file = tmp_path / 'test_job_STAT_1'
     assert stat_file.exists()
     assert stat_file.read_text().strip().splitlines()[-1] == 'FAILED'
-    assert not Path(tmp_path, 'test_job_COMPLETED').exists()
+    assert not (tmp_path / 'test_job_COMPLETED').exists()
 
 
 def test_killed_script(tmp_path: 'LocalPath'):
@@ -112,9 +112,9 @@ def test_killed_script(tmp_path: 'LocalPath'):
 
     p.join(timeout=5)
 
-    assert not Path(tmp_path, 'KILLED').exists()
-    assert not Path(tmp_path, 'test_job_COMPLETED').exists()
-    assert not Path(tmp_path, 'test_job_STAT_1').exists()
+    assert not (tmp_path / 'KILLED').exists()
+    assert not (tmp_path / 'test_job_COMPLETED').exists()
+    assert not (tmp_path / 'test_job_STAT_1').exists()
 
 
 def test_signalled_script(tmp_path: 'LocalPath'):
@@ -150,7 +150,7 @@ def test_signalled_script(tmp_path: 'LocalPath'):
 
     # First, we ensure the SIGNALLED file was created, and the script is now
     # sleeping for 10 seconds...
-    signalled_file = Path(tmp_path, 'SIGNALLED')
+    signalled_file = tmp_path / 'SIGNALLED'
     must_end = time() + 30
     while time() < must_end and not signalled_file.exists():
         sleep(0.1)
@@ -167,8 +167,8 @@ def test_signalled_script(tmp_path: 'LocalPath'):
     p.join()
 
     assert signalled_file.exists()
-    stat_file = Path(tmp_path, 'test_job_STAT_1')
+    stat_file = tmp_path / 'test_job_STAT_1'
     assert stat_file.exists(), "STAT file not created upon SIGTERM!"
     assert len(stat_file.read_text().strip().splitlines()) == 4, "STAT file should contain 4 lines (submit time, start time, end time, status)!"
     assert stat_file.read_text().strip().splitlines()[-1] == 'FAILED'
-    assert not Path(tmp_path, 'test_job_COMPLETED').exists()
+    assert not (tmp_path / 'test_job_COMPLETED').exists()

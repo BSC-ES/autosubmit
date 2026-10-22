@@ -619,14 +619,14 @@ def test_autosubmit_generate_config(
     expid = get_next_expid()
     read_files_mock = mocker.patch("autosubmit.experiment.manage.read_files")
 
-    temp_file_path = Path(tmp_path, "files")
+    temp_file_path = tmp_path / "files"
     temp_file_path.mkdir(exist_ok=True)
 
     with tempfile.NamedTemporaryFile(
         dir=temp_file_path, suffix=".yaml", mode="w"
     ) as source_yaml:
         # Our processed and commented YAML output file must be written here
-        Path(tmp_path, expid, "conf").mkdir(parents=True)
+        (tmp_path / expid / "conf").mkdir(parents=True)
 
         monkeypatch.setattr(BasicConfig, "LOCAL_ROOT_DIR", tmp_path)
 
@@ -640,16 +640,14 @@ def test_autosubmit_generate_config(
                         ROOT: No""")
         )
         source_yaml.flush()
-        read_files_mock.return_value = Path(tmp_path)
+        read_files_mock.return_value = tmp_path
 
         parameters = {"JOB": {"JOBNAME": "sim"}, "CONFIG": {"CONFIG.TEST": "42"}}
         _generate_as_config(exp_id=expid, parameters=parameters)  # type: ignore
 
         source_text = Path(source_yaml.name).read_text()
         source_name = Path(source_yaml.name)
-        output_text = Path(
-            tmp_path, expid, "conf", f"{source_name.stem}_{expid}.yml"
-        ).read_text()
+        output_text = (tmp_path / expid / "conf" / f"{source_name.stem}_{expid}.yml").read_text()
 
         assert source_text != output_text
         assert "# sim" not in source_text
@@ -702,7 +700,7 @@ def test_autosubmit_generate_config_resource_listdir_order(mocker, monkeypatch):
         with tempfile.TemporaryDirectory() as temp_dir:
             Path(temp_dir, expid, "conf").mkdir(parents=True)
             temp_file_path = Path(temp_dir, "files")
-            Path(temp_file_path).mkdir()
+            temp_file_path.mkdir()
 
             monkeypatch.setattr(BasicConfig, "LOCAL_ROOT_DIR", temp_dir)
 
@@ -710,7 +708,7 @@ def test_autosubmit_generate_config_resource_listdir_order(mocker, monkeypatch):
             filenames_return = []
 
             for file_name in cast(tuple[str, ...], test["resources"]):
-                input_path = Path(temp_file_path, file_name)
+                input_path = temp_file_path / file_name
                 with open(input_path, "w+") as source_yaml:
                     source_yaml.write("TEST: YES")
                     source_yaml.flush()
@@ -786,7 +784,7 @@ def test_autosubmit_generate_config_non_dict_parameters(
         """)
     )
 
-    Path(tmp_path, expid, "conf").mkdir(parents=True)
+    (tmp_path / expid / "conf").mkdir(parents=True)
     mocker.patch("autosubmit.experiment.manage.read_files", return_value=tmp_path)
     _generate_as_config(
         exp_id=expid,

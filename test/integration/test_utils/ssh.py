@@ -174,10 +174,10 @@ def create_ssh_keypair_and_config(
 
     :return: A tuple with private, public keys, and SSH config file.
     """
-    ssh_key_path = Path(ssh_dir, "test_key")
+    ssh_key_path = ssh_dir / "test_key"
     private_key, public_key = _generate_ssh_keypair(ssh_key_path)
 
-    ssh_config = Path(ssh_dir, config_filename)
+    ssh_config = ssh_dir / config_filename
     if not ssh_config.exists():
         ssh_config.write_text(
             dedent(f"""\

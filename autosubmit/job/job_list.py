@@ -89,7 +89,7 @@ class JobList:
         self.submitter = submitter
         self.check_wrapper_fake_ids = set()
         self.run_id: int | None = None
-        self._set_status_path = Path(BasicConfig.LOCAL_ROOT_DIR / Path(self.expid) / "status")
+        self._set_status_path = Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid / "status"
         self._update_file_path = self._set_status_path / self._update_file
 
     @property

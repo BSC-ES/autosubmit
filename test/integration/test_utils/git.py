@@ -72,7 +72,7 @@ def create_git_repository(path: Path, bare=False, branch='master') -> None:
         #       you need to push something so Git will create the refs/master for the
         #       branch. We do it here, since Autosubmit uses ``-b`` by default.
         with TemporaryDirectory() as td:
-            clone_repo = Path(td, 'clone')
+            clone_repo = Path(td) / 'clone'
             git_clone_repository(f'file:///{str(path)}', clone_repo)
 
             with open(clone_repo / 'README.md', 'w') as f:
