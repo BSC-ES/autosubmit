@@ -830,7 +830,7 @@ class AutosubmitConfig:
                 if matching_values:
                     dynamic_variables[key] = matching_values
             else:
-                match = re.search(pattern, dynamic_var, flags=re.IGNORECASE)
+                match = re.search(pattern, str(dynamic_var), flags=re.IGNORECASE)
                 if match is not None:
                     dynamic_variables[key] = dynamic_var
 
@@ -997,6 +997,7 @@ class AutosubmitConfig:
         :rtype: tuple[dict[str, Any], dict[str, Any]]
         """
         for i, key in enumerate(filter(None, keys)):
+            key = str(key)
             matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
             if in_the_end and "^" in key:
                 pattern_special_variables = r"%\^[a-zA-Z0-9_.-]*(\^\^|,,)?%"
