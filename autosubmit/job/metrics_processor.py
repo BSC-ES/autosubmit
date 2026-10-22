@@ -121,7 +121,7 @@ class UserMetricRepository:
         self.expid = expid
 
         exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
-        tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
+        tmp_path = exp_path.joinpath(BasicConfig.LOCAL_TMP_DIR)
         db_path = tmp_path.joinpath(f"metrics_{expid}.db")
 
         if BasicConfig.DATABASE_BACKEND == "postgres":

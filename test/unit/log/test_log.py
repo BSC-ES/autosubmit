@@ -333,8 +333,8 @@ def test_set_file_more_than_10_files(test_tmp_path: Path, mocker):
         tmp_file_with_date.touch()
 
     assert len(list(test_tmp_path.iterdir())) == 20
-    assert Path(test_tmp_path / '0_test.tmp').exists()
-    assert not Path(test_tmp_path / '100_test.tmp').exists()
+    assert (test_tmp_path / '0_test.tmp').exists()
+    assert not (test_tmp_path / '100_test.tmp').exists()
 
     mocked_log = mocker.patch('autosubmit.log.log.Log.log')
     mocker.patch('autosubmit.log.log.Log.date', '100_')
@@ -346,8 +346,8 @@ def test_set_file_more_than_10_files(test_tmp_path: Path, mocker):
     # and that the new log file has been created, and the first in the sorted by name list
     # has been deleted.
     assert len(list(test_tmp_path.iterdir())) == 20
-    assert not Path(test_tmp_path / '0_test.tmp').exists()
-    assert Path(test_tmp_path / '100_test.tmp').exists()
+    assert not (test_tmp_path / '0_test.tmp').exists()
+    assert (test_tmp_path / '100_test.tmp').exists()
 
 
 def test_log_not_format():
@@ -408,7 +408,7 @@ def test_compress_xz(tmp_path: Path):
     output_file = test_path / "test-compressed.xz"
     compress_xz(input_file, output_file, preset=9, extreme=True)
 
-    assert Path(output_file).exists()
+    assert output_file.exists()
     assert is_xz_file(output_file)
     assert len(find_uncompressed_files(str(test_path))) == 1
 

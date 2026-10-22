@@ -67,14 +67,14 @@ def test_add_files_empty_folder(empty_rocrate: ROCrate, tmp_path):
 
 
 def test_add_files(empty_rocrate: ROCrate, tmp_path):
-    sub_path = Path(tmp_path, 'files')
+    sub_path = tmp_path / 'files'
     sub_path.mkdir(parents=True)
     file = sub_path / 'file.txt'
     file.touch()
     file.write_text('hello')
     _add_files(
         crate=empty_rocrate,
-        base_path=Path(tmp_path),
+        base_path=tmp_path,
         relative_path=str(sub_path),
         expid=_EXPID
     )

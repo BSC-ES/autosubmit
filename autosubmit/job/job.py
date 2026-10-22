@@ -2672,7 +2672,7 @@ class Job:
         script_path = Path(self._tmp_path) / script_name
         with open(script_path, 'wb') as f:
             f.write(template_content.encode(lang))
-        Path(script_path).chmod(0o755)
+        script_path.chmod(0o755)
 
         # Added here so the user can check the generated script
 

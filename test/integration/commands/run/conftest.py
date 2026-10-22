@@ -134,7 +134,7 @@ def _check_db_fields(
     run_tmpdir = run_tmpdir.resolve()
 
     job_data_db = run_tmpdir / "metadata" / "data" / f"job_data_{expid}.db"
-    autosubmit_db = Path(run_tmpdir, "tests.db")
+    autosubmit_db = run_tmpdir / "tests.db"
 
     db_check_list = {
         "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {job_data_db} missing",),

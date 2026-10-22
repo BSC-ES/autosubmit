@@ -113,7 +113,7 @@ def _add_files(crate: ROCrate, base_path: Path, relative_path: str, expid: str,
     """
     existing_ids = {x['@id'] for x in crate.data_entities}
 
-    folder = Path(base_path, relative_path)
+    folder = base_path / relative_path
     for root, dirs, files in os.walk(folder, topdown=True):
         for file in files:
             file_path = Path(root, file)
@@ -443,7 +443,7 @@ def create_rocrate_archive(
     # Add files generated after its execution (retrospective provenance)
     # Some external files could have been loaded too. That's why we use the
     # ``as_conf.current_loaded_files`` dictionary instead (name: mtime).
-    experiment_configuration_path = Path(experiment_path, "conf")
+    experiment_configuration_path = experiment_path / "conf"
     for config_entry in as_conf.current_loaded_files.keys():
         config_entry_path = Path(config_entry)
         if not config_entry_path.is_file():
@@ -636,7 +636,7 @@ def create_rocrate_archive(
 
     # Write RO-Crate ZIP.
     date = datetime.today().strftime('%Y%m%d-%H%M%S-%f')
-    crate_path = Path(path, f"{expid}-crate-{date}.zip")
+    crate_path = path / f"{expid}-crate-{date}.zip"
     crate.source = crate_path
     # TODO: Use ro-crate-py's ZIP writer again once its performance issues
     #       with large projects are resolved. For now, write an uncompressed
