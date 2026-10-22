@@ -134,22 +134,25 @@ class AutosubmitConfig:
     def get_project_submodules_depth(self) -> list[int]:
         """Returns the max depth of the submodule at the moment of cloning.
 
-        The default is -1 (no limit).
+        ``PROJECT_SUBMODULES_DEPTH`` can be an integer, a list of integers, or a
+        string with either of them (e.g. ``"3"`` or ``"[1, 2]"``).
+
+        The default is -1 (no limit), which is also used when the value is not valid.
 
         :return: depth
         """
         git_data = self.experiment_data.get("GIT", {})
-        unparsed_depth = git_data.get('PROJECT_SUBMODULES_DEPTH', "-1")
-        if "[" in unparsed_depth and "]" in unparsed_depth:
-            unparsed_depth = unparsed_depth.strip("[]")
-            depth = [int(x) for x in unparsed_depth.split(",")]
-        else:
-            try:
-                depth = [int(unparsed_depth)]
-            except TypeError:
-                Log.warning("PROJECT_SUBMODULES_DEPTH is not an integer neither a int. Using default value -1")
-                depth = []
-        return depth
+        unparsed_depth = git_data.get('PROJECT_SUBMODULES_DEPTH', -1)
+        try:
+            if isinstance(unparsed_depth, list):
+                return [int(x) for x in unparsed_depth]
+            if isinstance(unparsed_depth, str) and "[" in unparsed_depth and "]" in unparsed_depth:
+                return [int(x) for x in unparsed_depth.strip("[] ").split(",")]
+            return [int(unparsed_depth)]
+        except (TypeError, ValueError):
+            Log.warning(f"PROJECT_SUBMODULES_DEPTH {unparsed_depth!r} is not an integer or a list of integers. "
+                        f"Using default value -1")
+            return [-1]
 
     def get_full_config_as_json(self):
         """Return config as json object"""
