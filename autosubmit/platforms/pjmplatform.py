@@ -81,14 +81,10 @@ class PJMPlatform(ParamikoPlatform):
         self._allow_wrappers = False
         self.update_cmds()
         self.config = config
-        exp_id_path = Path(self.config.get("LOCAL_ROOT_DIR"), self.expid)
-        tmp_path = Path(exp_id_path, "tmp")
-        self._submit_script_path = Path(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh"
-        )
-        self._submit_script_base_name = Path(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_"
-        )
+        exp_id_path = Path(self.config.get("LOCAL_ROOT_DIR", ""), self.expid)
+        tmp_path = exp_id_path / "tmp"
+        self._submit_script_path = tmp_path / self.config.get("LOCAL_ASLOG_DIR", "") / f"submit_{self.name}.sh"
+        self._submit_script_base_name = tmp_path / self.config.get("LOCAL_ASLOG_DIR", "") / "submit_"
 
     def create_a_new_copy(self):
         return PJMPlatform(self.expid, self.name, self.config)
@@ -129,7 +125,7 @@ class PJMPlatform(ParamikoPlatform):
         self.root_dir = Path(
             self.scratch, self.project_dir, self.user, self.expid
         )
-        self.remote_log_dir = str(self.root_dir / Path(f"LOG_{self.expid}"))
+        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
         self.cancel_cmd = "pjdel"
         self._checkhost_cmd = "echo 1"
         self._submit_cmd = f"cd {self.remote_log_dir} ; pjsub"
@@ -137,7 +133,7 @@ class PJMPlatform(ParamikoPlatform):
         self._submit_hold_cmd = f"cd {self.remote_log_dir} ; pjsub"
         self.put_cmd = "scp"
         self.get_cmd = "scp"
-        self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
+        self.mkdir_cmd = f"mkdir -p {self.remote_log_dir}"
 
     def get_mkdir_cmd(self):
         return self.mkdir_cmd

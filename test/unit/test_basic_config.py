@@ -35,11 +35,11 @@ https://googletesting.blogspot.com.es/2008/12/static-methods-are-death-to-testab
 
 def test_update_config_set_the_right_db_path():
     # arrange
-    BasicConfig.DB_PATH = 'fake-path'
+    BasicConfig.DB_PATH = Path("fake-path")
     # act
     BasicConfig._update_config()
     # assert
-    assert os.path.join(BasicConfig.DB_DIR, BasicConfig.DB_FILE) == BasicConfig.DB_PATH
+    assert str(Path(BasicConfig.DB_DIR) / BasicConfig.DB_FILE) == BasicConfig.DB_PATH
 
 
 def test_read_makes_the_right_method_calls():
@@ -154,15 +154,15 @@ def test_read_overwrites_config_with_etc_files(tmp_path):
         BasicConfig.CONFIG_FILE_FOUND = False
 
         # act: read files in order: legacy first, modern second
-        BasicConfig._BasicConfig__read_file_config(str(legacy_etc_rc))
-        BasicConfig._BasicConfig__read_file_config(str(etc_rc))
+        BasicConfig._BasicConfig__read_file_config(legacy_etc_rc)
+        BasicConfig._BasicConfig__read_file_config(etc_rc)
         BasicConfig._update_config()
 
         # assert
         assert BasicConfig.CONFIG_FILE_FOUND is True
         assert BasicConfig.DB_DIR == str(etc_db_dir)
         assert BasicConfig.DB_FILE == "etc.db"
-        assert BasicConfig.DB_PATH == os.path.join(str(etc_db_dir), "etc.db")
+        assert BasicConfig.DB_PATH == str(etc_db_dir / "etc.db")
 
     finally:
         # restore original values

@@ -1007,23 +1007,14 @@ class AutosubmitConfig:
         Substitute dynamic variables in the given keys.
 
         :param keys: List of keys to be processed.
-        :type keys: list[str]
         :param dynamic_var: Tuple containing the dynamic variable and its value.
-        :type dynamic_var: tuple[str, Any]
         :param parameters: Dictionary containing the parameters to be substituted.
-        :type parameters: dict[str, Any]
         :param pattern: Regex pattern to identify dynamic variables.
-        :type pattern: str
         :param start_long: Start index for long key format.
-        :type start_long: int
         :param dict_keys_type: Type of keys in the parameters dictionary, either "long" or "short".
-        :type dict_keys_type: str
         :param processed_dynamic_variables: Dictionary of already processed dynamic variables.
-        :type processed_dynamic_variables: dict[str, Any]
         :param in_the_end: Flag indicating whether to include special dynamic variables for substitution.
-        :type in_the_end: bool
         :return: A tuple containing the updated processed dynamic variables and parameters.
-        :rtype: tuple[dict[str, Any], dict[str, Any]]
         """
         for i, key in enumerate(filter(None, keys)):
             matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
@@ -1429,7 +1420,7 @@ class AutosubmitConfig:
                 with suppress(Exception):
                     if self.ignore_file_path:
                         if "SCRIPT" not in section_data:
-                            if not os.path.exists(os.path.join(self.get_project_dir(), section_file_path)):
+                            if not (Path(self.get_project_dir()) / section_file_path).exists():
                                 check_value = str(section_data.get('CHECK', True)).lower()
                                 if check_value != "false":
                                     if check_value not in "on_submission":
@@ -1437,7 +1428,7 @@ class AutosubmitConfig:
                                             [section,
                                              f"FILE {section_file_path} does not exist and check parameter is not set on_submission value"]]
                                 else:
-                                    self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} does not exist"]]
+                                    self.wrong_config["Jobs"] += [[section, f"FILE {Path(self.get_project_dir()) / section_file_path} does not exist"]]
 
             dependencies = section_data.get('DEPENDENCIES', '')
             if dependencies != "":
@@ -1613,11 +1604,11 @@ class AutosubmitConfig:
         :return:
         """
         # parameters.update( dict((name, getattr(BasicConfig, name)) for name in dir(BasicConfig) if not name.startswith('_') and not name=="read"))
-        parameters['ROOTDIR'] = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
+        parameters['ROOTDIR'] = str(Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid)
         # get_project_dir expects self.experiment_data to be loaded
         # parameters['PROJDIR'] = self.get_project_dir()
-        parameters['PROJDIR'] = os.path.join(
-            parameters['ROOTDIR'], "proj",
+        parameters['PROJDIR'] = str(Path(
+            parameters['ROOTDIR']) / "proj" /
             parameters.get('PROJECT', {}).get('PROJECT_DESTINATION', "project_files")
         )
         return parameters
@@ -1815,8 +1806,8 @@ class AutosubmitConfig:
             return True
         if self.experiment_data.get("CONFIG", {}).get("RELOAD_WHILE_RUNNING", True):
             for file in self.current_loaded_files.keys():
-                if os.path.exists(file):
-                    mod_time = os.path.getmtime(file)
+                if Path(file).exists():
+                    mod_time = Path(file).stat().st_mtime
                     if mod_time > self.current_loaded_files[file]:
                         return True
         return False
@@ -1873,8 +1864,7 @@ class AutosubmitConfig:
                 del self.experiment_data["AS_TEMP"]
             # IF expid and hpcarch are not defined, use the ones from the minimal.yml file
             self.deep_add_missing_starter_conf(self.experiment_data, starter_conf)
-            self.experiment_data['ROOTDIR'] = os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, self.expid)
+            self.experiment_data['ROOTDIR'] = str(Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid)
             self.experiment_data['PROJDIR'] = self.get_project_dir()
             self.experiment_data.update(BasicConfig().props())
             self.experiment_data = self.normalize_variables(self.experiment_data, must_exists=True, raise_exception=True)
@@ -2236,7 +2226,7 @@ class AutosubmitConfig:
             value = self.experiment_data.get("PROJECT", {}).get("PROJECT_DESTINATION", "project_files")
             if not value:
                 if self.experiment_data.get("PROJECT", {}).get("PROJECT_TYPE", "").lower() == "local":
-                    value = os.path.split(self.experiment_data.get("LOCAL", {}).get("PROJECT_PATH", ""))[-1]
+                    value = Path(self.experiment_data.get("LOCAL", {}).get("PROJECT_PATH", "")).name
                 elif self.experiment_data.get("PROJECT", {}).get("PROJECT_TYPE", "").lower() == "svn":
                     value = self.experiment_data.get("SVN", {}).get("PROJECT_URL", "").split('/')[-1]
                 elif self.experiment_data.get("PROJECT", {}).get("PROJECT_TYPE", "").lower() == "git":
@@ -2422,7 +2412,7 @@ class AutosubmitConfig:
         :param command: current autosubmit command
         :return:
         """
-        misc = os.path.join(self.conf_folder_yaml, "as_misc.yml")
+        misc = self.conf_folder_yaml / "as_misc.yml"
         try:
             content = open(misc, 'r').read()
             if re.search('AS_MISC:.*', content):
@@ -2446,7 +2436,7 @@ class AutosubmitConfig:
         :param autosubmit_version: autosubmit's version
         :type autosubmit_version: str
         """
-        version_file = os.path.join(self.conf_folder_yaml, "version.yml")
+        version_file = self.conf_folder_yaml / "version.yml"
         try:
             content = open(version_file, 'r').read()
             if re.search('AUTOSUBMIT_VERSION:.*', content):
@@ -2714,19 +2704,18 @@ class AutosubmitConfig:
 
     def parse_githooks(self) -> None:
         """Parse githooks section in the configuration file."""
-        proj_dir = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_PROJ_DIR)
+        proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid / BasicConfig.LOCAL_PROJ_DIR
         # get project_name
         project_name = str(self.get_project_destination())
 
         # get githook files from proj_dir
-        githook_files = [os.path.join(os.path.join(os.path.join(proj_dir, project_name), ".githooks"), f) for f in
-                         os.listdir(os.path.join(os.path.join(proj_dir, project_name), ".githooks"))]
+        githook_files = [proj_dir / project_name / ".githooks" / f for f in
+                         (proj_dir / project_name / ".githooks").iterdir()]
         parameters = self.load_parameters()
 
         # find all '%(?<!%%)\w+%(?!%%)' in githook files
         for githook_file in githook_files:
-            f_name, ext = os.path.splitext(githook_file)
+            f_name, ext = githook_file.stem, githook_file.suffix
             if ext == ".tmpl":
                 with open(githook_file, 'r') as f:
                     content = f.read()

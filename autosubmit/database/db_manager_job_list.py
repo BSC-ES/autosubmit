@@ -97,7 +97,7 @@ class JobsDbManager(DbManager):
 
     def __init__(self, schema: str | None = None) -> None:
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
-            persistence_full_path = Path(Path(BasicConfig.LOCAL_ROOT_DIR, schema, "db"), Path("job_list.db"))
+            persistence_full_path = Path(BasicConfig.LOCAL_ROOT_DIR, schema, "db", "job_list.db")
         else:
             persistence_full_path = None
         super().__init__(persistence_full_path, schema)

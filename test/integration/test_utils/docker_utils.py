@@ -372,8 +372,12 @@ def prepare_and_test_ssh_container(
     if exit_code != 0:
         raise RuntimeError(f'Failed to write authorized_keys to test container {container.get_wrapped_container().id}')
 
-    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context',
-                 return_value = multiprocessing.get_context('fork'))
+    fork_context = multiprocessing.get_context("fork")
+
+    mocker.patch(
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
+    )
     mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, mocker)
 
 
