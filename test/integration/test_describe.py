@@ -182,7 +182,7 @@ def test_describe_uid_without_user(autosubmit_exp, mocker, tmp_path):
     )
     mock_conf = mocker.MagicMock()
     mocker.patch(
-        "autosubmit.experiment.describe.AutosubmitConfig",
+        "autosubmit.experiment.describe.load_config",
         return_value=mock_conf,
     )
     mock_conf.conf_folder_yaml = str(tmp_path)

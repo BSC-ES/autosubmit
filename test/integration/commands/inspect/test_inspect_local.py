@@ -200,7 +200,7 @@ def test_inspect(
             expected_hpcrootdir = Path(hpcarch_info.get('SCRATCH_DIR', '')) / hpcarch_info.get('PROJECT', '') / hpcarch_info.get('USER', '') / as_exp.expid
             expected_hpclogdir = expected_hpcrootdir / f"LOG_{as_exp.expid}"
 
-        templates_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_exp.expid / BasicConfig.LOCAL_TMP_DIR
+        templates_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid / BasicConfig.LOCAL_TMP_DIR
 
         # Inspect the experiment
         inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
