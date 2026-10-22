@@ -266,11 +266,11 @@ class Log:
         while not os.path.exists(file_path) and retries < max_retries:
             try:
                 directory, filename = os.path.split(file_path)
-                # FIXME: This appears to be wrong. If the directory does not exist, we create it here;
-                #        however, below we create a ``FileHandler``, but that fails if the ``file_path``
-                #        does not exist -- which is the case when this directory is empty!
-                if not os.path.exists(directory):
-                    os.mkdir(directory)
+                # Create the directory (and any missing parents) so the ``FileHandler``s below can
+                # open the log file in it; ``FileHandler`` creates the file itself, so it does not
+                # need to exist beforehand. A bare file name means the current working directory.
+                directory = directory or os.curdir
+                os.makedirs(directory, exist_ok=True)
                 files = [f for f in os.listdir(directory) if os.path.isfile(
                     os.path.join(directory, f)) and f.endswith(filename)]
                 if len(files) >= 10:
