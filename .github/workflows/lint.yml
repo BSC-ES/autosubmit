@@ -2,11 +2,33 @@ name: Lint
 
 on:
   pull_request:
+    paths-ignore:
+      - '.gitignore'
+      - '.mailmap'
+      - '.pylintrc'
+      - 'CONTRIBUTING.md'
+      - 'CITATION.cff'
+      - 'LICENSE'
+      - 'README*.md'
+      - 'SECURITY.md'
+      - 'easybuild/**'
+      - 'docker/Dockerfile'
   workflow_dispatch:
   push:
     branches:
       - main
       - master
+    paths-ignore:
+      - '.gitignore'
+      - '.mailmap'
+      - '.pylintrc'
+      - 'CONTRIBUTING.md'
+      - 'CITATION.cff'
+      - 'LICENSE'
+      - 'README*.md'
+      - 'SECURITY.md'
+      - 'easybuild/**'
+      - 'docker/Dockerfile'
 permissions:
   contents: read
 
