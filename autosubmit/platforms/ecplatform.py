@@ -255,7 +255,7 @@ class EcPlatform(ParamikoPlatform):
                 continue
 
             remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
-            local_path = Path(self.tmp_path) / stat_name
+            local_path = self.tmp_path / stat_name
 
             # The job may still be queuing and not yet running, in that case the
             # STAT file won't exist on the remote side and the download will fail.
@@ -305,7 +305,7 @@ class EcPlatform(ParamikoPlatform):
                 continue
 
             remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
-            local_path = Path(self.tmp_path) / stat_name
+            local_path = self.tmp_path / stat_name
 
             try:
                 subprocess.check_output(
@@ -466,11 +466,11 @@ class EcPlatform(ParamikoPlatform):
     def send_file(self, filename, check=True) -> bool:
         self.check_remote_log_dir()
         self.delete_file(filename)
-        command = f'{self.put_cmd} {Path(self.tmp_path) / filename} {self.host}:{self.files_path / os.path.basename(filename)}'
+        command = f'{self.put_cmd} {self.tmp_path / filename} {self.host}:{self.files_path / os.path.basename(filename)}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError as e:
-            raise AutosubmitError(f"Could not send file {Path(self.tmp_path) / filename} to {self.files_path / filename}", 6005, str(e))
+            raise AutosubmitError(f"Could not send file {self.tmp_path / filename} to {self.files_path / filename}", 6005, str(e))
         return True
 
     def move_file(self, src, dest, must_exist=False):
@@ -499,13 +499,13 @@ class EcPlatform(ParamikoPlatform):
         return process_ok
 
     def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
-        local_path = os.path.join(self.tmp_path, relative_path)
-        if not os.path.exists(local_path):
-            os.makedirs(local_path)
+        local_path = (self.tmp_path/ relative_path)
+        if not local_path.exists():
+            local_path.mkdir()
 
-        file_path = os.path.join(local_path, filename)
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        file_path = (local_path / filename)
+        if file_path.exists():
+            file_path.unlink()
 
         command = f'{self.get_cmd} {self.host}:{self.files_path / filename} {file_path}'
         try:
@@ -543,7 +543,7 @@ class EcPlatform(ParamikoPlatform):
         from the ``[INFO] JOBID=`` marker on the first line.
         """
         filename = Path(remote_path).name
-        local_path = Path(self.tmp_path) / f".tmp_{filename}"
+        local_path = self.tmp_path / f".tmp_{filename}"
         try:
             subprocess.check_output(
                 f"{self.get_cmd} {self.host}:{remote_path} {local_path}",

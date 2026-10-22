@@ -40,4 +40,4 @@ def test_load_parameters_default_description_invalid_expid(autosubmit_exp):
 
     as_conf.load_parameters()
 
-    assert not as_conf.experiment_data['DEFAULT']['DESCRIPTION']
+    assert as_conf.experiment_data['DEFAULT']['DESCRIPTION'] ==  ""

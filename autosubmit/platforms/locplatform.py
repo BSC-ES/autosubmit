@@ -218,14 +218,14 @@ class LocalPlatform(ParamikoPlatform):
         :param check: Unused in this platform.
         :return: True if the file was sent successfully.
         """
-        command = (f"{self.put_cmd} {Path(self.tmp_path) / Path(filename).name} "
-                   f"{Path(self.tmp_path) / f'LOG_{self.expid}' / Path(filename).name}; "
-                   f"chmod 770 {Path(self.tmp_path) / f'LOG_{self.expid}' / Path(filename).name}")
+        command = (f"{self.put_cmd} {self.tmp_path / Path(filename).name} "
+                   f"{self.tmp_path / f'LOG_{self.expid}' / Path(filename).name}; "
+                   f"chmod 770 {self.tmp_path / f'LOG_{self.expid}' / Path(filename).name}")
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
             Log.error(
-                f"Could not send file {Path(self.tmp_path) / filename} to {Path(self.tmp_path) / f'LOG_{self.expid}' / filename}")
+                f"Could not send file {self.tmp_path / filename} to {self.tmp_path / f'LOG_{self.expid}' / filename}")
             raise
         return True
 
@@ -236,9 +236,9 @@ class LocalPlatform(ParamikoPlatform):
         :return: An empty string.
         """
         # This function is a copy of the slurm one
-        log_dir = Path(self.tmp_path) / f"LOG_{self.expid}"
+        log_dir = self.tmp_path / f"LOG_{self.expid}"
         multiple_delete_previous_run = Path(log_dir) / "multiple_delete_previous_run.sh"
-        if Path(log_dir).exists():
+        if log_dir.exists():
             lang = locale.getlocale()[1]
             if lang is None:
                 lang = 'UTF-8'
@@ -249,13 +249,13 @@ class LocalPlatform(ParamikoPlatform):
     def get_file(self,
             filename: str, must_exist: bool=True, relative_path: str='', ignore_log: bool=False, wrapper_failed: bool=False
         ) -> bool:
-        local_path = Path(self.tmp_path) / relative_path
-        if not Path(local_path).exists():
+        local_path = self.tmp_path / relative_path
+        if not local_path.exists():
             local_path.mkdir(parents=True, exist_ok=True)
-        file_path = Path(local_path, filename)
+        file_path = local_path / filename
         if file_path.exists():
             file_path.unlink()
-        command = f"{self.get_cmd} {Path(self.tmp_path) / f'LOG_{self.expid}' / filename} {file_path}"
+        command = f"{self.get_cmd} {self.tmp_path / f'LOG_{self.expid}' / filename} {file_path}"
         try:
             subprocess.check_call(command, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'), shell=True)
         except subprocess.CalledProcessError:
@@ -294,14 +294,14 @@ class LocalPlatform(ParamikoPlatform):
 
     def delete_file(self, filename, del_cmd=False):
         if del_cmd:
-            command = f"{self.del_cmd} {Path(self.tmp_path) / f'LOG_{self.expid}' / filename}"
+            command = f"{self.del_cmd} {self.tmp_path / f'LOG_{self.expid}' / filename}"
         else:
-            command = f"{self.del_cmd} {Path(self.tmp_path) / f'LOG_{self.expid}' / filename}"
-            command += f" ; {self.del_cmd} {Path(self.tmp_path) / filename}"
+            command = f"{self.del_cmd} {self.tmp_path / f'LOG_{self.expid}' / filename}"
+            command += f" ; {self.del_cmd} {self.tmp_path / filename}"
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
-            Log.debug(f"Could not remove file {Path(self.tmp_path) / filename}")
+            Log.debug(f"Could not remove file {self.tmp_path / filename}")
             return False
         return True
 
@@ -312,10 +312,9 @@ class LocalPlatform(ParamikoPlatform):
         :param dest: destination name.
         :param must_exist: ignore if file exist or not.
         """
-        path_root = ""
         try:
             path_root = self.files_path
-            (path_root / src).rename(Path(path_root) / dest)
+            (path_root / src).rename(path_root / dest)
             return True
         except OSError as e:
             if must_exist:

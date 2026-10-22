@@ -33,19 +33,16 @@ class BasicConfig:
                 pr[name] = value
         return pr
 
-    DB_DIR = os.path.join(os.path.expanduser('~'), 'debug', 'autosubmit')
-    STRUCTURES_DIR = os.path.join(
-        '/esarchive', 'autosubmit', 'as_metadata', 'structures')
-    GLOBAL_LOG_DIR = os.path.join(
-        '/esarchive', 'autosubmit', 'Aslogs')
-    DEFAULT_OUTPUT_DIR = os.path.join('/esarchive', 'autosubmit', 'as_output', 'stats')
-    JOBDATA_DIR = os.path.join(
-        '/esarchive', 'autosubmit', 'as_metadata', 'data')
-    HISTORICAL_LOG_DIR = os.path.join('/esarchive', 'autosubmit', 'as_metadata', 'logs')
+    DB_DIR = str(Path("~/debug/autosubmit").expanduser())
+    STRUCTURES_DIR = str(Path("/esarchive") / "autosubmit" / "as_metadata" / "structures")
+    GLOBAL_LOG_DIR = str(Path("/esarchive") / "autosubmit" / "Aslogs")
+    DEFAULT_OUTPUT_DIR = str(Path("/esarchive") / "autosubmit" / "as_output" / "stats")
+    JOBDATA_DIR =  str(Path("/esarchive") / "autosubmit" / "as_metadata" / "data")
+    HISTORICAL_LOG_DIR = str(Path("/esarchive") / "autosubmit" / "as_metadata" / "logs")
     AUTOSUBMIT_API_URL = "http://192.168.11.91:8081"
     DB_FILE = 'autosubmit.db'
     AS_TIMES_DB = 'as_times.db'
-    DB_PATH = os.path.join(DB_DIR, DB_FILE)
+    DB_PATH = str(Path(DB_DIR) / DB_FILE)
     LOCAL_ROOT_DIR = DB_DIR
     LOCAL_TMP_DIR = 'tmp'
     LOCAL_ASLOG_DIR = 'ASLOGS'
@@ -105,17 +102,15 @@ class BasicConfig:
         Updates commonly used composed paths
         """
         # Just one needed for the moment.
-        BasicConfig.DB_PATH = os.path.join(
-            BasicConfig.DB_DIR, BasicConfig.DB_FILE)
+        BasicConfig.DB_PATH = str(Path(BasicConfig.DB_DIR) / BasicConfig.DB_FILE)
 
     @staticmethod
-    def __read_file_config(file_path):
+    def __read_file_config(file_path: Path | str):
         """
         Reads configuration file. If configuration file does not exist in given path,
         no error is raised. Configuration options also are not required to exist
 
         :param file_path: configuration file to read
-        :type file_path: str
         """
         if not os.path.isfile(file_path):
             return
@@ -224,10 +219,10 @@ class BasicConfig:
             # Call read_file_config with the value of the environment variable
             BasicConfig.__read_file_config(config_file_path)
         else:
-            user_config_path = Path(Path.cwd(), dot_filename)
-            home_user_config_path = Path(Path.home(), dot_filename)
-            etc_rc_path = Path("/etc", filename)
-            legacy_etc_rc_path = Path("/etc", dot_filename)
+            user_config_path = Path.cwd() / dot_filename
+            home_user_config_path = Path.home() / dot_filename
+            etc_rc_path = Path("/etc") / filename
+            legacy_etc_rc_path = Path("/etc") / dot_filename
 
             if user_config_path.exists():
                 BasicConfig.__read_file_config(user_config_path)

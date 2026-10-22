@@ -837,7 +837,7 @@ def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
     """Verify confirm_done_jobs_via_stat uses ecaccess-file-dir and ecaccess-file-get."""
     ec_platform.host = "hpc"
     ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
-    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.tmp_path = tmp_path
     ec_platform.get_cmd = "ecaccess-file-get"
 
     # Mock send_command for ecaccess-file-dir
@@ -894,7 +894,7 @@ def test_confirm_done_jobs_via_stat_handles_download_outcomes(
     """Verify confirm_done_jobs_via_stat handles both download failure and success correctly."""
     ec_platform.host = "hpc"
     ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
-    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.tmp_path = tmp_path
     ec_platform.get_cmd = "ecaccess-file-get"
 
     def _send_command(cmd: str, **_) -> bool:
@@ -935,7 +935,7 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     """Verify set_start_time_from_remote_stat_file uses ecaccess-file-dir and ecaccess-file-get."""
     ec_platform.host = "hpc"
     ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
-    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.tmp_path = tmp_path
     ec_platform.get_cmd = "ecaccess-file-get"
 
     # Mock send_command for ecaccess-file-dir

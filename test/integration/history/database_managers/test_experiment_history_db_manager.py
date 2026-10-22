@@ -72,9 +72,9 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
     # Test that .db file was created or not depending on the database engine
     db_file_path = Path(tmp_test_dir, f"job_data_{options['expid']}.db")
     if is_sqlalchemy:
-        assert not Path(db_file_path).exists()
+        assert not db_file_path.exists()
     else:
-        assert Path(db_file_path).exists()
+        assert db_file_path.exists()
 
     # Test experiment run history methods
     # Test run insertion
@@ -167,9 +167,9 @@ def test_sqlite_initialize_no_db(autosubmit_exp, mocker, tmp_path):
 
 def test_sqlite_initialize_wrong_version(autosubmit_exp, mocker, tmp_path, monkeypatch):
     exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
+    data_folder = tmp_path / 'metadata/data'
     db_file = data_folder / f'job_data_{exp.expid}.db'
-    Path(db_file).touch()
+    db_file.touch()
     db_manager = create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
@@ -193,9 +193,9 @@ def test_sqlite_initialize_wrong_version(autosubmit_exp, mocker, tmp_path, monke
 
 def test_sqlite_initialize_db_exists(autosubmit_exp, mocker, tmp_path):
     exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
+    data_folder = tmp_path / 'metadata/data'
     db_file = data_folder / f'job_data_{exp.expid}.db'
-    Path(db_file).touch()
+    db_file.touch()
     db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
@@ -213,9 +213,9 @@ def test_sqlite_initialize_db_exists(autosubmit_exp, mocker, tmp_path):
 
 def test_sqlite_is_current_version_db_exists(autosubmit_exp, tmp_path):
     exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
+    data_folder = tmp_path / 'metadata/data'
     db_file = data_folder / f'job_data_{exp.expid}.db'
-    Path(db_file).touch()
+    db_file.touch()
     db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
@@ -228,7 +228,7 @@ def test_sqlite_is_current_version_db_exists(autosubmit_exp, tmp_path):
 
 def test_sqlite_is_current_version_no_db(autosubmit_exp, tmp_path):
     exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
+    data_folder = tmp_path / 'metadata/data'
     db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
@@ -241,9 +241,9 @@ def test_sqlite_is_current_version_no_db(autosubmit_exp, tmp_path):
 
 def test_sqlite_is_header_ready_db_version_db_exists(autosubmit_exp, tmp_path):
     exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
+    data_folder = tmp_path / 'metadata/data'
     db_file = data_folder
-    Path(db_file).touch()
+    db_file.touch()
     db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
@@ -256,7 +256,7 @@ def test_sqlite_is_header_ready_db_version_db_exists(autosubmit_exp, tmp_path):
 
 def test_sqlite_is_header_ready_db_version_no_db(autosubmit_exp, tmp_path):
     exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
+    data_folder = tmp_path / 'metadata/data'
     db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         expid=exp.expid,
@@ -510,9 +510,9 @@ def test_update_list_job_data_dc_by_each_id(as_db: str, autosubmit_exp):
 
 def test_sqlite_pragma_version(autosubmit_exp, tmp_path: 'LocalPath'):
     exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
+    data_folder = tmp_path / 'metadata/data'
     db_file = data_folder / f'job_data_{exp.expid}.db'
-    Path(db_file).touch()
+    db_file.touch()
     db_manager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
@@ -520,8 +520,8 @@ def test_sqlite_pragma_version(autosubmit_exp, tmp_path: 'LocalPath'):
         jobdata_dir_path=str(data_folder)
     ))
 
-    Path(db_file).unlink()
-    Path(db_file).touch()
+    db_file.unlink()
+    db_file.touch()
 
     db_manager.execute_statement_on_dbfile(db_manager.historicaldb_file_path, db_manager.create_table_header_query)
     db_manager.execute_statement_on_dbfile(db_manager.historicaldb_file_path, db_manager.create_table_query)

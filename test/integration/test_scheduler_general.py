@@ -31,8 +31,8 @@ def _get_script_files_path() -> Path:
 
 def _write_test_files(expid, local_root_dir: Path):
     # touch as_misc
-    platforms_path = Path(local_root_dir, f"{expid}/conf/platforms_{expid}.yml")
-    jobs_path = Path(local_root_dir, f"{expid}/conf/jobs_{expid}.yml")
+    platforms_path = local_root_dir / f"{expid}/conf/platforms_{expid}.yml"
+    jobs_path = local_root_dir / f"{expid}/conf/jobs_{expid}.yml"
 
     exp_tmp_dir = local_root_dir / expid / 'tmp'
     aslogs_dir = local_root_dir / expid / 'ASLOGS'
@@ -156,9 +156,9 @@ def _write_test_files(expid, local_root_dir: Path):
                 """)
         )
 
-    expid_dir = Path(local_root_dir, f"scratch/whatever/{local_root_dir.owner()}/{expid}")
-    dummy_dir = Path(local_root_dir, f"scratch/whatever/{local_root_dir.owner()}/{expid}/dummy_dir")
-    real_data = Path(local_root_dir, f"scratch/whatever/{local_root_dir.owner()}/{expid}/real_data")
+    expid_dir = local_root_dir / f"scratch/whatever/{local_root_dir.owner()}/{expid}"
+    dummy_dir = local_root_dir / f"scratch/whatever/{local_root_dir.owner()}/{expid}/dummy_dir"
+    real_data = local_root_dir / f"scratch/whatever/{local_root_dir.owner()}/{expid}/real_data"
     # write some dummy data inside scratch dir
     expid_dir.mkdir(parents=True, exist_ok=True)
     dummy_dir.mkdir(parents=True, exist_ok=True)
@@ -167,7 +167,7 @@ def _write_test_files(expid, local_root_dir: Path):
     with open(dummy_dir.joinpath('dummy_file'), 'w') as f:
         f.write('dummy data')
     # create some dummy absolute symlinks in expid_dir to test migrate function
-    Path(real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
+    (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
     return local_root_dir
 
 
@@ -219,7 +219,7 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit_exp: Callable) -> N
     if job_type == "DEFAULT":
         for base_f in _get_script_files_path().glob('base_*.cmd'):
             if scheduler in base_f.stem.split('_')[1].upper():
-                expected_data = Path(base_f).read_text()
+                expected_data = base_f.read_text()
                 break
     elif job_type == "NODES":
         for nodes_f in _get_script_files_path().glob('nodes_*.cmd'):
@@ -227,7 +227,7 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit_exp: Callable) -> N
                 expected_data = Path(nodes_f).read_text()
                 break
     else:
-        expected_data = (Path(_get_script_files_path()) / Path(
+        expected_data = (_get_script_files_path() / Path(
             f"base_{job_type.lower()}_{scheduler.lower()}.cmd")).read_text()
     if not expected_data:
         pytest.fail(f"Could not find the expected data for {scheduler} and {job_type}")
@@ -237,11 +237,11 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit_exp: Callable) -> N
 
     # Get the actual default parameters for the scheduler
     if job_type == "DEFAULT":
-        actual = Path(exp_path, f"tmp/{expid}_BASE_{scheduler}.cmd").read_text()
+        actual = (exp_path / f"tmp/{expid}_BASE_{scheduler}.cmd").read_text()
     elif job_type == "NODES":
-        actual = Path(exp_path, f"tmp/{expid}_NODES_{scheduler}.cmd").read_text()
+        actual = (exp_path / f"tmp/{expid}_NODES_{scheduler}.cmd").read_text()
     else:
-        for asthread in Path(exp_path, "tmp").glob(f"*ASThread_WRAP_{job_type}_[0-9]*.cmd"):
+        for asthread in (exp_path / "tmp").glob(f"*ASThread_WRAP_{job_type}_[0-9]*.cmd"):
             actual = asthread.read_text()
             break
         else:

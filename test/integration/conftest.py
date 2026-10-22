@@ -202,7 +202,7 @@ def autosubmit_exp(
             advanced=False,
             database_path=BasicConfig.DB_DIR if not is_postgres else "",  # type: ignore
             database_filename=BasicConfig.DB_FILE if not is_postgres else "",  # type: ignore
-            local_root_path=str(tmp_path),
+            local_root_path=tmp_path,
             platforms_conf_path=None,  # type: ignore
             jobs_conf_path=None,  # type: ignore
             smtp_hostname=None,  # type: ignore

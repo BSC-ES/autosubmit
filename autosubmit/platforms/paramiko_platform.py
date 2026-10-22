@@ -108,7 +108,7 @@ def _load_ssh_config(ssh_config_path: Path) -> paramiko.SSHConfig:
     Log.info(f"Using {ssh_config_path} as SSH configuration file")
 
     if ssh_config_path.exists():
-        with open(Path(ssh_config_path).expanduser(), "r") as ssh_config_file:
+        with open(ssh_config_path.expanduser(), "r") as ssh_config_file:
             ssh_config.parse(ssh_config_file)
     else:
         Log.warning(f"The SSH configuration file {ssh_config_path} does not exist!")
@@ -754,7 +754,7 @@ class ParamikoPlatform(Platform):
         :param wrapper_failed:
         :return: True if file is copied successfully, false otherwise
         """
-        local_path = Path(self.tmp_path) / relative_path
+        local_path = self.tmp_path / relative_path
         if not local_path.exists():
             local_path.mkdir(parents=True, exist_ok=True)
 
@@ -841,14 +841,14 @@ class ParamikoPlatform(Platform):
         except OSError as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(
-                    f"File {Path(path_root) / src} does not exist, something went "
+                    f"File {path_root / src} does not exist, something went "
                     f"wrong with the platform",
                     6004,
                     str(e),
                 )
             if must_exist:
                 raise AutosubmitError(
-                    f"File {Path(path_root) / src} does not exist", 6004, str(e)
+                    f"File {path_root / src} does not exist", 6004, str(e)
                 )
             else:
                 Log.debug(f"File {path_root} does not exist ")

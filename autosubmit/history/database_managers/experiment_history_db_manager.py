@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import textwrap
 import time
 import traceback
@@ -58,7 +57,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         super().__init__(expid, jobdata_dir_path=jobdata_dir_path)
         self._set_schema_changes()
         self._set_table_queries()
-        self.historicaldb_file_path = str(Path(jobdata_dir_path) / f"job_data_{expid}.db")
+        self.historicaldb_file_path = Path(jobdata_dir_path) / f"job_data_{expid}.db"
 
     def initialize(self):
         if self.my_database_exists():
@@ -68,7 +67,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
             self.create_historical_database()
 
     def my_database_exists(self):
-        if os.path.exists(self.historicaldb_file_path):
+        if self.historicaldb_file_path.exists():
             # Check if the 2 tables exists
             statement = "SELECT name FROM sqlite_master WHERE type='table' AND (name='job_data' OR name='experiment_run');"
             table_result = self.get_from_statement(self.historicaldb_file_path, statement)

@@ -141,9 +141,9 @@ def test_generate_output(
             assert 'could not be opened' in logged_message
 
         if output_format == 'txt':
-            plots_dir = Path(exp_path, 'status')
+            plots_dir = exp_path / 'status'
         else:
-            plots_dir = Path(exp_path, 'plot')
+            plots_dir = exp_path / 'plot'
         plots = list(plots_dir.iterdir())
 
         # Both calls must have produced a separate file.

@@ -292,7 +292,7 @@ def test_get_pscall(paramiko_platform):
 def test_remove_multiple_files_no_error_path_does_not_exist(paramiko_platform):
     """Test that calling a platform function to remove multiple files accepts non-existing directories. """
     from uuid import uuid4
-    paramiko_platform.tmp_path = 'non-existing-path-' + uuid4().hex
+    paramiko_platform.tmp_path = Path('non-existing-path-' + uuid4().hex)
     assert paramiko_platform.remove_multiple_files([]) == ""
 
 
@@ -562,7 +562,6 @@ def test_get_file_errors(exception_message: bool, must_exist: bool, ignore_log: 
     #       or if that logic is not necessary -- after all, it is working fine without that? Or maybe not...
     #       To reproduce the bug, just change the first message from "Garbage" to "The Garbage", and
     #       now the test should fail.
-    # mocker.patch.object(paramiko_platform, "files_path", side_effect=tmp_path)
 
     paramiko_platform.tmp_path = tmp_path
     paramiko_platform.TYPE = PlatformType.SLURM

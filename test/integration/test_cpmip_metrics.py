@@ -168,15 +168,15 @@ def _assert_violation_email(email: dict[str, Any], expid: str, job_name: str,
     "thresholds, notifications, expected_inbox_count",
     [
         (VIOLATION_THRESHOLDS, "true", 1),
-        # (NON_VIOLATION_THRESHOLDS, "true", 0),
-        # (VIOLATION_THRESHOLDS, "false", 0),
-        # (NON_VIOLATION_THRESHOLDS, "false", 0),
+        (NON_VIOLATION_THRESHOLDS, "true", 0),
+        (VIOLATION_THRESHOLDS, "false", 0),
+        (NON_VIOLATION_THRESHOLDS, "false", 0),
     ],
     ids=[
         "violation_emits_notification",
-        # "no_violation",
-        # "violation_but_notifications_off",
-        # "no_violation_and_notifications_off",
+        "no_violation",
+        "violation_but_notifications_off",
+        "no_violation_and_notifications_off",
     ],
 )
 def test_cpmip_notification(
