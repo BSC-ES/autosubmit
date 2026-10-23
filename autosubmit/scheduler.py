@@ -27,8 +27,8 @@ from autosubmit.helpers.utils import check_jobs_file_exists
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.log.log import AutosubmitCritical, Log
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.platform import Platform
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -118,9 +118,9 @@ def check_deadlock(
 def submit_ready_jobs(
     as_conf: "AutosubmitConfig",
     job_list: "JobList",
-    platforms_to_test: list["ParamikoPlatform"],
-    inspect=False,
-    only_wrappers=False,
+    platforms_to_test: list["Platform"],
+    inspect: bool=False,
+    only_wrappers: bool=False,
 ) -> None:
     """Gets READY jobs and send them to the platforms if there is available space on the queues.
 

@@ -198,7 +198,8 @@ def test_describe_uid_without_user(autosubmit_exp, mocker, tmp_path):
         get_from_user="current",
     )
 
-    assert result[0].user == str(owner_uid)
+    assert result[0].user == str(owner_uid) if result is not None else None
+
     mocked_log.warning.assert_any_call(
         f"Current owner of experiment {exp.expid} could not be retrieved. "
         "The owner is no longer in the system database."

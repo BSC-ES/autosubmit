@@ -54,6 +54,7 @@ from autosubmit.job.filters import (
     filter_jobs_by_chunks_splits,
     filter_sections_splits,
 )
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, get_job_status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList, load_job_list
@@ -93,9 +94,9 @@ def _signal_handler(signal_received, frame) -> None:
 
 def _prepare_run(
     expid: str,
-    start_time: str | None = None,
-    start_after: str | None = None,
-    run_only_members: str | None = None,
+    start_time: str = "",
+    start_after: str = "",
+    run_only_members: str = "",
     recover: bool = False,
     check_scripts: bool = False,
     submitter: ParamikoSubmitter | None = None,
@@ -105,7 +106,7 @@ def _prepare_run(
     ExperimentHistory | None,
     str | None,
     "AutosubmitConfig",
-    set["Platform"],
+    list["Platform"],
     bool,
 ]:
     """Prepare the run of the experiment.
@@ -265,7 +266,7 @@ def _prepare_run(
 
 
 def stop(
-    expids: str | None,
+    expids: str,
     force=False,
     all_expids=False,
     force_all=False,
@@ -313,7 +314,7 @@ def stop(
 
     truthy_values = ["true", "yes", "y", "1", ""]
     if not force_all:
-        expid_list: list[str] = [
+        expid_list = [
             expid_in_list
             for expid_in_list in expid_list
             if force_yes
@@ -326,7 +327,7 @@ def stop(
     sig_to_process = signal.SIGKILL if force else signal.SIGINT
     killed_expids = []
     for expid_in_list in expid_list:
-        pid: int = process_id(expid_in_list)
+        pid: int | None  = process_id(expid_in_list)
         if not pid or pid <= 1:
             Log.info(f"Expid {expid_in_list} was not running")
             continue
@@ -362,10 +363,10 @@ def stop(
 def monitor(
     expid: str,
     file_format: str,
-    lst: str,
-    filter_chunks: str,
-    filter_status: str,
-    filter_section: str,
+    lst: str | None,
+    filter_chunks: str | None,
+    filter_status: str | None,
+    filter_section: str | None,
     hide: bool,
     txt_only=False,
     group_by: str | None = None,
@@ -589,9 +590,9 @@ def _process_historical_data_iteration(job_list, job_changes_tracker, expid):
 
 def run(
     expid: str,
-    start_time: str | None = None,
-    start_after: str | None = None,
-    run_only_members: str | None = None,
+    start_time: str = "",
+    start_after: str = "",
+    run_only_members: str = "",
     profiler: "Profiler | None" = None,
     stop_event=None,
 ) -> int:
@@ -672,7 +673,7 @@ def run(
     as_conf.set_platform_parameters(job_list, submitter.platforms)
     # Save metadata.
     as_conf.save()
-    job_changes_tracker = {}
+    job_changes_tracker: dict = {}
     _save_historical_edges(expid)
     job_list.recover_logs(from_db=True)
     job_list.reset_updated_logs()
@@ -761,8 +762,8 @@ def run(
                 )
             Log.result("Storing failed job count...done")
             while not recovery and (
-                recovery_retrials < max_recovery_retrials
-                or max_recovery_retrials <= 0
+                    recovery_retrials < max_recovery_retrials
+                    or max_recovery_retrials <= 0
             ):
                 delay = min(15 * consecutive_retrials, 120)
                 recovery_retrials += 1
@@ -804,8 +805,8 @@ def run(
             consecutive_retrials = 1
             delay = min(15 * consecutive_retrials, 120)
             while not reconnected and (
-                recovery_retrials < max_recovery_retrials
-                or max_recovery_retrials <= 0
+                    recovery_retrials < max_recovery_retrials
+                    or max_recovery_retrials <= 0
             ):
                 recovery_retrials += 1
                 Log.info("Recovering the remote platform connection")
@@ -838,8 +839,8 @@ def run(
                 except Exception:
                     reconnected = False
             if (
-                recovery_retrials == max_recovery_retrials
-                and max_recovery_retrials > 0
+                    recovery_retrials == max_recovery_retrials
+                    and max_recovery_retrials > 0
             ):
                 raise AutosubmitCritical(
                     f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials * 120} reached",
@@ -952,9 +953,9 @@ def recover(
     save: bool,
     all_jobs: bool,
     hide: bool,
-    group_by: str | None = None,
-    expand: list[str] | None = None,
-    expand_status: list[str] | None = None,
+    group_by: str = "",
+    expand: str | None = None,
+    expand_status: str | None = None,
     detail: bool = False,
     force: bool = False,
     offline: bool = False,
@@ -972,7 +973,7 @@ def recover(
     :param save: If True, persist changes to the job list.
     :param all_jobs: If True, recover all jobs; otherwise only active jobs.
     :param hide: If True, hide GUI/windows when generating plots.
-    :param group_by: Optional grouping key for display.
+    :param group_by: grouping key for display.
     :param expand: Optional list of job names/sections to expand in the view.
     :param expand_status: Optional list of statuses to expand in the view.
     :param detail: If True, produce a more detailed (and more expensive) textual representation.
@@ -1000,7 +1001,7 @@ def recover(
     submitter = ParamikoSubmitter(as_conf)
     # TODO: Rebase check if this still works
     # Changed to check the platforms in used by iterating the configuration instead of the whole job_list
-    platforms_to_test: set["ParamikoPlatform"] = set()
+    platforms_to_test: set = set()
     for section_data in as_conf.jobs_data.values():
         if (
             "PLATFORM" in section_data
@@ -1147,7 +1148,7 @@ def recover(
             from autosubmit.monitor.monitor import Monitor
 
             status = []
-            if group_by and expand_status:
+            if group_by != "" and expand_status:
                 if isinstance(expand_status, str):
                     for s in expand_status.split():
                         status.append(get_job_status(s.upper()))
@@ -1303,7 +1304,7 @@ def inspect(
                     jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", [])
                     wrapped_sections.extend(jobs_in_wrapper)
                     wrapped_sections = list(set(wrapped_sections))
-        jobs_aux = []
+        jobs_aux: list['Job'] = []
         sections_added = set()
         for job in jobs:
             if job.section not in sections_added or job.section in wrapped_sections:
@@ -1321,7 +1322,7 @@ def inspect(
         del jobs_aux
     file_paths = ""
 
-    if isinstance(jobs, type([])):
+    if isinstance(jobs, list):
         for job in jobs:
             file_paths += f"{str(tmp_path / (job.name + '.cmd'))} | {job.file}\n"
             job.status = Status.WAITING
@@ -1362,7 +1363,7 @@ def statistics(
     :param jobs_summary: Show jobs statistics.
     :param hide: Hide the window with the plot.
     """
-    import autosubmit.statistics.utils as StatisticsUtils
+    import autosubmit.statistics.utils as statisticsutils
     from autosubmit.job.job_common import Status
     from autosubmit.job.job_list import JobList
     from autosubmit.job.job_utils import SubJob, SubJobManager
@@ -1378,8 +1379,8 @@ def statistics(
         for job in job_list.get_job_list():
             job.update_parameters(as_conf, set_attributes=True)
         Log.debug("Job list restored from db")
-        jobs = StatisticsUtils.filter_by_section(job_list.get_job_list(), filter_type)
-        jobs, period_ini, period_fi = StatisticsUtils.filter_by_time_period(
+        jobs = statisticsutils.filter_by_section(job_list.get_job_list(), filter_type)
+        jobs, period_ini, period_fi = statisticsutils.filter_by_time_period(
             jobs, filter_period
         )
         # Package information

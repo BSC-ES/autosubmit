@@ -705,7 +705,8 @@ def test_create_tree_list_grouped_jobs():
         group_by='date',
         jobs=jobs.copy(),  # TODO: Why does ``group_jobs`` destroy the list ``jobs``??
         job_list=job_list,
-        expand_list=None
+        expand_list=[],
+        expanded_status=[]
     )
 
     groups = job_grouping.group_jobs()

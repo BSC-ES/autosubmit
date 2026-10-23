@@ -28,7 +28,7 @@ from autosubmit.log.log import AutosubmitCritical, Log
 
 def handle_start_time(start_time: str) -> None:
     """Wait until the supplied time."""
-    if start_time:
+    if start_time != "" and start_time is not None:
         Log.info("User provided starting time has been detected.")
         # current_time = time()
         datetime_now = datetime.datetime.now()
@@ -71,7 +71,7 @@ def handle_start_after(start_after: str, expid: str) -> str | None:
     :return: The ``start_after`` expid when it does not exist, so the caller can
         report it after the console is cleared; ``None`` otherwise.
     """
-    if start_after:
+    if start_after != "" and start_after is not None:
         Log.info("User provided expid completion trigger has been detected.")
         # The user tries to be tricky
         if str(start_after) == str(expid):
@@ -126,7 +126,7 @@ def _run_is_completed(current_run) -> bool:
     )
 
 
-def get_allowed_members(run_members: str | None, as_conf: AutosubmitConfig) -> list[str] | list[Any]:
+def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> list[str] | list[Any]:
     """Check if the members sent are allowed
 
    :param run_members: str
@@ -134,7 +134,7 @@ def get_allowed_members(run_members: str | None, as_conf: AutosubmitConfig) -> l
 
    :return: dict
     """
-    if run_members is not None:
+    if run_members != "" and run_members is not None:
         allowed_members = run_members.split()
         runs_missing = [run_member for run_member in allowed_members if run_member not in as_conf.get_member_list()]
         if len(runs_missing) > 0:
