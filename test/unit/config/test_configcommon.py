@@ -1625,3 +1625,35 @@ def test_check_wrapper_conf_local_platform_not_supported(autosubmit_config):
         as_conf.check_wrapper_conf(wrappers)
 
     assert "LOCAL platform does not support wrappers" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "depth,expected",
+    [
+        (None, [-1]),
+        ("-1", [-1]),
+        ("3", [3]),
+        (3, [3]),
+        ("[1,2]", [1, 2]),
+        ("[1, 2]", [1, 2]),
+        ([1, 2], [1, 2]),
+        (["1", "2"], [1, 2]),
+    ],
+)
+def test_get_project_submodules_depth(autosubmit_config, depth, expected):
+    """Test that ``PROJECT_SUBMODULES_DEPTH`` is parsed from strings, integers, and lists."""
+    git = {} if depth is None else {"PROJECT_SUBMODULES_DEPTH": depth}
+    as_conf = autosubmit_config(_EXPID, experiment_data={"GIT": git})
+
+    assert as_conf.get_project_submodules_depth() == expected
+
+
+@pytest.mark.parametrize("depth", ["abc", "", "[1,a]", [1, "a"], {"A": 1}])
+def test_get_project_submodules_depth_invalid_uses_default(autosubmit_config, mocker, depth):
+    """Test that an invalid ``PROJECT_SUBMODULES_DEPTH`` logs a warning and uses the default -1."""
+    mocked_log = mocker.patch("autosubmit.config.configcommon.Log")
+    as_conf = autosubmit_config(_EXPID, experiment_data={"GIT": {"PROJECT_SUBMODULES_DEPTH": depth}})
+
+    assert as_conf.get_project_submodules_depth() == [-1]
+    assert mocked_log.warning.call_count == 1
+    assert "Using default value -1" in mocked_log.warning.call_args[0][0]
