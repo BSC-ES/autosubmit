@@ -23,7 +23,7 @@ from autosubmit.database.db_utils import batch_size_for, chunked, max_params
 
 
 @pytest.mark.parametrize(
-    "dialect, expected",
+    "dialect,expected",
     [
         ("sqlite", 999),
         ("postgresql", 65535),
@@ -35,7 +35,7 @@ def test_max_params(dialect: str, expected: int) -> None:
 
 
 @pytest.mark.parametrize(
-    "num_columns, dialect, expected",
+    "num_columns,dialect,expected",
     [
         (1, "sqlite", 999),
         (4, "sqlite", 249),

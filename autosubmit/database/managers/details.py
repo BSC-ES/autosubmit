@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Repository for the experiment ``details`` table."""
+"""Manager for the experiment ``details`` table."""
 
 from typing import Any
 
@@ -26,7 +26,7 @@ from autosubmit.database.models.tables import TableRegistry
 from autosubmit.database.session import get_engine
 
 
-class ExperimentDetailsRepository:
+class ExperimentDetailsManager:
     """Manage the experiment details in the general database."""
 
     def __init__(self) -> None:

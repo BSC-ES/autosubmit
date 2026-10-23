@@ -15,26 +15,26 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Integration tests for the experiment details repository."""
+"""Integration tests for the experiment details manager."""
 
 import pytest
 
-from autosubmit.database.managers.details import ExperimentDetailsRepository
+from autosubmit.database.managers.details import ExperimentDetailsManager
 
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_details_repository(as_db: str):
-    details_repo = ExperimentDetailsRepository()
+def test_details_manager(as_db: str):
+    details_manager = ExperimentDetailsManager()
 
     exp_id = 10
     created = "2024-04-11T13:34:41+02:00"
 
     # Insert data
-    details_repo.upsert_details(
+    details_manager.upsert_details(
         exp_id=exp_id, user="foo", created=created, model="my_model", branch="NA", hpc="MN5"
     )
-    assert details_repo.get_details(exp_id) == {
+    assert details_manager.get_details(exp_id) == {
         "exp_id": exp_id,
         "user": "foo",
         "created": created,
@@ -44,13 +44,13 @@ def test_details_repository(as_db: str):
     }
 
     # Update data
-    details_repo.upsert_details(
+    details_manager.upsert_details(
         exp_id=exp_id, user="bar", created=created, model="my_model", branch="NA", hpc="MN5"
     )
-    updated = details_repo.get_details(exp_id)
+    updated = details_manager.get_details(exp_id)
     assert updated is not None
     assert updated["user"] == "bar"
 
     # Delete data
-    details_repo.delete_details(exp_id)
-    assert details_repo.get_details(exp_id) is None
+    details_manager.delete_details(exp_id)
+    assert details_manager.get_details(exp_id) is None

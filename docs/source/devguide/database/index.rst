@@ -44,7 +44,7 @@ Core databases
      - ``$HOME/autosubmit/autosubmit.db``
      - The main database of Autosubmit. Stores the experiments (``experiment``),
        their details (``details``) and the per-target schema versions
-       (``schema_migrations``). Its location can be customized in the
+       (``schema_version``). Its location can be customized in the
        ``autosubmitrc`` file.
    * - ``as_times.db``
      - ``$HOME/autosubmit/as_times.db``

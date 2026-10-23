@@ -39,10 +39,10 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.models.tables import GENERALTABLES, Table, TableRegistry
 from autosubmit.database.schema_version import (
-    ensure_schema_migrations_table,
+    ensure_schema_version_table,
     get_schema_version,
-    record_schema_migration,
-    schema_migrations_table,
+    record_schema_version,
+    schema_version_table,
 )
 
 
@@ -50,23 +50,23 @@ class SchemaVersionedManager:
     """Tracks the schema version of a single target database.
 
     Subclasses that own a target set ``SCHEMA_VERSION`` to the version they
-    expect and give the target a unique ``SCHEMA_MIGRATIONS_TABLE_NAME``
+    expect and give the target a unique ``SCHEMA_VERSION_TABLE_NAME``
     (targets that share a schema must not reuse the same table name).
     """
 
     # Schema version expected for the target database. When set, the manager
-    # records it in a ``schema_migrations`` table inside the target database.
+    # records it in a ``schema_version`` table inside the target database.
     SCHEMA_VERSION: int | None = None
-    SCHEMA_MIGRATIONS_TABLE_NAME = "schema_migrations"
+    SCHEMA_VERSION_TABLE_NAME = "schema_version"
 
     def _init_schema_version(self, metadata: MetaData) -> None:
-        """Build the per-target ``schema_migrations`` table on ``metadata``."""
-        self._schema_migrations_table = schema_migrations_table(
-            metadata, name=self.SCHEMA_MIGRATIONS_TABLE_NAME
+        """Build the per-target ``schema_version`` table on ``metadata``."""
+        self._schema_version_table = schema_version_table(
+            metadata, name=self.SCHEMA_VERSION_TABLE_NAME
         )
 
     def _set_schema_version(self, target: Engine | Connection, version: int | None = None) -> None:
-        """Create the ``schema_migrations`` table and record ``version``.
+        """Create the ``schema_version`` table and record ``version``.
 
         :param target: An open connection, or an engine (a transaction is opened).
         :param version: Version to record; defaults to ``SCHEMA_VERSION``.
@@ -74,8 +74,8 @@ class SchemaVersionedManager:
         version = self.SCHEMA_VERSION if version is None else version
         if version is None:
             return
-        ensure_schema_migrations_table(target, self._schema_migrations_table)
-        record_schema_migration(target, self._schema_migrations_table, version)
+        ensure_schema_version_table(target, self._schema_version_table)
+        record_schema_version(target, self._schema_version_table, version)
 
     def _get_schema_version(self, target: Engine, schema: str | None = None) -> int:
         """Read the recorded schema version, or 0 if it is unknown.
@@ -84,7 +84,7 @@ class SchemaVersionedManager:
         :param schema: Optional schema name.
         :return: The recorded version, or 0 if it is unknown.
         """
-        return get_schema_version(target, self._schema_migrations_table, schema)
+        return get_schema_version(target, self._schema_version_table, schema)
 
 
 class DbManager(SchemaVersionedManager):
@@ -116,7 +116,7 @@ class DbManager(SchemaVersionedManager):
         return cast(Engine, self.engine_historical or self.engine)
 
     def _ensure_schema_version(self) -> None:
-        """Ensure the ``schema_migrations`` table exists and records the current version."""
+        """Ensure the ``schema_version`` table exists and records the current version."""
         if self.SCHEMA_VERSION is None or self._schema_version_ensured:
             return
         engine = self._target_engine()

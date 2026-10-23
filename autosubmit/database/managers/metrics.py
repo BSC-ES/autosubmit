@@ -15,10 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Repository for the per-experiment ``user_metrics`` database."""
+"""Manager for the per-experiment ``user_metrics`` database."""
 
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete, insert
@@ -29,15 +28,13 @@ from autosubmit.database import session
 from autosubmit.database.models.tables import TableRegistry
 
 
-class UserMetricRepository:
+class UserMetricManager:
     """Store user metrics in the experiment's metrics database."""
 
     def __init__(self, expid: str):
         self.expid = expid
 
-        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
-        tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
-        db_path = tmp_path.joinpath(f"metrics_{expid}.db")
+        db_path = BasicConfig.expid_tmp_dir(expid).joinpath(f"metrics_{expid}.db")
 
         if BasicConfig.DATABASE_BACKEND == "postgres":
             # Postgres backend

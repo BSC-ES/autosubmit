@@ -25,7 +25,7 @@ from typing import Any
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.registry import load_config
 from autosubmit.database.db_common import get_experiment_id
-from autosubmit.database.managers.details import ExperimentDetailsRepository
+from autosubmit.database.managers.details import ExperimentDetailsManager
 
 __all__ = [
     "LOCAL_TZ",
@@ -40,7 +40,7 @@ class ExperimentDetails:
 
     def __init__(self, expid: str, init_reload: bool = True) -> None:
         self.expid = expid
-        self._details_repo = ExperimentDetailsRepository()
+        self._details_manager = ExperimentDetailsManager()
         if init_reload:
             self.reload()
 
@@ -59,7 +59,7 @@ class ExperimentDetails:
 
     def save_update_details(self) -> None:
         """Save the details of the experiment to the database. Upserts the details."""
-        self._details_repo.upsert_details(
+        self._details_manager.upsert_details(
             self.exp_id, self.user, self.created, self.model, self.branch, self.hpc
         )
 
@@ -68,11 +68,11 @@ class ExperimentDetails:
         exp_id = getattr(self, "exp_id", None)
         if exp_id is None:
             exp_id = get_experiment_id(self.expid)
-        return self._details_repo.get_details(exp_id)
+        return self._details_manager.get_details(exp_id)
 
     def delete_details(self) -> None:
         """Delete the details of the experiment from the database."""
-        self._details_repo.delete_details(self.exp_id)
+        self._details_manager.delete_details(self.exp_id)
 
     @property
     def user(self) -> str:
