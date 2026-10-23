@@ -31,6 +31,14 @@ versioning (SQLite pragmas / the ``db_version`` table) is not read here, so a
 pre-existing database is stamped with the current version the first time it is
 opened.
 
+Each target has its own version constant and its own tracking table, even when
+several targets share a PostgreSQL schema::
+
+    Target      Version constant              Tracking table
+    general     GENERAL_SCHEMA_VERSION        general_schema_version
+    job_list    JOB_LIST_SCHEMA_VERSION       job_list_schema_version
+    history     HISTORY_SCHEMA_VERSION        history_schema_version
+
 TODO(#1286): a dedicated migration tool should eventually read the legacy version
 and apply the ordered migration steps, taking over this layer. The tool is TBD.
 Alternatives to evaluate:
@@ -50,20 +58,29 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.schema import CreateTable
 
+# Schema versions for every target. Each target has an independent migration
+# sequence, even when several targets share a PostgreSQL schema.
+GENERAL_SCHEMA_VERSION = 1
+JOB_LIST_SCHEMA_VERSION = 1
+HISTORY_SCHEMA_VERSION = 21
+
 __all__ = [
-    "ensure_schema_migrations_table",
+    "GENERAL_SCHEMA_VERSION",
+    "HISTORY_SCHEMA_VERSION",
+    "JOB_LIST_SCHEMA_VERSION",
+    "ensure_schema_version_table",
     "get_schema_version",
-    "record_schema_migration",
-    "schema_migrations_table",
+    "record_schema_version",
+    "schema_version_table",
 ]
 
 
-def schema_migrations_table(metadata: MetaData, name: str) -> Table:
-    """Build the table that records which migrations were applied.
+def schema_version_table(metadata: MetaData, name: str) -> Table:
+    """Build the table that records the schema version of a target.
 
     :param metadata: The metadata the table belongs to.
     :param name: The table name.
-    :return: The ``schema_migrations`` table.
+    :return: The ``schema_version`` table.
     """
     return Table(
         name,
@@ -78,11 +95,11 @@ def _now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
 
-def ensure_schema_migrations_table(target: Engine | Connection, table: Table) -> None:
-    """Create the ``schema_migrations`` table if it does not exist.
+def ensure_schema_version_table(target: Engine | Connection, table: Table) -> None:
+    """Create the ``schema_version`` table if it does not exist.
 
     :param target: The engine that owns the target database, or an open connection.
-    :param table: The ``schema_migrations`` table.
+    :param table: The ``schema_version`` table.
     """
     if isinstance(target, Engine):
         with target.begin() as conn:
@@ -92,10 +109,10 @@ def ensure_schema_migrations_table(target: Engine | Connection, table: Table) ->
 
 
 def get_schema_version(engine: Engine, table: Table, schema: str | None = None) -> int:
-    """Return the highest migration version recorded for the target.
+    """Return the schema version recorded for the target.
 
     :param engine: The engine that owns the target database.
-    :param table: The ``schema_migrations`` table.
+    :param table: The ``schema_version`` table.
     :param schema: Optional schema name (PostgreSQL).
     :return: The current schema version, or 0 if none was recorded.
     """
@@ -106,15 +123,15 @@ def get_schema_version(engine: Engine, table: Table, schema: str | None = None) 
     return int(version) if version is not None else 0
 
 
-def record_schema_migration(conn: Connection, table: Table, version: int) -> None:
-    """Record a migration as applied. Safe to call more than once.
+def record_schema_version(conn: Connection, table: Table, version: int) -> None:
+    """Record the current schema version for a target. Safe to call more than once.
 
     Uses a dialect upsert (``ON CONFLICT DO NOTHING``) so concurrent writers do
     not race on the check-then-insert.
 
     :param conn: An open connection.
-    :param table: The ``schema_migrations`` table.
-    :param version: The migration version to record.
+    :param table: The ``schema_version`` table.
+    :param version: The schema version to record.
     """
     values = {"version": version, "applied_at": _now()}
     if conn.dialect.name == "postgresql":

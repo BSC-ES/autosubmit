@@ -22,6 +22,6 @@ job-list and historical-edge managers. Managers with a different shape (SQL
 written by hand, or more than one engine) do not inherit from it:
 ``SqlAlchemyExperimentHistoryDbManager`` and
 ``SqlAlchemyExperimentStatusDbManager`` only share ``SchemaVersionedManager``
-for schema-version tracking. ``ExperimentDetailsRepository`` and
-``UserMetricRepository`` are single-table repositories.
+for schema-version tracking. ``ExperimentDetailsManager`` and
+``UserMetricManager`` are single-table managers.
 """

@@ -127,9 +127,10 @@ def get_engine(db_path: str | Path) -> Engine:
     db_backend = BasicConfig.DATABASE_BACKEND
 
     if db_backend == "sqlite":
-        if str(db_path) == ":memory:":
+        connection_url = URL.create("sqlite", database=str(db_path))
+        if _is_in_memory(connection_url):
             # In-memory databases are not cached: each call gets a fresh engine.
-            return _resolve_engine("sqlite:///:memory:")
+            return _resolve_engine(connection_url)
         db_path = Path(db_path).resolve()
         _ensure_sqlite_file(db_path)
         connection_url = URL.create("sqlite", database=str(db_path))

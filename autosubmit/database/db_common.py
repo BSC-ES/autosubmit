@@ -34,8 +34,9 @@ from autosubmit.database import session
 from autosubmit.database.db_utils import batch_size_for, chunked
 from autosubmit.database.models import tables
 from autosubmit.database.schema_version import (
-    record_schema_migration,
-    schema_migrations_table,
+    GENERAL_SCHEMA_VERSION,
+    record_schema_version,
+    schema_version_table,
 )
 from autosubmit.log.log import AutosubmitCritical, Log
 
@@ -44,12 +45,11 @@ if TYPE_CHECKING:
     from sqlalchemy.sql.elements import ColumnElement
 
 
-CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 15
 
-# The general database records its schema version in ``general_schema_migrations``.
-_SCHEMA_MIGRATIONS_TABLE = schema_migrations_table(
-    tables.metadata_obj, name="general_schema_migrations"
+# The general database records its schema version in ``general_schema_version``.
+_SCHEMA_VERSION_TABLE = schema_version_table(
+    tables.metadata_obj, name="general_schema_version"
 )
 
 
@@ -87,13 +87,13 @@ def create_db() -> bool:
     tables_to_create = [
         tables.ExperimentTable,
         tables.DetailsTable,
-        _SCHEMA_MIGRATIONS_TABLE,
+        _SCHEMA_VERSION_TABLE,
     ]
     try:
         with _get_engine(create=True).begin() as conn:
             for table in tables_to_create:
                 conn.execute(CreateTable(table, if_not_exists=True))
-            record_schema_migration(conn, _SCHEMA_MIGRATIONS_TABLE, CURRENT_DATABASE_VERSION)
+            record_schema_version(conn, _SCHEMA_VERSION_TABLE, GENERAL_SCHEMA_VERSION)
     except Exception as exc:
         raise AutosubmitCritical(f"Database can not be created: {exc}", 7004, str(exc))
     return True

@@ -35,6 +35,7 @@ from autosubmit.database.models.tables import (
     WrapperInfoTable,
     WrapperJobsTable,
 )
+from autosubmit.database.schema_version import JOB_LIST_SCHEMA_VERSION
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
 
@@ -94,11 +95,11 @@ class JobsDbManager(DbManager):
     It supports the SQLite and PostgreSQL backends used by Autosubmit.
     """
 
-    # Schema version of the job_list database, recorded in ``schema_migrations``.
-    SCHEMA_VERSION = 1
+    # Schema version of the job_list database, recorded in ``schema_version``.
+    SCHEMA_VERSION = JOB_LIST_SCHEMA_VERSION
 
     # The job_list schema is shared with the history tables on PostgreSQL.
-    SCHEMA_MIGRATIONS_TABLE_NAME = "job_list_schema_migrations"
+    SCHEMA_VERSION_TABLE_NAME = "job_list_schema_version"
 
     def __init__(self, schema: str | None = None) -> None:
         if BasicConfig.DATABASE_BACKEND == 'sqlite':

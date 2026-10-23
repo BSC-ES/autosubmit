@@ -29,14 +29,14 @@ from autosubmit.database.db_common import (
     update_experiment_description_version,
 )
 from autosubmit.database.schema_version import (
-    ensure_schema_migrations_table,
-    record_schema_migration,
-    schema_migrations_table,
+    ensure_schema_version_table,
+    record_schema_version,
+    schema_version_table,
 )
 from autosubmit.database.session import get_engine
 from autosubmit.log.log import AutosubmitCritical
 
-MIGRATIONS_TABLE_NAME = "schema_migrations_it"
+VERSION_TABLE_NAME = "schema_version_it"
 
 
 @pytest.mark.docker
@@ -106,15 +106,15 @@ def test_update_experiment_description_version_nonexistent(as_db: str) -> None:
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_record_schema_migration_is_idempotent(as_db: str) -> None:
+def test_record_schema_version_is_idempotent(as_db: str) -> None:
     """Recording the same version in separate transactions keeps a single row."""
     engine = get_engine(db_path=BasicConfig.DB_PATH)
-    table = schema_migrations_table(MetaData(), MIGRATIONS_TABLE_NAME)
-    ensure_schema_migrations_table(engine, table)
+    table = schema_version_table(MetaData(), VERSION_TABLE_NAME)
+    ensure_schema_version_table(engine, table)
 
     for _ in range(3):
         with engine.begin() as conn:
-            record_schema_migration(conn, table, 1)
+            record_schema_version(conn, table, 1)
 
     with engine.connect() as conn:
         rows = conn.execute(select(table.c.version)).fetchall()

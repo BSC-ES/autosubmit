@@ -22,12 +22,12 @@ from sqlalchemy import and_, create_engine, delete, insert, inspect, select
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.managers.history import (
-    CURRENT_DB_VERSION,
     DB_EXPERIMENT_HEADER_SCHEMA_CHANGES,
     SqlAlchemyExperimentHistoryDbManager,
     get_last_run_id,
 )
 from autosubmit.database.models.tables import JobDataTable
+from autosubmit.database.schema_version import HISTORY_SCHEMA_VERSION
 from autosubmit.history.utils import get_current_datetime
 from test._oldschema import old_experiment_run_table, old_job_data_table, with_schema
 
@@ -131,7 +131,7 @@ def test_sqlalchemy_initialize_migration_preserves_data(tmp_path, mocker):
 def _set_only_version(db_manager, version: int) -> None:
     """Reset the recorded migrations and leave only ``version`` (test helper)."""
     with db_manager.engine.begin() as conn:
-        conn.execute(delete(db_manager._schema_migrations_table))
+        conn.execute(delete(db_manager._schema_version_table))
         db_manager._set_schema_version(conn, version)
 
 
@@ -139,7 +139,7 @@ def test_sqlalchemy_create_creates_index_and_records_version(sqlalchemy_db_manag
     """A freshly initialized SQLAlchemy database records the current version and has the job_data index."""
     assert sqlalchemy_db_manager._get_schema_version(
         sqlalchemy_db_manager.engine, sqlalchemy_db_manager.schema
-    ) == CURRENT_DB_VERSION
+    ) == HISTORY_SCHEMA_VERSION
     assert sqlalchemy_db_manager.is_header_ready_db_version() is True
 
     inspector = inspect(sqlalchemy_db_manager.engine)
@@ -153,7 +153,7 @@ def test_sqlalchemy_create_creates_index_and_records_version(sqlalchemy_db_manag
         (0, False),
         (DB_EXPERIMENT_HEADER_SCHEMA_CHANGES - 1, False),
         (DB_EXPERIMENT_HEADER_SCHEMA_CHANGES, True),
-        (CURRENT_DB_VERSION, True),
+        (HISTORY_SCHEMA_VERSION, True),
     ],
 )
 def test_sqlalchemy_version_checks(

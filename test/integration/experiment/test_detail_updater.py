@@ -21,7 +21,7 @@ from autosubmit.experiment.detail_updater import ExperimentDetails
 
 
 def test_details_properties(autosubmit_exp, mocker):
-    mocker.patch('autosubmit.experiment.detail_updater.ExperimentDetailsRepository')
+    mocker.patch('autosubmit.experiment.detail_updater.ExperimentDetailsManager')
     exp = autosubmit_exp()
     exp_details = ExperimentDetails(exp.expid, init_reload=False)
 
