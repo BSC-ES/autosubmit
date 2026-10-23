@@ -103,7 +103,7 @@ def test_group_by_date(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('date', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('date', job_list.get_job_list(), job_list, [], [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -146,7 +146,7 @@ def test_group_by_member(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list, [], [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -188,7 +188,7 @@ def test_group_by_chunk(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('chunk', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('chunk', job_list.get_job_list(), job_list, [], [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -235,7 +235,7 @@ def test_group_by_split(job_list, mocker):
     job_list.get_chunk_list = mocker.Mock(return_value=[1, 2])
     job_list.get_date_format = mocker.Mock(return_value='')
 
-    job_grouping = JobGrouping('split', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('split', job_list.get_job_list(), job_list, [], [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -277,7 +277,7 @@ def test_automatic_grouping_all(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     with mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect):'''
-    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list, [], [])
     grouped = job_grouping.group_jobs()
     assert grouped["status"] == groups_dict["status"]
     assert grouped["jobs"] == groups_dict["jobs"]
@@ -323,7 +323,7 @@ def test_automatic_grouping_not_ini(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list, [], [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -391,7 +391,7 @@ def test_automatic_grouping_splits(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list, [], [])
     result = job_grouping.group_jobs()
     assert result["status"] == groups_dict["status"]
     assert result["jobs"] == groups_dict["jobs"]
@@ -446,7 +446,7 @@ def test_automatic_grouping_different_status_member(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list, [], [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -496,7 +496,7 @@ def test_automatic_grouping_different_status_chunk(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list, [], [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -550,7 +550,7 @@ def test_group_by_member_expand_running(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list, expanded_status=[Status.RUNNING])
+    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list, "", expanded_status=[Status.RUNNING])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -606,7 +606,7 @@ def test_group_by_chunk_expand_failed_running(job_list, mocker):
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
     expanded_status = [Status.RUNNING, Status.FAILED]
-    job_grouping = JobGrouping('chunk', job_list.get_job_list(), job_list, expanded_status=expanded_status)
+    job_grouping = JobGrouping('chunk', job_list.get_job_list(), job_list, "", expanded_status=expanded_status)
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -650,7 +650,7 @@ def test_group_by_member_expand(job_list, mocker):
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
     expand_list = "[ 19000101 [m2] 19000202 [m1 m2] ]"
-    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list, expand_list=expand_list)
+    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list, expand_list=expand_list, expanded_status=[])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -742,7 +742,7 @@ def test_group_by_chunk_expand(job_list, mocker):
     job_list.get_date_format = mocker.Mock(return_value='')
 
     job_grouping = JobGrouping('chunk', job_list.get_job_list(), job_list,
-                               expand_list="[ 19000101 [m2 [2] ] 19000202 [m1 [1 2] m2 [1] ] ]")
+                               expand_list="[ 19000101 [m2 [2] ] 19000202 [m1 [1 2] m2 [1] ] ]", expanded_status=[])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -796,7 +796,7 @@ def test_synchronize_member_group_member(job_list, mocker):
     job_list.get_chunk_list = mocker.Mock(return_value=[1, 2])
     job_list.get_date_format = mocker.Mock(return_value='')
 
-    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list, "", [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -847,7 +847,7 @@ def test_synchronize_member_group_chunk(job_list, mocker):
     job_list.get_chunk_list = mocker.Mock(return_value=[1, 2])
     job_list.get_date_format = mocker.Mock(return_value='')
 
-    job_grouping = JobGrouping('chunk', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('chunk', job_list.get_job_list(), job_list, "", [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -892,7 +892,7 @@ def test_synchronize_member_group_date(job_list):
         'expid_19000202_1_ASIM': ['19000202'], 'expid_19000202_2_ASIM': ['19000202']
     }}
 
-    job_grouping = JobGrouping('date', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('date', job_list.get_job_list(), job_list, "", [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -957,7 +957,7 @@ def test_synchronize_date_group_member(job_list, mocker):
             side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('member', job_list.get_job_list(), job_list, "", [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -1024,7 +1024,7 @@ def test_synchronize_date_group_chunk(job_list, mocker):
                 side_effect.append(date2str(job.date, ''))
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('chunk', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('chunk', job_list.get_job_list(), job_list, [], [])
     assert job_grouping.group_jobs() == groups_dict
 
 
@@ -1082,5 +1082,5 @@ def test_synchronize_date_group_date(job_list, mocker):
             side_effect.append('19000202')
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
-    job_grouping = JobGrouping('date', job_list.get_job_list(), job_list)
+    job_grouping = JobGrouping('date', job_list.get_job_list(), job_list, [], [])
     assert job_grouping.group_jobs() == groups_dict

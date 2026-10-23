@@ -52,8 +52,8 @@ class CreateOptions(ExpidOptions):
     hide: bool
     output: str
     group_by: str
-    expand: list | None
-    expand_status: list | None
+    expand: list = []
+    expand_status: list = []
     check_wrapper: bool
     detail: bool
     force: bool

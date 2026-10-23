@@ -57,9 +57,8 @@ def set_status(
     filter_type_chunk_split: str,
     hide: bool,
     group_by: str | None = None,
-    expand: list | None = None,
+    expand: str | None = None,
     expand_status: str | None = None,
-    check_wrapper=False,
     detail=False,
 ) -> bool:
     """Set status of jobs.
@@ -78,7 +77,6 @@ def set_status(
     :param group_by: group by
     :param expand: Whether to expand during job grouping or not.
     :param expand_status: The status to use when expanding.
-    :param check_wrapper: check wrapper
     :param detail: detail
     :return: ``True`` if executed successfully.
     :raises AutosubmitCritical: if any of the filters is malformed or if no filter is provided, with a message describing the errors found.

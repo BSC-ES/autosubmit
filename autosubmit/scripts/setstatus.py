@@ -233,6 +233,5 @@ def main(opts: SetstatusOptions) -> int | bool | None:
         opts.group_by,
         opts.expand,
         opts.expand_status,
-        opts.check_wrapper,
         opts.detail,
     )

@@ -652,12 +652,12 @@ def test_wrapper_config(
             as_exp.as_conf.set_last_as_command("inspect")
             inspect(
                 expid=as_exp.expid,
-                lst=None,  # type: ignore
                 check_wrapper=True,
                 force=True,
-                filter_chunks=None,  # type: ignore
-                filter_section=None,  # type: ignore
-                filter_status=None,  # type: ignore
+                lst="",
+                filter_chunks="",
+                filter_status="",
+                filter_section="",
                 quick=run_type == "quick-inspect",
             )
         templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
@@ -1103,12 +1103,12 @@ def test_inspect_wrappers(
     # Inspect
     inspect(
         expid=exp.expid,
-        lst=None,  # type: ignore
         check_wrapper=True,
         force=True,
-        filter_chunks=None,  # type: ignore
-        filter_section=None,  # type: ignore
-        filter_status=None,  # type: ignore
+        lst="",
+        filter_chunks="",
+        filter_status="",
+        filter_section="",
         quick=False,
     )
 
@@ -1156,10 +1156,10 @@ def test_monitor_wrappers(
     monitor(
         expid=exp.expid,
         file_format="txt",
-        lst=None,  # type: ignore
-        filter_chunks=None,  # type: ignore
-        filter_status=None,  # type: ignore
-        filter_section=None,  # type: ignore
+        lst="",
+        filter_chunks="",
+        filter_status="",
+        filter_section="",
         hide=False,
         txt_only=True,
         check_wrapper=True,
@@ -1595,12 +1595,12 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
         as_conf.set_last_as_command("inspect")
         inspect(
             expid=as_exp.expid,
-            lst=None,  # type: ignore
             check_wrapper=True,
             force=True,
-            filter_chunks=None,  # type: ignore
-            filter_section=None,  # type: ignore
-            filter_status=None,  # type: ignore
+            lst="",
+            filter_chunks="",
+            filter_status="",
+            filter_section="",
             quick=False,
         )
 
@@ -1620,10 +1620,10 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
         monitor(
             expid=as_exp.expid,
             file_format="txt",
-            lst=None,  # type: ignore
-            filter_chunks=None,  # type: ignore
-            filter_status=None,  # type: ignore
-            filter_section=None,  # type: ignore
+            lst="",
+            filter_chunks="",
+            filter_status="",
+            filter_section="",
             hide=False,
             txt_only=True,
             check_wrapper=True,

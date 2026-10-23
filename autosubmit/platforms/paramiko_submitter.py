@@ -179,7 +179,7 @@ class ParamikoSubmitter:
 
     def __init__(self, as_conf: 'AutosubmitConfig', auth_password: str | None = None,
                  local_auth_password=None):
-        self.platforms: dict[str, ParamikoPlatform] = {}
+        self.platforms: dict[str, Platform] = {}
         self.load_platforms(as_conf=as_conf, auth_password=auth_password, local_auth_password=local_auth_password)
 
     @property

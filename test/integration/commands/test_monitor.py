@@ -111,10 +111,10 @@ def test_monitor(autosubmit_exp, wrapper_type, min_trigger_status, from_step, ge
         expand=[],
         expand_status=[],
         file_format="pdf",
-        lst=None,
-        filter_chunks=None,
-        filter_status=None,
-        filter_section=None,
+        lst="",
+        filter_chunks="",
+        filter_status="",
+        filter_section="",
         check_wrapper=False if wrapper_type == "simple" else True,
     )
 

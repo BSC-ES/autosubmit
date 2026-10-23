@@ -821,13 +821,13 @@ def create(
     expid: str,
     noplot: bool,
     hide: bool,
-    output="pdf",
-    group_by: str | None = None,
-    expand: list | None = None,
-    expand_status: list | None = None,
-    check_wrappers=False,
-    detail=False,
-    force=False,
+    output: str = "pdf",
+    group_by: str = "",
+    expand: list = [],
+    expand_status: list = [],
+    check_wrappers: bool = False,
+    detail: bool = False,
+    force: bool = False,
 ) -> int:
     """Creates job list for given experiment. Configuration files must be valid before executing this process.
 
@@ -844,10 +844,6 @@ def create(
     :param output: plot's file format. It can be "pdf", "png", "ps" or "svg".
     :param force: Whether to force the creation of a new job object or not.
     """
-    if not expand:
-        expand = []
-    if not expand_status:
-        expand_status = []
     exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
     try:
         as_conf = load_config(expid)
@@ -985,13 +981,8 @@ def create(
 
             if group_by:
                 status = []
-                if expand_status:
-                    status_list = (
-                        expand_status.split()
-                        if isinstance(expand_status, str)
-                        else expand_status
-                    )
-                    for s in status_list:
+                if len(expand_status) < 1:
+                    for s in expand_status:
                         status.append(get_job_status(s.upper()))
 
                 job_grouping = JobGrouping(
