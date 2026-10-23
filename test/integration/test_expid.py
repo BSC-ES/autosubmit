@@ -804,19 +804,19 @@ def test_expid_generated_correctly(tmp_path, autosubmit_exp):
         expid=f"{as_exp.expid}",
         check_wrapper=True,
         force=True,
-        lst=None,  # type: ignore[arg-type]
-        filter_chunks=None,  # type: ignore[arg-type]
-        filter_status=None,  # type: ignore[arg-type]
-        filter_section=None,  # type: ignore[arg-type]
+        lst="",
+        filter_chunks="",
+        filter_status="",
+        filter_section="",
     )
     inspect(
         expid=f"{as_exp.expid}",
         check_wrapper=True,
         force=True,
-        lst=None,  # type: ignore[arg-type]
-        filter_chunks=None,  # type: ignore[arg-type]
-        filter_status=None,  # type: ignore[arg-type]
-        filter_section=None,  # type: ignore[arg-type]
+        lst="",
+        filter_chunks="",
+        filter_status="",
+        filter_section="",
     )
     assert f"{as_exp.expid}_DEBUG.cmd" in [
         Path(f).name for f in Path(f"{run_dir}/{as_exp.expid}/tmp").iterdir()

@@ -51,7 +51,7 @@ from autosubmit.scripts._cli_function import cli_function
 class DescribeOptions(DefaultOptions):
     """Options for the describe command."""
 
-    expid: str | None
+    expid: str = ""
     user: str
 
     accepts_multiple_expids = True

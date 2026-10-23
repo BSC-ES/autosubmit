@@ -28,12 +28,7 @@ if TYPE_CHECKING:
 
 class JobGrouping:
 
-    def __init__(self, group_by: str, jobs: list["Job"], job_list: "JobList", expand_list: list | None = None,
-                 expanded_status: list | None = None):
-        if not expand_list:
-            expand_list = []
-        if not expanded_status:
-            expanded_status = []
+    def __init__(self, group_by: str, jobs: list["Job"], job_list: "JobList", expand_list: list | str, expanded_status: list):
 
         self.group_by = group_by
         self.jobs = jobs

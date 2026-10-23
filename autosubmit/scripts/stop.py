@@ -58,7 +58,7 @@ from autosubmit.scripts._validation import validate_expid
 class StopOptions(DefaultOptions):
     """Options for the stop command."""
 
-    expid: str | None
+    expid: str
     force: bool
     all: bool
     force_all: bool

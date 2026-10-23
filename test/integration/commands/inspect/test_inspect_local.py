@@ -203,7 +203,15 @@ def test_inspect(
         templates_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid / BasicConfig.LOCAL_TMP_DIR
 
         # Inspect the experiment
-        inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
+        inspect(expid=as_exp.expid,
+                check_wrapper=False,
+                force=True,
+                lst="",
+                filter_chunks="",
+                filter_status="",
+                filter_section="",
+                quick=False
+            )
         assert as_exp.as_conf.experiment_data["HPCARCH"] == hpcarch
         assert as_exp.as_conf.experiment_data["HPCROOTDIR"] == str(expected_hpcrootdir)
         assert as_exp.as_conf.experiment_data["HPCLOGDIR"] == str(expected_hpclogdir)
@@ -359,7 +367,15 @@ def test_inspect_calendar(tmp_path, autosubmit_exp, general_data: dict[str, Any]
 
     # Execute inspect
     as_conf.set_last_as_command('inspect')
-    inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
+    inspect(expid=as_exp.expid,
+        check_wrapper=False,
+        force=True,
+        lst="",
+        filter_chunks="",
+        filter_status="",
+        filter_section="",
+        quick=False
+    )
 
     # Parse result
     jobs_info = {}
