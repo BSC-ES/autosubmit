@@ -83,8 +83,9 @@ def test_runtime_invalid_sections_fall_back_to_defaults(runtime) -> None:
         ({"CONSECUTIVE_MAX_RESTARTS": "nope"}, "RUNTIME.LOG_RECOVERY.CONSECUTIVE_MAX_RESTARTS"),
         ({"RETRY_DELAY": "nope"}, "RUNTIME.LOG_RECOVERY.RETRY_DELAY"),
         ({"INLINE_FALLBACK": "nope"}, "RUNTIME.LOG_RECOVERY.INLINE_FALLBACK"),
+        ({"INLINE_FALLBACK": 1}, "RUNTIME.LOG_RECOVERY.INLINE_FALLBACK"),
     ],
-    ids=["invalid-restarts", "invalid-delay", "invalid-fallback"],
+    ids=["invalid-restarts", "invalid-delay", "invalid-fallback", "invalid-fallback-type"],
 )
 def test_runtime_invalid_values_log_warning(mocker, log_recovery: dict, option_name: str) -> None:
     warning = mocker.patch("autosubmit.config.runtime.Log.warning")

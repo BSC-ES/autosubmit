@@ -17,11 +17,15 @@
 
 """This file contains tests for the ``platform``."""
 
+import multiprocessing as mp
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.job.job import Job, RecoveryAttempt, RecoveryReport
+from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.manage import restore_platforms
@@ -119,25 +123,100 @@ def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):
     assert len(Log.log.handlers) == current_number_of_handlers + 2  # + out + err
 
 
-def test_add_job_to_log_recover_signals_work_event(mocker):
-    """add_job_to_log_recover signals work_event after queuing the job."""
+@pytest.mark.parametrize(
+    "work_event,queue_size,filter_called",
+    [
+        (True, 200, False),
+        (False, 200, False),
+        (True, 0, True),
+    ],
+    ids=["signals-work-event", "no-work-event", "bounds-pending"],
+)
+def test_add_job_to_log_recover_signals_work_event(
+    autosubmit_config, mocker, work_event, queue_size, filter_called
+):
+    """add_job_to_log_recover queues the job, signals work, and bounds the pending map."""
+    ctx = mp.get_context("fork")
     platform = LocalPlatform("t000", "test_platform", {})
-    platform.recovery_queue = mocker.MagicMock()
-    platform.work_event = mocker.MagicMock()
-    platform.log_recovery_process = mocker.MagicMock()
-    platform.log_recovery_process.is_alive.return_value = True
-    as_conf = mocker.MagicMock()
-    as_conf.is_recovery_threads_disabled.return_value = False
+    platform.recovery_queue = CopyQueue(ctx=ctx)
+    platform.work_event = ctx.Event() if work_event else None
+    platform.log_queue_size = queue_size
+    platform.log_recovery_process = SimpleNamespace(is_alive=lambda: True)
+    as_conf = autosubmit_config("t000", {"PLATFORMS": {"test_platform": {}}})
     as_conf.misc_data = {"AS_COMMAND": "run"}
+    job = Job("test_job", 123, Status.COMPLETED, 0)
+    pending_filter = mocker.patch.object(
+        platform, "_pending_still_needing_recovery", return_value={}
+    )
 
-    job = mocker.MagicMock()
-    job.id = 123
-    job.name = "test_job"
-    job.fail_count = 0
+    try:
+        assert platform.add_job_to_log_recover(job, as_conf) is True
 
-    assert platform.add_job_to_log_recover(job, as_conf) is True
-    platform.recovery_queue.put_raw.assert_called_once_with(CopyQueue.job_data(job), timeout=30)
-    platform.work_event.set.assert_called_once_with()
+        assert platform.recovery_queue.get(timeout=5) == CopyQueue.job_data(job)
+        if work_event:
+            assert platform.work_event.is_set()
+        else:
+            assert platform.work_event is None
+        if filter_called:
+            pending_filter.assert_called_once_with()
+        else:
+            pending_filter.assert_not_called()
+    finally:
+        platform.recovery_queue.cancel_join_thread()
+        platform.recovery_queue.close()
+
+
+@pytest.mark.parametrize(
+    "all_succeeded,errors,warning_expected,result_expected",
+    [
+        (True, [], False, False),
+        (True, [None, None], False, True),
+        (False, ["boom"], True, False),
+        (False, ["Remote logs not found"], False, False),
+    ],
+    ids=["no-attempts", "all-succeeded", "failed-attempt", "remote-not-found"],
+)
+def test_recover_job_reports_attempts(
+    mocker, all_succeeded, errors, warning_expected, result_expected
+):
+    """_recover_job reports failed attempts and only logs recovered attempts when there are some."""
+    platform = LocalPlatform("t000", "test_platform", {})
+    attempts = [
+        RecoveryAttempt(
+            attempt=index,
+            success=error is None,
+            local_logs=("", ""),
+            remote_logs=("", ""),
+            error=error,
+        )
+        for index, error in enumerate(errors)
+    ]
+    report = RecoveryReport(
+        job_name="test_job",
+        attempts=attempts,
+        all_succeeded=all_succeeded,
+    )
+    job = SimpleNamespace(
+        name="test_job",
+        retrieve_logfiles=lambda: report,
+        send_cpmip_notification=lambda as_conf: None,
+    )
+    saved_jobs: list[object] = []
+    jobs_db_manager = SimpleNamespace(save_job_log=saved_jobs.append)
+    warning = mocker.patch.object(Log, "warning")
+    result = mocker.patch.object(Log, "result")
+
+    platform._recover_job(job, jobs_db_manager, object())
+
+    if warning_expected:
+        warning.assert_called_once()
+    else:
+        warning.assert_not_called()
+    if result_expected:
+        result.assert_called_once()
+    else:
+        result.assert_not_called()
+    assert saved_jobs == [job]
 
 
 def _restore_platforms_mock(mocker, *, connected=True, should_run=True, process_alive=False):

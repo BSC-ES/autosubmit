@@ -728,12 +728,14 @@ def test_recover_logs_wakes_only_platforms_with_recovery_threads(as_conf, mocker
     as_conf.experiment_data["PLATFORMS"] = {
         "enabled": {},
         "disabled": {"DISABLE_RECOVERY_THREADS": True},
+        "no_queue": {},
     }
     job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
     job_list.dbmanager = mocker.MagicMock()
     job_list.dbmanager.select_finished_jobs_needing_log_recovery.return_value = [
         {"name": "job_enabled", "platform_name": "enabled"},
         {"name": "job_disabled", "platform_name": "disabled"},
+        {"name": "job_no_queue", "platform_name": "no_queue"},
     ]
 
     enabled_platform = mocker.MagicMock()
@@ -746,10 +748,16 @@ def test_recover_logs_wakes_only_platforms_with_recovery_threads(as_conf, mocker
     disabled_platform.work_event = mocker.MagicMock()
     disabled_platform.recovery_queue = mocker.MagicMock()
     disabled_platform.keep_alive_timeout = 60
+    no_queue_platform = mocker.MagicMock()
+    no_queue_platform.serial_platform = no_queue_platform
+    no_queue_platform.work_event = mocker.MagicMock()
+    no_queue_platform.recovery_queue = None
+    no_queue_platform.keep_alive_timeout = 60
 
     for name, platform, platform_name in (
         ("job_enabled", enabled_platform, "enabled"),
         ("job_disabled", disabled_platform, "disabled"),
+        ("job_no_queue", no_queue_platform, "no_queue"),
     ):
         job = Job(name, "42", Status.COMPLETED, 0)
         job.submit_time_timestamp = "20200101000000"
@@ -765,6 +773,7 @@ def test_recover_logs_wakes_only_platforms_with_recovery_threads(as_conf, mocker
 
     enabled_platform.work_event.set.assert_called_once()
     disabled_platform.work_event.set.assert_not_called()
+    no_queue_platform.work_event.set.assert_not_called()
 
 
 def test_recover_last_data_restores_and_marks_finished_jobs(as_conf, mocker):
