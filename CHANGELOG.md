@@ -29,6 +29,8 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
 - Fixed vertical wrappers silently reporting jobs as `COMPLETED` when the inner job script was truncated. The wrapper ran the script through `bash -s` on stdin, so any command in the job body that read stdin swallowed the rest of the script. The inner script now runs as a regular file, with its stdin detached from the wrapper. jira-external#1494
 - Fixed vertical wrappers not stopping an inner job that ignored `SIGTERM`, which could let the job outlive its wallclock inside the wrapper. The per-job `timeout` now also forces a `SIGKILL` after a grace period. jira-external#1494
+- Fixed the log recovery process being silently skipped when it died, which lost the logs and stats of the affected jobs. Autosubmit now restarts it and re-queues the pending jobs #3342
+- Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name instead of platform name #3342
 
 **New Features:**
 
@@ -44,6 +46,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
 - Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
 - Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
+- Added `RUNTIME.LOG_RECOVERY` options to configure log recovery resiliency: `CONSECUTIVE_MAX_RESTARTS` (consecutive restart attempts before waiting to retry, default `2`, `0` disables the limit), `RETRY_DELAY` (seconds to wait after exhausting those attempts before trying to start the recovery process again, default `600`) and `INLINE_FALLBACK` (recover pending logs in the main process while the separate process is unavailable, default `true`) #3342
 - Add `[database] backup` option to `autosubmitrc` to disable SQLite backups #3129
 
 **Migration from `job_list.pkl` to Database**

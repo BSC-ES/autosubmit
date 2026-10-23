@@ -398,7 +398,7 @@ class EcPlatform(ParamikoPlatform):
                 self.connected = False
         except Exception:
             self.connected = False
-        if not log_recovery_process:
+        if self.connected and not log_recovery_process:
             self.spawn_log_retrieval_process(as_conf)
 
     def create_a_new_copy(self):
