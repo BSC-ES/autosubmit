@@ -528,7 +528,7 @@ CONFIG:
         child = Job("child", 1, Status.WAITING, 0)
         self.job.add_children([child])
         assert 1 == len(self.job.children)
-        assert child == list(self.job.children)[0]
+        assert child == next(iter(self.job.children))
 
 
 # TODO: remove this and use pytest fixtures.

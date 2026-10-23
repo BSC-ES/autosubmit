@@ -201,12 +201,12 @@ def _get_action_status(jobs: list[Job]) -> str:
     """
     if not jobs:
         return 'PotentialActionStatus'
-    if all([job.status == Status.COMPLETED for job in jobs]):
-        return 'CompletedActionStatus'
+    if all(job.status == Status.COMPLETED for job in jobs):
+        return "CompletedActionStatus"
     failed_statuses = [
         Status.FAILED
     ]
-    if any([job.status in failed_statuses for job in jobs]):
+    if any(job.status in failed_statuses for job in jobs):
         return 'FailedActionStatus'
     return 'PotentialActionStatus'
 

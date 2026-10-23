@@ -712,7 +712,7 @@ class JobsDbManager(DbManager):
             # Load only active wrapper jobs
             job_names = [job.name for job in job_list] if job_list else []
             wrappers_inner_jobs = self.select_latest_inner_jobs(innerjobs_table, job_names)
-            packages_names = list(set([job['package_name'] for job in wrappers_inner_jobs]))
+            packages_names = list({job['package_name'] for job in wrappers_inner_jobs})
             wrappers_info_filter_with_names = {**wrappers_info_filter, 'name': packages_names}
             wrappers_info = self.select_where_with_columns(wrapper_info_table, wrappers_info_filter_with_names)
         # change status to the proper value

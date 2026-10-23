@@ -334,9 +334,8 @@ def test_calculate_summary(statistics: Statistics, summary: StatsSummary, job_st
 def test_get_summary_as_list(statistics: Statistics, summary_as_list: list[str], create_jobs) -> None:
     """Test that the summary is correctly converted to a list of strings."""
     statistics.calculate_summary()
-    summary_as_list = statistics.summary_list
 
-    assert summary_as_list == summary_as_list
+    assert summary_as_list == statistics.summary_list
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
