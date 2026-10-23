@@ -23,7 +23,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from autosubmit.database.managers.metrics import UserMetricRepository
+from autosubmit.database.managers.metrics import UserMetricManager
 from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
@@ -115,7 +115,7 @@ class UserMetricProcessor:
         self.as_conf = as_conf
         self.job = job
         self.run_id = run_id
-        self.user_metric_repository = UserMetricRepository(job.expid)
+        self.user_metric_manager = UserMetricManager(job.expid)
         self._processed_metrics = {}
 
     def read_metrics_specs(self) -> list[MetricSpec]:
@@ -150,7 +150,7 @@ class UserMetricProcessor:
         """
         Store the metric value in the database
         """
-        self.user_metric_repository.store_metric(
+        self.user_metric_manager.store_metric(
             self.run_id, self.job.name, metric_name, metric_value
         )
         self._processed_metrics[metric_name] = metric_value

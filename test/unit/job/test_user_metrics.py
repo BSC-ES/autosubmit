@@ -39,8 +39,8 @@ _EXPID = "t123"
 
 
 @pytest.fixture
-def disable_metric_repository(mocker):
-    mock = mocker.patch("autosubmit.job.metrics_processor.UserMetricRepository")
+def disable_metric_manager(mocker):
+    mock = mocker.patch("autosubmit.job.metrics_processor.UserMetricManager")
     mock.return_value = mocker.MagicMock()
     yield mock
 
@@ -195,7 +195,7 @@ def test_metric_spec_load_invalid(metric_specs: Any):
         MetricSpec.load(metric_specs)
 
 
-def test_read_metrics_specs_as_conf_exception(disable_metric_repository, mocker):
+def test_read_metrics_specs_as_conf_exception(disable_metric_manager, mocker):
     # Mocking the AutosubmitConfig and Job objects
     as_conf = mocker.MagicMock()
     as_conf.get_section.side_effect = ValueError
@@ -210,7 +210,7 @@ def test_read_metrics_specs_as_conf_exception(disable_metric_repository, mocker)
     assert 'Invalid or missing metrics section' in str(cm.value)
 
 
-def test_process_metrics(disable_metric_repository, mocker: MockerFixture):
+def test_process_metrics(disable_metric_manager, mocker: MockerFixture):
     # Mocking the AutosubmitConfig and Job objects
     as_conf = mocker.MagicMock()
     job = mocker.MagicMock()
@@ -237,13 +237,13 @@ def test_process_metrics(disable_metric_repository, mocker: MockerFixture):
         ),
     ]
 
-    # Mocking the repository
+    # Mocking the manager
     mock_store_metric = mocker.MagicMock()
-    mock_repo = mocker.MagicMock()
-    mock_repo.store_metric = mock_store_metric
+    mock_manager = mocker.MagicMock()
+    mock_manager.store_metric = mock_store_metric
 
     user_metric_processor = UserMetricProcessor(as_conf, job)
-    user_metric_processor.user_metric_repository = mock_repo
+    user_metric_processor.user_metric_manager = mock_manager
     user_metric_processor.process_metrics()
 
     assert mock_read_metrics_specs.call_count == 1

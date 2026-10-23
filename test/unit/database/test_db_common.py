@@ -34,6 +34,7 @@ from sqlalchemy.exc import IntegrityError
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.database.db_common import TIMEOUT, database_backup
+from autosubmit.database.schema_version import GENERAL_SCHEMA_VERSION
 from autosubmit.log.log import AutosubmitCritical
 
 if TYPE_CHECKING:
@@ -86,17 +87,17 @@ def _partial_dump_then_fail(cmd: list[str], stdout, **_) -> None:
     raise subprocess.CalledProcessError(1, cmd, stderr="Error: database disk image is malformed")
 
 
-def test_install_creates_schema_migrations(autosubmit_config) -> None:
+def test_install_creates_schema_version(autosubmit_config) -> None:
     """install() creates the general database with a recorded schema version."""
     autosubmit_config("a000", {})
 
     conn = sqlite3.connect(BasicConfig.DB_PATH)
     try:
-        rows = conn.execute("SELECT version FROM general_schema_migrations").fetchall()
+        rows = conn.execute("SELECT version FROM general_schema_version").fetchall()
     finally:
         conn.close()
 
-    assert rows == [(db_common.CURRENT_DATABASE_VERSION,)]
+    assert rows == [(GENERAL_SCHEMA_VERSION,)]
 
 
 @pytest.mark.parametrize(
@@ -246,7 +247,7 @@ def test_create_db_wraps_errors(mocker, monkeypatch, tmp_path) -> None:
         db_common.create_db()
 
 
-@pytest.mark.parametrize("error_on_inexistence, create_folder, expect_raises", [
+@pytest.mark.parametrize("error_on_inexistence,create_folder,expect_raises", [
     (True, False, True),
     (False, True, False),
 ])

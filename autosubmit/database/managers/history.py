@@ -44,11 +44,11 @@ from autosubmit.database.models.tables import (
     JobDataTable,
     TableRegistry,
 )
+from autosubmit.database.schema_version import HISTORY_SCHEMA_VERSION
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.log.log import Log
 
-CURRENT_DB_VERSION = 21  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
 DEFAULT_MAX_COUNTER = 0
 
@@ -56,11 +56,11 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
     """A SQLAlchemy experiment history database manager.
 
     Schema versions are tracked through ``autosubmit.database.schema_version``
-    (a portable ``schema_migrations`` table) instead of SQLite pragmas.
+    (a portable ``schema_version`` table) instead of SQLite pragmas.
     """
 
-    SCHEMA_VERSION = CURRENT_DB_VERSION
-    SCHEMA_MIGRATIONS_TABLE_NAME = "history_schema_migrations"
+    SCHEMA_VERSION = HISTORY_SCHEMA_VERSION
+    SCHEMA_VERSION_TABLE_NAME = "history_schema_version"
 
     def __init__(
             self,
@@ -621,5 +621,3 @@ def get_last_run_id(expid: str) -> int | None:
         Log.warning(f"Could not get last experiment run ID for {expid}: {exp}")
         Log.debug(traceback.format_exc())
         return None
-
-
