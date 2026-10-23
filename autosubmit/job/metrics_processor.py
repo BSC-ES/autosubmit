@@ -19,17 +19,11 @@ import copy
 import json
 import locale
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, insert
-from sqlalchemy.schema import CreateSchema, CreateTable
-
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database import session
-from autosubmit.database.tables import TableRegistry
+from autosubmit.database.managers.metrics import UserMetricManager
 from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
@@ -116,60 +110,6 @@ class MetricSpec:
         )
 
 
-class UserMetricRepository:
-    def __init__(self, expid: str):
-        self.expid = expid
-
-        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
-        tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
-        db_path = tmp_path.joinpath(f"metrics_{expid}.db")
-
-        if BasicConfig.DATABASE_BACKEND == "postgres":
-            # Postgres backend
-            self.schema = self.expid
-        else:
-            # SQLite backend
-            self.schema = None
-
-        self.table_registry = TableRegistry(schema=self.schema)
-        self.table = self.table_registry.get("user_metrics")
-        self.engine = session.get_engine(db_path=db_path)
-
-        with self.engine.connect() as conn, conn.begin():
-            if self.schema:
-                conn.execute(CreateSchema(self.schema, if_not_exists=True))
-            conn.execute(CreateTable(self.table, if_not_exists=True))
-
-    def store_metric(
-        self, run_id: int, job_name: str, metric_name: str, metric_value: Any
-    ):
-        """
-        Store the metric value in the database. Will overwrite the value if it already exists.
-        """
-        with self.engine.connect() as conn, conn.begin():
-            # Delete the existing metric
-            conn.execute(
-                delete(self.table).where(
-                    self.table.c.run_id == run_id,
-                    self.table.c.job_name == job_name,
-                    self.table.c.metric_name == metric_name,
-                )
-            )
-
-            # Insert the new metric
-            conn.execute(
-                insert(self.table).values(
-                    run_id=run_id,
-                    job_name=job_name,
-                    metric_name=metric_name,
-                    metric_value=str(metric_value),
-                    modified=datetime.now(tz=timezone.utc).isoformat(
-                        timespec="seconds"
-                    ),
-                )
-            )
-
-
 class UserMetricProcessor:
     def __init__(
         self, as_conf: "AutosubmitConfig", job: "Job", run_id: int | None = None
@@ -177,7 +117,7 @@ class UserMetricProcessor:
         self.as_conf = as_conf
         self.job = job
         self.run_id = run_id
-        self.user_metric_repository = UserMetricRepository(job.expid)
+        self.user_metric_manager = UserMetricManager(job.expid)
         self._processed_metrics = {}
 
     def read_metrics_specs(self) -> list[MetricSpec]:
@@ -212,7 +152,7 @@ class UserMetricProcessor:
         """
         Store the metric value in the database
         """
-        self.user_metric_repository.store_metric(
+        self.user_metric_manager.store_metric(
             self.run_id, self.job.name, metric_name, metric_value
         )
         self._processed_metrics[metric_name] = metric_value

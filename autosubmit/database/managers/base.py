@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -15,13 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Contains code to manage a database via SQLAlchemy."""
-from pathlib import Path
+"""Base SQLAlchemy database manager shared by all Autosubmit target databases."""
 from typing import Any, cast
 
 from sqlalchemy import (
     ClauseElement,
+    Connection,
     Engine,
+    MetaData,
     delete,
     desc,
     func,
@@ -36,17 +37,63 @@ from sqlalchemy.schema import CreateSchema, CreateTable, DropTable
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
-from autosubmit.database.tables import GENERALTABLES, Table, TableRegistry
+from autosubmit.database.models.tables import GENERALTABLES, Table, TableRegistry
+from autosubmit.database.schema_version import (
+    ensure_schema_version_table,
+    get_schema_version,
+    record_schema_version,
+    schema_version_table,
+)
 
 
-class DbManager:
-    """A database manager using SQLAlchemy.
+class SchemaVersionedManager:
+    """Tracks the schema version of a single target database.
 
-    It can be used with any engine supported by SQLAlchemy, such
-    as Postgres, Mongo, MySQL, etc.
+    Subclasses that own a target set ``SCHEMA_VERSION`` to the version they
+    expect and give the target a unique ``SCHEMA_VERSION_TABLE_NAME``
+    (targets that share a schema must not reuse the same table name).
     """
 
-    def __init__(self, db_path: str, schema: str | None = None, historical: bool | None = False) -> None:
+    # Schema version expected for the target database. When set, the manager
+    # records it in a ``schema_version`` table inside the target database.
+    SCHEMA_VERSION: int | None = None
+    SCHEMA_VERSION_TABLE_NAME = "schema_version"
+
+    def _init_schema_version(self, metadata: MetaData) -> None:
+        """Build the per-target ``schema_version`` table on ``metadata``."""
+        self._schema_version_table = schema_version_table(
+            metadata, name=self.SCHEMA_VERSION_TABLE_NAME
+        )
+
+    def _set_schema_version(self, target: Engine | Connection, version: int | None = None) -> None:
+        """Create the ``schema_version`` table and record ``version``.
+
+        :param target: An open connection, or an engine (a transaction is opened).
+        :param version: Version to record; defaults to ``SCHEMA_VERSION``.
+        """
+        version = self.SCHEMA_VERSION if version is None else version
+        if version is None:
+            return
+        ensure_schema_version_table(target, self._schema_version_table)
+        record_schema_version(target, self._schema_version_table, version)
+
+    def _get_schema_version(self, target: Engine, schema: str | None = None) -> int:
+        """Read the recorded schema version, or 0 if it is unknown.
+
+        :param target: An engine to read from.
+        :param schema: Optional schema name.
+        :return: The recorded version, or 0 if it is unknown.
+        """
+        return get_schema_version(target, self._schema_version_table, schema)
+
+
+class DbManager(SchemaVersionedManager):
+    """A database manager using SQLAlchemy.
+
+    It supports the SQLite and PostgreSQL backends used by Autosubmit.
+    """
+
+    def __init__(self, db_path: str, schema: str | None = None, historical: bool = False) -> None:
         self.engine = None
         self.engine_historical = None
         if BasicConfig.DATABASE_BACKEND == "sqlite":
@@ -60,13 +107,29 @@ class DbManager:
             self.engine_historical = self.engine
 
         self.schema = schema if BasicConfig.DATABASE_BACKEND != "sqlite" else None
-        self.restore_path = Path(BasicConfig.DB_PATH) / "autosubmit_db.sql"
         self.table_registry = TableRegistry(self.schema)
+        self._init_schema_version(self.table_registry.metadata)
+        self._schema_version_ensured = False
+
+    def _target_engine(self) -> Engine:
+        """Return the engine that owns the tables managed by this instance."""
+        return cast(Engine, self.engine_historical or self.engine)
+
+    def _ensure_schema_version(self) -> None:
+        """Ensure the ``schema_version`` table exists and records the current version."""
+        if self.SCHEMA_VERSION is None or self._schema_version_ensured:
+            return
+        engine = self._target_engine()
+        with engine.begin() as conn:
+            if self.schema:
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            self._set_schema_version(conn)
+        self._schema_version_ensured = True
 
     def _get_engine(self, table_name: str | None = None) -> Engine:
         """Return the appropriate engine based on context.
 
-        :param table_name: If True, return the historical engine.
+        :param table_name: Optional table name; general tables are routed to the historical engine when available.
         :return: The selected SQLAlchemy engine.
         """
         if table_name and table_name in GENERALTABLES and self.engine_historical:
@@ -74,6 +137,7 @@ class DbManager:
         return self.engine
 
     def create_table(self, table_name: str) -> None:
+        self._ensure_schema_version()
         table = self.table_registry.get(table_name)
         with self._get_engine(table_name).begin() as conn:
             if self.schema:
@@ -109,18 +173,8 @@ class DbManager:
             result = conn.execute(insert(table), data)
             return result.rowcount
 
-    def select_first_where(self, table_name: str, where: dict[str, str] | None) -> Any | None:
-        table = self.table_registry.get(table_name)
-        query = select(table)
-        if where:
-            for key, value in where.items():
-                query = query.where(getattr(table.c, key) == value)
-        with self._get_engine(table_name).connect() as conn:
-            row = conn.execute(query).first()
-            return row.tuple() if row else None
-
-    def select_all_with_columns(self, table_name: str) -> list[tuple[tuple[str, Any]]]:
-        """Select rows from a table. Return a list of hasheable tuples."""
+    def select_all_with_columns(self, table_name: str) -> list[tuple[tuple[str, Any], ...]]:
+        """Select rows from a table. Return a list of hashable tuples."""
         table = self.table_registry.get(table_name)
         with self._get_engine(table_name).connect() as conn:
             rows = conn.execute(select(table)).fetchall()
@@ -131,15 +185,12 @@ class DbManager:
             self,
             table: "Table",
             where: dict[str, Any] | ClauseElement | None = None
-    ) -> list[tuple[tuple[str, Any]]]:
+    ) -> list[tuple[tuple[str, Any], ...]]:
         """Select rows from a table with specific columns. Return a list of hashable tuples.
 
-        :param table: Table object or table name to select from.
-        :type table: Table
+        :param table: SQLAlchemy ``Table`` to select from.
         :param where: Dictionary of column:value pairs to filter by, or a SQLAlchemy clause.
-        :type where: Dict[str, Any] | ClauseElement
         :return: List of tuples containing column-value pairs.
-        :rtype: List[tuple[str, Any]]
         """
         self.create_table(table.name)  # Ensure the table exists
 
@@ -179,11 +230,8 @@ class DbManager:
         Supports both equality and 'IN' queries for list values.
 
         :param table_name: Name of the table to delete from.
-        :type table_name: str
         :param where: Dictionary of column names and values (single value or list for IN).
-        :type where: Dict[str, Any]
         :return: Number of rows deleted.
-        :rtype: int
         :raises ValueError: If 'where' is empty.
         """
         table = self.table_registry.get(table_name)
@@ -206,9 +254,7 @@ class DbManager:
 
     def upsert_many(self, table_name: str, data: list[dict[str, Any]], conflict_cols: list[str],
                      exclude_cols: list[str] | None = None, batch_size: int = 1000) -> int:
-        """Perform an upsert (update or insert) operation.
-        First delete the affected rows
-        then insert the new data.
+        """Perform an upsert (insert, or update the conflicting row) operation.
 
         :param table_name: Name of the table.
         :param data: List of dictionaries containing the data to upsert.
@@ -268,7 +314,6 @@ class DbManager:
         :param values: Dictionary of column names and new values to set.
         :param where: Dictionary of column names and values (single value or list for IN).
         :return: Number of rows updated.
-        :raises ValueError: If 'where' is empty.
         """
         table = self.table_registry.get(table_name)
         query = table.update().values(**values)

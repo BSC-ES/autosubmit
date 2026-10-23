@@ -46,3 +46,15 @@ old_experiment_run_table = Table(
     Column("running", Integer, nullable=False),
     Column("submitted", Integer, nullable=False),
 )
+
+
+def with_schema(schema: str | None, table: Table) -> Table:
+    """Return a copy of ``table`` bound to ``schema``.
+
+    Used by the history tests to simulate a legacy table in a given schema.
+    """
+    metadata = MetaData(schema=schema)
+    dest_table = Table(table.name, metadata)
+    for column in table.columns:
+        dest_table.append_column(column.copy())
+    return dest_table

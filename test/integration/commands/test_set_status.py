@@ -22,7 +22,7 @@ import pytest
 from bscearth.utils.date import date2str
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.database_managers.experiment_history_db_manager import (
+from autosubmit.database.managers.history import (
     SqlAlchemyExperimentHistoryDbManager,
 )
 from autosubmit.job.job_common import Status
