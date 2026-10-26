@@ -45,7 +45,7 @@ _EXPID = 't000'
         'execute in 5 seconds'
     ]
 )
-def test_handle_start_time(time):
+def test_handle_start_time(time: str | datetime):
     """Test the function handle_start_time inside autosubmit_helper."""
     if not isinstance(time, str):
         time = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -56,14 +56,14 @@ def test_handle_start_time(time):
     'ids,return_list_value,result',
     [
         (None, [''], []),
-        ('', [''], AutosubmitCritical),
+        ('', [''], []),
         (_EXPID, ['a001'], AutosubmitCritical),
         (_EXPID, [_EXPID], [_EXPID]),
         (f'{_EXPID} a001', [_EXPID, 'a001'], [_EXPID, 'a001']),
         (f'{_EXPID} a001', [_EXPID, 'a001', 'a002'], [_EXPID, 'a001']),
     ], ids=[
         'None',
-        'expected AScritical members',
+        'expected None members',
         'expected AScritical run_members',
         'one ids',
         'multiple sent ids',

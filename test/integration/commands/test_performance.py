@@ -518,8 +518,8 @@ def test_autosubmit_recovery_profile_metrics(
         all_jobs=True,
         hide=True,
         group_by="date",
-        expand=[],
-        expand_status=[],
+        expand=None,
+        expand_status=None,
         detail=True,
         force=True,
         offline=False,
@@ -552,9 +552,8 @@ def do_setstatus(
         filter_type_chunk_split=ftcs,
         hide=False,
         group_by=None,
-        expand=[],
-        expand_status=[],
-        check_wrapper=False,
+        expand=None,
+        expand_status=None,
         detail=False,
     )
 

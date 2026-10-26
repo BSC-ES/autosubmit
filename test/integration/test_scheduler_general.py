@@ -206,10 +206,10 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit_exp: Callable) -> N
         expid,
         check_wrapper=True,
         force=True,
-        lst=None,
-        filter_chunks=None,
-        filter_status=None,
-        filter_section=None
+        lst="",
+        filter_chunks="",
+        filter_status="",
+        filter_section=""
     )
 
     # Load the base file for each scheduler

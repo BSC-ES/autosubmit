@@ -109,10 +109,10 @@ def args_parser() -> ArgumentParser:
     options_type=StatsOptions,
     validators=validate_expid,
 )
-def main(opts: StatsOptions) -> int | bool | None:
+def main(opts: StatsOptions) -> bool:
     from autosubmit.workflow.manage import statistics
 
-    statistics(
+    return statistics(
         opts.expid,
         opts.filter_type,
         opts.filter_period,

@@ -70,7 +70,6 @@ def do_setstatus(
         group_by=None,
         expand=[],
         expand_status=[],
-        check_wrapper=False,
         detail=False,
     )
     return load_job_list(
@@ -666,7 +665,6 @@ def test_set_status_noplot_calls_generate_output(as_exp, mocker, noplot):
         group_by=None,
         expand=[],
         expand_status=[],
-        check_wrapper=False,
         detail=False,
     )
 

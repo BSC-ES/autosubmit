@@ -2222,7 +2222,7 @@ class JobList:
         """
         return self._chunk_list
 
-    def get_job_list(self) -> list:
+    def get_job_list(self) -> list[Job]:
         """Get inner job list.
 
         :return: job list
