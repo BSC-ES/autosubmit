@@ -54,7 +54,7 @@ def test_clean_plots(autosubmit_exp):
             f"{exp.expid}_statistics_1.pdf",
         ]
     ):
-        p = Path(plots_dir / plot)
+        p = (plots_dir / plot)
         p.touch()
         utime(str(p), (i, i))
 
@@ -64,8 +64,8 @@ def test_clean_plots(autosubmit_exp):
 
     # keeps the statistics file and two newest plot files
     assert len(plots) == 3
-    assert Path(plots_dir / "plot_c.pdf").exists()
-    assert Path(plots_dir / "plot_d.pdf").exists()
+    assert (plots_dir / "plot_c.pdf").exists()
+    assert (plots_dir / "plot_d.pdf").exists()
 
 
 def test_clean_stats(autosubmit_exp):
@@ -89,7 +89,7 @@ def test_clean_stats(autosubmit_exp):
             f"{exp.expid}_statistics_3.pdf",
         ]
     ):
-        p = Path(stats_dir / stats_file)
+        p = (stats_dir / stats_file)
         p.touch()
         utime(str(p), (i, i))
 
@@ -98,9 +98,9 @@ def test_clean_stats(autosubmit_exp):
     stats = list(stats_dir.iterdir())
 
     assert len(stats) == 2
-    assert Path(stats_dir / f"{exp.expid}_statistics_2.pdf").exists()
-    assert Path(stats_dir / f"{exp.expid}_statistics_3.pdf").exists()
-    assert Path(plots_dir / "plot_a.pdf").exists()
+    assert (stats_dir / f"{exp.expid}_statistics_2.pdf").exists()
+    assert (stats_dir / f"{exp.expid}_statistics_3.pdf").exists()
+    assert (plots_dir / "plot_a.pdf").exists()
 
 
 def test_clean_dummy_project(autosubmit_exp, mocker):
@@ -131,7 +131,7 @@ def test_clean_dummy_project(autosubmit_exp, mocker):
             f"{exp.expid}_statistics_3.pdf",
         ]
     ):
-        p = Path(plots_dir / plot)
+        p = (plots_dir / plot)
         p.touch()
         utime(str(p), (i, i))
 
@@ -174,9 +174,9 @@ def test_clean_git_project(
         "autosubmit.git.autosubmit_git.clean_git", return_value=clean_git_return
     )
 
-    git_project = Path(tmp_path / "tmp_git_project")
+    git_project = (tmp_path / "tmp_git_project")
     git_project.mkdir()
-    Path(git_project, "test.sh").touch()
+    (git_project / "test.sh").touch()
 
     chdir(git_project)
     check_output(["git", "init"])
@@ -210,7 +210,7 @@ def test_clean_git_project(
             f"{exp.expid}_statistics_3.pdf",
         ]
     ):
-        p = Path(plots_dir / plot)
+        p = (plots_dir / plot)
         p.touch()
         utime(str(p), (i, i))
 

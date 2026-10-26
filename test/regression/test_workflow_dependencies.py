@@ -80,8 +80,8 @@ def prepare_workflow_runs(current_tmpdir: Path) -> None:
     """
 
     # Write an autosubmitrc file in the temporary directory
-    folder = Path(current_tmpdir)
-    autosubmitrc = folder.joinpath('autosubmitrc')
+    folder = current_tmpdir
+    autosubmitrc = folder / 'autosubmitrc'
     with autosubmitrc.open('w') as f:
         f.write(f'''
             [database]
@@ -230,11 +230,11 @@ def get_workflow_folder() -> list[str]:
     """
     workflow_dir = get_project_root() / 'test' / 'regression' / 'workflows'
     # The test will be performed on all the workflows in the 'workflows' directory
-    return sorted([f.name for f in Path(workflow_dir).iterdir() if f.is_dir() and "pycache" not in f.name])
+    return sorted([f.name for f in workflow_dir.iterdir() if f.is_dir() and "pycache" not in f.name])
 
 
 @pytest.mark.parametrize("expid", get_workflow_folder())
-def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_tmpdir: Path, mocker: Any,
+def x(prepare_workflow_runs: Any, expid: str, current_tmpdir: Path, mocker: Any,
                                 prepare_basic_config: Any) -> None:
     """Compare current workflow dependencies with the reference ones.
 

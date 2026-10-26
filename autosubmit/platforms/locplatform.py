@@ -238,7 +238,7 @@ class LocalPlatform(ParamikoPlatform):
         # This function is a copy of the slurm one
         log_dir = Path(self.tmp_path) / f"LOG_{self.expid}"
         multiple_delete_previous_run = Path(log_dir) / "multiple_delete_previous_run.sh"
-        if Path(log_dir).exists():
+        if log_dir.exists():
             lang = locale.getlocale()[1]
             if lang is None:
                 lang = 'UTF-8'
@@ -250,9 +250,9 @@ class LocalPlatform(ParamikoPlatform):
             filename: str, must_exist: bool=True, relative_path: str='', ignore_log: bool=False, wrapper_failed: bool=False
         ) -> bool:
         local_path = Path(self.tmp_path) / relative_path
-        if not Path(local_path).exists():
+        if not local_path.exists():
             local_path.mkdir(parents=True, exist_ok=True)
-        file_path = Path(local_path, filename)
+        file_path = local_path / filename
         if file_path.exists():
             file_path.unlink()
         command = f"{self.get_cmd} {Path(self.tmp_path) / f'LOG_{self.expid}' / filename} {file_path}"
@@ -311,22 +311,23 @@ class LocalPlatform(ParamikoPlatform):
         """
         path_root = ""
         try:
-            path_root = self.files_path
-            (Path(path_root) / src).rename(Path(path_root) / dest)
+            path_root = Path(self.files_path)
+            (path_root / src).rename(path_root / dest)
             return True
         except OSError as e:
             if must_exist:
-                raise AutosubmitError(f"File {Path(path_root) / src} does not exist", 6004, str(e))
+                raise AutosubmitError(f"File {path_root / src} does not exist", 6004, str(e))
             else:
                 Log.debug(f"File {path_root} does not exist ")
                 return False
         except Exception as e:
+            path_root = Path(self.files_path)
             if str(e) in "Garbage":
-                raise AutosubmitError(f"File {Path(self.files_path) / src} does not exist", 6004, str(e))
+                raise AutosubmitError(f"File {path_root / src} does not exist", 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {Path(self.files_path) / src} does not exist", 6004, str(e))
+                raise AutosubmitError(f"File {path_root / src} does not exist", 6004, str(e))
             else:
-                Log.printlog(f"Log file couldn't be moved: {Path(self.files_path) / src}", 5001)
+                Log.printlog(f"Log file couldn't be moved: {path_root / src}", 5001)
                 return False
 
     def get_ssh_output(self):

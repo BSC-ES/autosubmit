@@ -108,7 +108,7 @@ def _load_ssh_config(ssh_config_path: Path) -> paramiko.SSHConfig:
     Log.info(f"Using {ssh_config_path} as SSH configuration file")
 
     if ssh_config_path.exists():
-        with open(Path(ssh_config_path).expanduser(), "r") as ssh_config_file:
+        with open(ssh_config_path.expanduser(), "r") as ssh_config_file:
             ssh_config.parse(ssh_config_file)
     else:
         Log.warning(f"The SSH configuration file {ssh_config_path} does not exist!")
@@ -664,7 +664,7 @@ class ParamikoPlatform(Platform):
     #       ``self.platform`` in ``job_package.py``.
     def remove_multiple_files(self, filenames):
         log_dir = Path(self.tmp_path) / f"LOG_{self.expid}"
-        multiple_delete_previous_run = str(Path(log_dir) / "multiple_delete_previous_run.sh")
+        multiple_delete_previous_run = str(log_dir / "multiple_delete_previous_run.sh")
         if log_dir.exists():
             lang = locale.getlocale()[1]
             if lang is None:
@@ -841,14 +841,14 @@ class ParamikoPlatform(Platform):
         except OSError as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(
-                    f"File {Path(path_root) / src} does not exist, something went "
+                    f"File {path_root / src} does not exist, something went "
                     f"wrong with the platform",
                     6004,
                     str(e),
                 )
             if must_exist:
                 raise AutosubmitError(
-                    f"File {Path(path_root) / src} does not exist", 6004, str(e)
+                    f"File {path_root / src} does not exist", 6004, str(e)
                 )
             else:
                 Log.debug(f"File {path_root} does not exist ")

@@ -583,7 +583,7 @@ def test_clean_plot(mocker, tmp_path: LocalPath):
 
      It must leave the latest 2 plots, and the statistics files untouched."""
     expid = 't000'
-    search_dir = Path(tmp_path / expid / 'plot')
+    search_dir = tmp_path / expid / 'plot'
     search_dir.mkdir(parents=True, exist_ok=True)
 
     for i, stats_file in enumerate([
@@ -594,32 +594,32 @@ def test_clean_plot(mocker, tmp_path: LocalPath):
         'plot_c.pdf',
         f'{expid}_statistics_19900103.csv',
     ]):
-        Path(search_dir / stats_file).touch()
+        (search_dir / stats_file).touch()
         # Here we set the atime, mtime tuple to the enumeration index, so that
         # the generated files do not have the same milliseconds, making this test
         # deterministic.
-        utime(Path(search_dir / stats_file), (i, i))
+        utime((search_dir / stats_file), (i, i))
 
-    assert len(list(Path(search_dir).iterdir())) == 6
+    assert len(list(search_dir.iterdir())) == 6
 
     mocker.patch('autosubmit.monitor.monitor.BasicConfig.LOCAL_ROOT_DIR', str(tmp_path))
 
     clean_plot(expid)
 
-    assert len(list(Path(search_dir).iterdir())) == 5
-    assert Path(search_dir / f'{expid}_statistics_19900101.csv').exists()
-    assert Path(search_dir / f'{expid}_statistics_19900102.csv').exists()
+    assert len(list(search_dir.iterdir())) == 5
+    assert (search_dir / f'{expid}_statistics_19900101.csv').exists()
+    assert (search_dir / f'{expid}_statistics_19900102.csv').exists()
     # plot_a.pdf had the earliest atime, mtime, so it was deleted and only the two newest kept.
-    assert Path(search_dir / 'plot_b.pdf').exists()
-    assert Path(search_dir / 'plot_c.pdf').exists()
+    assert (search_dir / 'plot_b.pdf').exists()
+    assert (search_dir / 'plot_c.pdf').exists()
 
 
 def test_clean_stats(mocker, tmp_path: LocalPath):
     """Verify that ``clean_stats`` deletes the oldest statistics files."""
     expid = 't000'
-    stats_dir = Path(tmp_path / expid / 'stats')
+    stats_dir = tmp_path / expid / 'stats'
     stats_dir.mkdir(parents=True, exist_ok=True)
-    plot_dir = Path(tmp_path / expid / 'plot')
+    plot_dir = tmp_path / expid / 'plot'
     plot_dir.mkdir(parents=True, exist_ok=True)
 
     for i, stats_file in enumerate([
@@ -627,11 +627,11 @@ def test_clean_stats(mocker, tmp_path: LocalPath):
         f'{expid}_statistics_19900102.csv',
         f'{expid}_statistics_19900103.csv',
     ]):
-        Path(stats_dir / stats_file).touch()
+        (stats_dir / stats_file).touch()
         # Here we set the atime, mtime tuple to the enumeration index, so that
         # the generated files do not have the same milliseconds, making this test
         # deterministic.
-        utime(Path(stats_dir / stats_file), (i, i))
+        utime((stats_dir / stats_file), (i, i))
 
     plot_file = plot_dir / 'plot_a.pdf'
     plot_file.touch()
@@ -643,8 +643,8 @@ def test_clean_stats(mocker, tmp_path: LocalPath):
 
     assert len(list(stats_dir.iterdir())) == 2
     # <EXPID>_statistics_19900101.csv had the earliest atime, mtime, so it was deleted and only the two newest kept.
-    assert Path(stats_dir / f'{expid}_statistics_19900102.csv').exists()
-    assert Path(stats_dir / f'{expid}_statistics_19900103.csv').exists()
+    assert (stats_dir / f'{expid}_statistics_19900102.csv').exists()
+    assert (stats_dir / f'{expid}_statistics_19900103.csv').exists()
     assert plot_file.exists()
 
 
@@ -938,7 +938,7 @@ def test_generate_output_stats(job_statuses: list[int], hide: bool, expected: bo
     date_time3 = '20240101020000'
 
     for job in jobs:
-        job_total_stats = Path(total_stats_path, f'{job.name}_TOTAL_STATS')
+        job_total_stats = total_stats_path / f'{job.name}_TOTAL_STATS'
         job_total_stats.write_text(f'{date_time1} {date_time2} {date_time3} '
                                    f'{Status.VALUE_TO_KEY[Status.KEY_TO_VALUE[job.status]]} \n')
 

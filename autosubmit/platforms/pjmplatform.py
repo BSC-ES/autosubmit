@@ -81,14 +81,10 @@ class PJMPlatform(ParamikoPlatform):
         self._allow_wrappers = False
         self.update_cmds()
         self.config = config
-        exp_id_path = Path(self.config.get("LOCAL_ROOT_DIR"), self.expid)
-        tmp_path = Path(exp_id_path, "tmp")
-        self._submit_script_path = Path(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh"
-        )
-        self._submit_script_base_name = Path(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_"
-        )
+        exp_id_path = Path(self.config.get("LOCAL_ROOT_DIR", ""), self.expid)
+        tmp_path = exp_id_path / "tmp"
+        self._submit_script_path = tmp_path / self.config.get("LOCAL_ASLOG_DIR", "") / f"submit_{self.name}.sh"
+        self._submit_script_base_name = tmp_path / self.config.get("LOCAL_ASLOG_DIR", "") / "submit_"
 
     def create_a_new_copy(self):
         return PJMPlatform(self.expid, self.name, self.config)

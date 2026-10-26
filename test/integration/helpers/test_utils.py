@@ -41,7 +41,7 @@ def test_check_jobs_file_exists_missing_templates_dir(autosubmit_exp, tmp_path):
     """Test that we raise an error if the template directory is missing."""
     project_path = tmp_path / 'project'
     project_path.mkdir()
-    Path(project_path, 'dummy.sh').touch()
+    (project_path / 'dummy.sh').touch()
     exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',
@@ -72,7 +72,7 @@ def test_check_jobs_file_exists_template_dir_is_file(autosubmit_exp, tmp_path):
     """Test that we raise an error if the template directory is actually a file."""
     project_path = tmp_path / 'project'
     project_path.mkdir()
-    Path(project_path, 'dummy.sh').touch()
+    (project_path / 'dummy.sh').touch()
     exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',
@@ -106,7 +106,7 @@ def test_check_jobs_file_exists_section_does_not_exist(autosubmit_exp, tmp_path)
     """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
     project_path = tmp_path / 'project'
     project_path.mkdir()
-    Path(project_path, 'dummy.sh').touch()
+    (project_path / 'dummy.sh').touch()
     exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',
@@ -131,7 +131,7 @@ def test_check_jobs_file_exists_missing_script(autosubmit_exp, tmp_path):
     """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
     project_path = tmp_path / 'project'
     project_path.mkdir()
-    Path(project_path, 'dummy.sh').touch()
+    (project_path / 'dummy.sh').touch()
     exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',
@@ -159,7 +159,7 @@ def test_check_jobs_file_exists_all_good(autosubmit_exp, tmp_path):
     """Success path."""
     project_path = tmp_path / 'project'
     project_path.mkdir()
-    Path(project_path, 'dummy.sh').touch()
+    (project_path / 'dummy.sh').touch()
     exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',

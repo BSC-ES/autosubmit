@@ -92,9 +92,9 @@ class SlurmPlatform(ParamikoPlatform):
         self._allow_wrappers = True
         self.update_cmds()
         self.config = config
-        tmp_path = Path(self.config.get("LOCAL_ROOT_DIR")) / self.expid / "tmp"
-        self._submit_script_path = Path(tmp_path) / self.config.get("LOCAL_ASLOG_DIR") / f"submit_{self.name}.sh"
-        self._submit_script_base_name = Path(tmp_path) / self.config.get("LOCAL_ASLOG_DIR") / "submit_"
+        tmp_path = Path(self.config.get("LOCAL_ROOT_DIR", "")) / self.expid / "tmp"
+        self._submit_script_path = tmp_path / self.config.get("LOCAL_ASLOG_DIR", "") / f"submit_{self.name}.sh"
+        self._submit_script_base_name = tmp_path / self.config.get("LOCAL_ASLOG_DIR", "") / "submit_"
 
     def create_a_new_copy(self):
         """Return a copy of a SlurmPlatform object with the same expid, name and config as the original.

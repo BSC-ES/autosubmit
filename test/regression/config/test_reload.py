@@ -148,7 +148,7 @@ def test_custom_config_for(
     )
     prepare_yaml_files(default_yaml_file, temp_folder)
     as_conf = AutosubmitConfig("test")
-    as_conf.conf_folder_yaml = Path(temp_folder)
+    as_conf.conf_folder_yaml = temp_folder
     as_conf.load_workflow_commit = MagicMock()
     as_conf.reload(True)
     for file_name in project_yaml_files:
@@ -351,7 +351,7 @@ def test_override_immutable_variables_in_custom_config(
     prepare_yaml_files(default_yaml_file, temp_folder)
 
     as_conf = AutosubmitConfig("test")
-    as_conf.conf_folder_yaml = Path(temp_folder)
+    as_conf.conf_folder_yaml = temp_folder
     as_conf.load_workflow_commit = MagicMock()
     as_conf.reload(True)
 
