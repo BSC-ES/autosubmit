@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -39,17 +39,15 @@ from autosubmit.config.basicconfig import BasicConfig
     ],
     ids=["local_true", "local_false"]
 )
-def test_save(autosubmit_config, tmpdir, mocker, data: dict, owner: str, monkeypatch):
-    if owner:
-        monkeypatch.setenv("USER", Path(tmpdir).owner())
-    else:
-        monkeypatch.setenv("USER", 'whatever')
+def test_save(autosubmit_config, mocker, data: dict, owner: str, monkeypatch):
     as_conf = autosubmit_config(expid='t000', experiment_data=data, include_basic_config=True)
     data['ROOTDIR'] = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid)
     # TODO: figure why some autosubmit_config conf_test( I hope ) is adding functions to experiment_data
     as_conf.experiment_data = {k: v for k, v in data.items() if not callable(v)}
     as_conf.load_common_parameters(as_conf.experiment_data)
     as_conf.load_as_env_variables(as_conf.experiment_data)
+    owner_uid = Path(data['ROOTDIR']).stat().st_uid
+    mocker.patch("os.getuid", return_value=owner_uid if owner else owner_uid + 1)
     as_conf.save()
     if not owner:
         assert not Path(as_conf.metadata_folder).exists()

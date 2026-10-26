@@ -19,28 +19,26 @@ import pytest
 
 
 @pytest.mark.parametrize("is_owner", [True, False])
-def test_is_current_real_user_owner(autosubmit_config, mocker, is_owner):
-    """Test if the SUDO_USER from the environment matches the owner of the current experiment."""
+def test_is_current_real_user_owner(autosubmit_config, mocker, is_owner, tmp_path):
+    """Test if the real user (``AS_ENV_CURRENT_USER``) owns the current experiment."""
     as_conf = autosubmit_config(
         expid='a000',
-        experiment_data={"ROOTDIR": "/dummy/rootdir", "AS_ENV_CURRENT_USER": "dummy"}
+        experiment_data={"ROOTDIR": str(tmp_path), "AS_ENV_CURRENT_USER": "dummy"}
     )
-    mocker.patch("pathlib.Path.owner", return_value="dummy" if is_owner else "otheruser")
+    owner_uid = tmp_path.stat().st_uid
+    mocker.patch(
+        "pwd.getpwnam", return_value=mocker.Mock(pw_uid=owner_uid if is_owner else owner_uid + 1)
+    )
     assert as_conf.is_current_real_user_owner == is_owner
 
 
 @pytest.mark.parametrize("is_owner", [True, False])
 def test_is_current_logged_user_owner(autosubmit_config, mocker, is_owner, tmp_path, monkeypatch):
-    """Test if the USER from the environment matches the owner of the current experiment."""
-
+    """Test that the ownership of the experiment is decided comparing UIDs."""
     as_conf = autosubmit_config(
         expid='a000',
         experiment_data={"ROOTDIR": f"{str(tmp_path)}"}
     )
-    if is_owner:
-        monkeypatch.setenv("USER", "dummy")
-    else:
-        monkeypatch.setenv("USER", "otheruser")
-
-    mocker.patch("pathlib.Path.owner", return_value="dummy")
+    owner_uid = tmp_path.stat().st_uid
+    mocker.patch("os.getuid", return_value=owner_uid if is_owner else owner_uid + 1)
     assert as_conf.is_current_logged_user_owner == is_owner
