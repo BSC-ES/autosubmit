@@ -32,6 +32,42 @@ def test_is_current_real_user_owner(autosubmit_config, mocker, is_owner, tmp_pat
     assert as_conf.is_current_real_user_owner == is_owner
 
 
+def test_is_current_real_user_owner_unknown_user(autosubmit_config, tmp_path):
+    """Test that ``False`` is returned when ``AS_ENV_CURRENT_USER`` is not in the user db."""
+    as_conf = autosubmit_config(
+        expid='a000',
+        experiment_data={"ROOTDIR": str(tmp_path), "AS_ENV_CURRENT_USER": "user_that_does_not_exist"}
+    )
+    assert as_conf.is_current_real_user_owner is False
+
+
+def test_is_current_real_user_owner_deleted_user(autosubmit_config, mocker, tmp_path):
+    """A missing passwd entry for the owner UID should not raise an exception."""
+    as_conf = autosubmit_config(
+        expid='a000',
+        experiment_data={"ROOTDIR": str(tmp_path), "AS_ENV_CURRENT_USER": "dummy"}
+    )
+    owner_uid = tmp_path.stat().st_uid
+    mocker.patch("pwd.getpwnam", return_value=mocker.Mock(pw_uid=owner_uid))
+    mocker.patch("pwd.getpwuid", side_effect=KeyError)
+    assert as_conf.is_current_real_user_owner is True
+
+
+@pytest.mark.parametrize(
+    "experiment_data",
+    [
+        {},
+        {"AS_ENV_CURRENT_USER": "dummy"},
+        {"ROOTDIR": "/dummy/rootdir"},
+    ],
+    ids=["Missing rootdir and user", "Missing rootdir", "Missing user", ]
+)
+def test_is_current_real_user_owner_missing_data(autosubmit_config, experiment_data):
+    """Test that ``False`` is returned when the experiment data is missing required fields."""
+    as_conf = autosubmit_config(expid='a000', experiment_data=experiment_data)
+    assert as_conf.is_current_real_user_owner is False
+
+
 @pytest.mark.parametrize("is_owner", [True, False])
 def test_is_current_logged_user_owner(autosubmit_config, mocker, is_owner, tmp_path, monkeypatch):
     """Test that the ownership of the experiment is decided comparing UIDs."""
