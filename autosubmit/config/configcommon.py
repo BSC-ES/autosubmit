@@ -2295,6 +2295,25 @@ class AutosubmitConfig:
             return default
         return int(chunk_size)
 
+    def get_split_size_unit(self):
+        """Unit for the split length
+
+        :return: Unit for the split length  Options: {hour, day, month, year}
+        :rtype: str
+        """
+        return self.get_section(['EXPERIMENT', 'SPLITSIZEUNIT'])
+
+    def get_split_size(self, default=1):
+        """Split Size as defined in the expdef file.
+
+        :return: Split size, 1 as default.
+        :rtype: int
+        """
+        split_size = self.get_section(['experiment', 'SPLITSIZE'], default)
+        if not split_size:
+            return default
+        return int(split_size)
+
     def get_member_list(self, run_only=False):
         """Returns members list from experiment's config file
 
