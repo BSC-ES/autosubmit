@@ -93,7 +93,7 @@ _AS_R_TAILER = dedent("""\
 """Autosubmit R tailer."""
 
 
-def as_header(platform_header: str, executable: str) -> str:
+def as_header(platform_header: str, executable: str | None = "") -> str:
     executable = executable or _DEFAULT_EXECUTABLE
     shebang = shebang_from_executable(executable)
 
