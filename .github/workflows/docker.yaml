@@ -1,10 +1,30 @@
 on:
   pull_request:
+    paths:
+      - 'docker/Dockerfile'
+      - '!**/.gitignore'
+      - '!**/.mailmap'
+      - '!**/.pylintrc'
+      - '!**/CONTRIBUTING.md'
+      - '!**/LICENSE'
+      - '!**/README*.md'
+      - '!**/SECURITY.md'
+      - '!easybuild/**'
   workflow_dispatch:
   push:
     branches:
       - main
       - master
+    paths:
+      - 'docker/Dockerfile'
+      - '!**/.gitignore'
+      - '!**/.mailmap'
+      - '!**/.pylintrc'
+      - '!**/CONTRIBUTING.md'
+      - '!**/LICENSE'
+      - '!**/README*.md'
+      - '!**/SECURITY.md'
+      - '!easybuild/**'
 permissions:
   contents: read
 

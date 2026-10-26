@@ -80,6 +80,7 @@ tests = [
     "pytest>=8.2,<9.2",
     "pytest-cov",
     "pytest-mock",
+    "pytest-split",
     "pytest-xdist",
     "testcontainers",
     "pytest-timeout",
