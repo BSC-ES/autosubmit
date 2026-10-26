@@ -39,7 +39,7 @@ from autosubmit.config.basicconfig import BasicConfig
     ],
     ids=["local_true", "local_false"]
 )
-def test_save(autosubmit_config, mocker, data: dict, owner: str, monkeypatch):
+def test_save(autosubmit_config, mocker, data: dict, owner: bool):
     as_conf = autosubmit_config(expid='t000', experiment_data=data, include_basic_config=True)
     data['ROOTDIR'] = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid)
     # TODO: figure why some autosubmit_config conf_test( I hope ) is adding functions to experiment_data

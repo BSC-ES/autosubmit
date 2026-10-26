@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -41,16 +41,17 @@ def test_is_current_real_user_owner_unknown_user(autosubmit_config, tmp_path):
     assert as_conf.is_current_real_user_owner is False
 
 
-def test_is_current_real_user_owner_deleted_user(autosubmit_config, mocker, tmp_path):
-    """A missing passwd entry for the owner UID should not raise an exception."""
+def test_is_current_real_user_owner_does_not_resolve_owner_name(autosubmit_config, mocker, tmp_path):
+    """Test that the user database is not queried when the current user is the owner of the experiment.
+    A missing passwd entry for the owner of the experiment should not cause an exception."""
     as_conf = autosubmit_config(
         expid='a000',
         experiment_data={"ROOTDIR": str(tmp_path), "AS_ENV_CURRENT_USER": "dummy"}
     )
-    owner_uid = tmp_path.stat().st_uid
-    mocker.patch("pwd.getpwnam", return_value=mocker.Mock(pw_uid=owner_uid))
-    mocker.patch("pwd.getpwuid", side_effect=KeyError)
+    mocker.patch("pwd.getpwnam", return_value=mocker.Mock(pw_uid=tmp_path.stat().st_uid))
+    mocked_getpwuid = mocker.patch("pwd.getpwuid")
     assert as_conf.is_current_real_user_owner is True
+    mocked_getpwuid.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -59,8 +60,9 @@ def test_is_current_real_user_owner_deleted_user(autosubmit_config, mocker, tmp_
         {},
         {"AS_ENV_CURRENT_USER": "dummy"},
         {"ROOTDIR": "/dummy/rootdir"},
+        {"ROOTDIR": "/dummy/rootdir", "AS_ENV_CURRENT_USER": ""},
     ],
-    ids=["Missing rootdir and user", "Missing rootdir", "Missing user", ]
+    ids=["Missing rootdir and user", "Missing rootdir", "Missing user", "Empty user", ]
 )
 def test_is_current_real_user_owner_missing_data(autosubmit_config, experiment_data):
     """Test that ``False`` is returned when the experiment data is missing required fields."""
@@ -69,7 +71,7 @@ def test_is_current_real_user_owner_missing_data(autosubmit_config, experiment_d
 
 
 @pytest.mark.parametrize("is_owner", [True, False])
-def test_is_current_logged_user_owner(autosubmit_config, mocker, is_owner, tmp_path, monkeypatch):
+def test_is_current_logged_user_owner(autosubmit_config, mocker, is_owner, tmp_path):
     """Test that the ownership of the experiment is decided comparing UIDs."""
     as_conf = autosubmit_config(
         expid='a000',
