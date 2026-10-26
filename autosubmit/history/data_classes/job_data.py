@@ -166,7 +166,7 @@ class JobData:
         return self._energy
 
     @property
-    def wrapper_code(self):
+    def wrapper_code(self) -> int:
         """ 
         Another name for rowtype
         """

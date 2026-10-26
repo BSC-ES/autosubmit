@@ -44,7 +44,6 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 class AutosubmitConfigFactory(Protocol):
-
     def __call__(
             self,
             expid: str,
@@ -97,7 +96,10 @@ def autosubmit_config(
             experiment_data = {}
 
         # FIXME: (BRUNO) Do we really need postgres here in the unit tests conftest?
-        is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
+        is_postgres = (
+            hasattr(BasicConfig, "DATABASE_BACKEND")
+            and BasicConfig.DATABASE_BACKEND == "postgres"
+        )
         if is_postgres or not Path(BasicConfig.DB_PATH).exists():
             install()
 
@@ -107,7 +109,7 @@ def autosubmit_config(
         # <expid>/tmp/ASLOGS
         aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
         # <expid>/tmp/LOG_<expid>
-        expid_logs_dir = exp_tmp_dir / f'LOG_{expid}'
+        expid_logs_dir = exp_tmp_dir / f"LOG_{expid}"
         Path(expid_logs_dir).mkdir(parents=True, exist_ok=True)
         # <expid>/conf
         conf_dir = exp_path / "conf"
@@ -117,7 +119,10 @@ def autosubmit_config(
         db_dir = exp_path / "db"
         Path(db_dir).mkdir(exist_ok=True)
         # ~/autosubmit/autosubmit.db
-        is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
+        is_postgres = (
+            hasattr(BasicConfig, "DATABASE_BACKEND")
+            and BasicConfig.DATABASE_BACKEND == "postgres"
+        )
         db_path = Path(BasicConfig.DB_PATH)
         if not is_postgres:
             db_path.touch()
@@ -139,52 +144,49 @@ def autosubmit_config(
         # in ``BasicConfig``. For some reason, some platforms use variables like ``LOCAL_ROOT_DIR``
         # from the configuration object, instead of using ``BasicConfig``.
         if include_basic_config:
-            for k, v in {k: v for k, v in BasicConfig.__dict__.items() if not k.startswith('__')}.items():
+            for k, v in {
+                k: v for k, v in BasicConfig.__dict__.items() if not k.startswith("__")
+            }.items():
                 config.experiment_data[k] = v
 
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
-        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
+        must_exists = ["DEFAULT", "JOBS", "PLATFORMS", "CONFIG"]
         for must_exist in must_exists:
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
 
-        if not config.experiment_data.get('CONFIG').get('AUTOSUBMIT_VERSION', ''):
+        if not config.experiment_data.get("CONFIG").get("AUTOSUBMIT_VERSION", ""):
             try:
-                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
+                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = version("autosubmit")
             except PackageNotFoundError:
-                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
+                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = ""
 
-        config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
+        config.experiment_data["CONFIG"]["SAFETYSLEEPTIME"] = 0
         # TODO: one test failed while moving things from unit to integration, but this shouldn't be
         #       needed, especially if the disk has the valid value?
-        config.experiment_data['DEFAULT']['EXPID'] = expid
+        config.experiment_data["DEFAULT"]["EXPID"] = expid
 
-        if 'HPCARCH' not in config.experiment_data['DEFAULT']:
-            config.experiment_data['DEFAULT']['HPCARCH'] = 'LOCAL'
+        if "HPCARCH" not in config.experiment_data["DEFAULT"]:
+            config.experiment_data["DEFAULT"]["HPCARCH"] = "LOCAL"
 
         for arg, value in kwargs.items():
             setattr(config, arg, value)
-        config.current_loaded_files[str(conf_dir / 'dummy-so-it-doesnt-force-reload.yml')] = time()
+        config.current_loaded_files[
+            str(conf_dir / "dummy-so-it-doesnt-force-reload.yml")
+        ] = time()
         return config
 
     return _create_autosubmit_config
 
 
 @pytest.fixture(scope="function")
-def create_jobs(
-        mocker,
-        request
-) -> list[Job]:
+def create_jobs(mocker, request) -> list[Job]:
     """
     :return: Jobs with random attributes and retrials.
     """
 
-    def _create_jobs(
-            mock,
-            num_jobs,
-            max_num_retrials_per_job
-    ) -> list[Job]:
+    def _create_jobs(mock, num_jobs, max_num_retrials_per_job) -> list[Job]:
         jobs = []
         seed(time())
         submit_time = datetime(2023, 1, 1, 10, 0, 0)
@@ -195,7 +197,7 @@ def create_jobs(
             [submit_time, start_time, end_time, ""],
             [submit_time, start_time, ""],
             [submit_time, ""],
-            [""]
+            [""],
         ]
         job_statuses = Status.LOGICAL_ORDER
         for i in range(num_jobs):
@@ -204,12 +206,12 @@ def create_jobs(
                 name="example_name_" + str(i),
                 job_id="example_id_" + str(i),
                 status=status,
-                priority=i
+                priority=i,
             )
 
             # Custom values for job attributes
             job_aux.processors = str(i)
-            job_aux.wallclock = '00:05'
+            job_aux.wallclock = "00:05"
             job_aux.section = "example_section_" + str(i)
             job_aux.member = "example_member_" + str(i)
             job_aux.chunk = "example_chunk_" + str(i)
@@ -377,12 +379,12 @@ class FakePlatform:
     """Minimal platform stub for testing wrapper and job-check logic."""
 
     def __init__(self):
-        self.name = 'fake_platform'
+        self.name = "fake_platform"
         # serial_platform is accessed by get_in_queue for platform matching.
         self.serial_platform = self
         # serial_queue / queue accessed when job queue property is evaluated.
-        self.serial_queue = ''
-        self.queue = ''
+        self.serial_queue = ""
+        self.queue = ""
         self.log_recovery_process = None
         self.cleanup_event = None
         # Replaced by mocker.MagicMock() in fixtures that need them:
@@ -393,9 +395,9 @@ class FakePlatform:
 @pytest.fixture
 def fake_platform(mocker) -> FakePlatform:
     """Return a :class:`FakePlatform` with mocker-backed method stubs.
+
     :param mocker: pytest-mock mocker fixture.
     :return: Configured :class:`FakePlatform` instance.
-    :rtype: FakePlatform
     """
     fp = FakePlatform()
     fp.check_all_jobs = mocker.MagicMock()
@@ -406,12 +408,12 @@ def fake_platform(mocker) -> FakePlatform:
 @pytest.fixture
 def fake_job_list(mocker) -> JobList:
     """Return a minimal :class:`JobList` for wrapper/job-check unit tests.
+
     :param mocker: pytest-mock mocker fixture.
     :return: Configured :class:`JobList` instance.
-    :rtype: JobList
     """
     as_conf = mocker.MagicMock()
     as_conf.experiment_data = {}
-    job_list = JobList('a000', as_conf, YAMLParserFactory())
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
     job_list.dbmanager = mocker.MagicMock()
     return job_list

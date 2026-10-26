@@ -395,7 +395,7 @@ class Job:
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
-        self._wrapper_queue = None
+        self._wrapper_queue: str = ""
         self._platform: ParamikoPlatform = None
         self._queue = None
         self._partition = None
@@ -520,7 +520,7 @@ class Job:
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
-        self._wrapper_queue = None
+        self._wrapper_queue = ""
         self._queue = None
         self._partition = None
         self.retry_delay = None
