@@ -723,41 +723,80 @@ def test_recover_logs_skips_jobs_without_valid_id_or_submit_time(as_conf, mocker
     mocked_save.assert_called_once()
 
 
-def test_recover_logs_wakes_only_platforms_with_recovery_threads(as_conf, mocker):
-    """Persisted jobs wake the separate recovery process only for enabled platforms."""
+class _RecoveryPlatform:
+    """Minimal platform stand-in for the ``recover_logs`` wake logic."""
+
+    def __init__(self, work_event, recovery_queue):
+        self.work_event = work_event
+        self.recovery_queue = recovery_queue
+        self.keep_alive_timeout = 60
+        self.serial_platform = self
+
+
+def _recovery_platform(mocker, *, recovery_queue=True):
+    """Build a fake platform with the attributes used by ``recover_logs``."""
+    return _RecoveryPlatform(
+        work_event=mocker.Mock(),
+        recovery_queue=mocker.Mock() if recovery_queue else None,
+    )
+
+
+@pytest.mark.parametrize(
+    "platform_config,has_recovery_queue,expected_wake",
+    [
+        ({}, True, True),
+        ({"DISABLE_RECOVERY_THREADS": True}, True, False),
+        ({}, False, False),
+    ],
+    ids=["enabled", "disabled", "no-queue"],
+)
+def test_recover_logs_wakes_only_platforms_with_recovery_threads(
+    as_conf, mocker, platform_config, has_recovery_queue, expected_wake
+):
+    """Persisted jobs wake the separate recovery process only when it can be used."""
+    platform_name = "platform"
+    as_conf.experiment_data["PLATFORMS"] = {platform_name: platform_config}
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), disable_save=True)
+    job_list.dbmanager = mocker.Mock()
+    job_list.dbmanager.select_finished_jobs_needing_log_recovery.return_value = [
+        {"name": "job", "platform_name": platform_name},
+    ]
+    platform = _recovery_platform(mocker, recovery_queue=has_recovery_queue)
+    job = Job("job", "42", Status.COMPLETED, 0)
+    job.submit_time_timestamp = "20200101000000"
+    job.platform = platform
+    job.platform_name = platform_name
+    job_list.graph.add_node("job", job=job)
+
+    mocker.patch.object(job_list, "_add_job_node_with_platform")
+    mocker.patch.object(Job, "recover_log")
+
+    assert job_list.recover_logs(from_db=True) is True
+
+    if expected_wake:
+        platform.work_event.set.assert_called_once()
+    else:
+        platform.work_event.set.assert_not_called()
+
+
+def test_recover_logs_does_not_wake_disabled_platform(as_conf, mocker):
+    """A disabled platform is not woken when another platform is enabled."""
     as_conf.experiment_data["PLATFORMS"] = {
         "enabled": {},
         "disabled": {"DISABLE_RECOVERY_THREADS": True},
-        "no_queue": {},
     }
-    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
-    job_list.dbmanager = mocker.MagicMock()
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), disable_save=True)
+    job_list.dbmanager = mocker.Mock()
     job_list.dbmanager.select_finished_jobs_needing_log_recovery.return_value = [
         {"name": "job_enabled", "platform_name": "enabled"},
         {"name": "job_disabled", "platform_name": "disabled"},
-        {"name": "job_no_queue", "platform_name": "no_queue"},
     ]
-
-    enabled_platform = mocker.MagicMock()
-    enabled_platform.serial_platform = enabled_platform
-    enabled_platform.work_event = mocker.MagicMock()
-    enabled_platform.recovery_queue = mocker.MagicMock()
-    enabled_platform.keep_alive_timeout = 60
-    disabled_platform = mocker.MagicMock()
-    disabled_platform.serial_platform = disabled_platform
-    disabled_platform.work_event = mocker.MagicMock()
-    disabled_platform.recovery_queue = mocker.MagicMock()
-    disabled_platform.keep_alive_timeout = 60
-    no_queue_platform = mocker.MagicMock()
-    no_queue_platform.serial_platform = no_queue_platform
-    no_queue_platform.work_event = mocker.MagicMock()
-    no_queue_platform.recovery_queue = None
-    no_queue_platform.keep_alive_timeout = 60
+    enabled_platform = _recovery_platform(mocker)
+    disabled_platform = _recovery_platform(mocker)
 
     for name, platform, platform_name in (
         ("job_enabled", enabled_platform, "enabled"),
         ("job_disabled", disabled_platform, "disabled"),
-        ("job_no_queue", no_queue_platform, "no_queue"),
     ):
         job = Job(name, "42", Status.COMPLETED, 0)
         job.submit_time_timestamp = "20200101000000"
@@ -767,13 +806,11 @@ def test_recover_logs_wakes_only_platforms_with_recovery_threads(as_conf, mocker
 
     mocker.patch.object(job_list, "_add_job_node_with_platform")
     mocker.patch.object(Job, "recover_log")
-    mocker.patch.object(job_list, "save_jobs")
 
     assert job_list.recover_logs(from_db=True) is True
 
     enabled_platform.work_event.set.assert_called_once()
     disabled_platform.work_event.set.assert_not_called()
-    no_queue_platform.work_event.set.assert_not_called()
 
 
 def test_recover_last_data_restores_and_marks_finished_jobs(as_conf, mocker):

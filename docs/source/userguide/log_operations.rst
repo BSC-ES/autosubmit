@@ -81,9 +81,14 @@ Log recovery resiliency
 
 Autosubmit recovers the logs and stats of the finished jobs in a separate process.
 When that process is enabled, the first start is mandatory: if it cannot be started
-from the main process, the run stops instead of silently losing logs and stats. The
-options below control how the process is restarted when it dies unexpectedly. They live
-in the ``RUNTIME`` section of the experiment configuration.
+from the main process, the run stops instead of silently losing logs and stats.
+
+If an individual job cannot be recovered, Autosubmit logs the error and leaves the job
+pending. The next recovery scan retries it. The run only stops when the recovery process
+cannot be started on the first start.
+
+The options below control how the process is restarted when it dies unexpectedly. They
+live in the ``RUNTIME`` section of the experiment configuration.
 
 .. list-table::
     :widths: 25 75
@@ -100,8 +105,9 @@ in the ``RUNTIME`` section of the experiment configuration.
         ``INLINE_FALLBACK`` both enabled and disabled.
     * - ``INLINE_FALLBACK``
       - If ``true``, while the separate process is not available, pending logs are recovered
-        in the main process, so no logs or stats are lost. Default: ``true``. This option
-        does not apply to the mandatory first start of the process.
+        in the main process. If an individual job fails, it stays pending for the next
+        recovery scan. Default: ``true``. This option does not apply to the mandatory first
+        start of the process.
 
 Example:
 
