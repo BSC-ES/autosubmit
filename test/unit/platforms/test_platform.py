@@ -19,6 +19,7 @@
 
 import multiprocessing as mp
 from pathlib import Path
+from queue import Queue
 from types import SimpleNamespace
 
 import pytest
@@ -219,7 +220,59 @@ def test_recover_job_reports_attempts(
     assert saved_jobs == [job]
 
 
-def _restore_platforms_mock(mocker, *, connected=True, should_run=True, process_alive=False):
+def test_recover_job_reports_only_recovered_attempts(mocker):
+    """The recovered attempt count ignores failed attempts."""
+    platform = LocalPlatform("t000", "test_platform", {})
+    report = RecoveryReport(
+        job_name="test_job",
+        attempts=[
+            RecoveryAttempt(0, True, ("", ""), ("", "")),
+            RecoveryAttempt(1, False, ("", ""), ("", ""), error="boom"),
+            RecoveryAttempt(2, True, ("", ""), ("", "")),
+        ],
+        all_succeeded=False,
+    )
+    retrieved = []
+    job = SimpleNamespace(
+        name="test_job",
+        retrieve_logfiles=lambda: retrieved.append(report) or report,
+        send_cpmip_notification=lambda as_conf: None,
+    )
+    warning = mocker.patch.object(Log, "warning")
+    result = mocker.patch.object(Log, "result")
+    jobs_db_manager = mocker.MagicMock()
+
+    platform._recover_job(job, jobs_db_manager, object())
+
+    assert retrieved == [report]
+    warning.assert_called_once()
+    result.assert_called_once()
+    assert "recovered 2 attempt" in result.call_args.args[0]
+    jobs_db_manager.save_job_log.assert_called_once_with(job)
+
+
+def test_recover_job_log_continues_after_a_failed_job(mocker):
+    """A failed job does not stop the recovery of the remaining queued jobs."""
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.recovery_queue = Queue()
+    platform.recovery_queue.put({"name": "job_a", "id": 1})
+    platform.recovery_queue.put({"name": "job_b", "id": 2})
+    platform._as_conf = object()
+    recover = mocker.patch.object(
+        platform, "_recover_single_log", side_effect=[Exception("boom"), None]
+    )
+    restore = mocker.patch.object(platform, "restore_connection")
+    warning = mocker.patch.object(Log, "warning")
+    mocker.patch.object(Log, "debug")
+
+    platform.recover_job_log(mocker.MagicMock())
+
+    assert recover.call_count == 2
+    warning.assert_called_once()
+    restore.assert_called_once_with(platform._as_conf, log_recovery_process=True)
+
+
+def _restore_platforms_mock(mocker, *, connected=True, should_run=True, respawn_ok=False):
     platform = mocker.MagicMock()
     platform.name = "local"
     platform.host = "localhost"
@@ -227,13 +280,12 @@ def _restore_platforms_mock(mocker, *, connected=True, should_run=True, process_
     platform.test_connection.return_value = None
     platform.check_remote_permissions.return_value = True
     platform.should_run_log_recovery.return_value = should_run
-    platform.log_recovery_process = mocker.MagicMock()
-    platform.log_recovery_process.is_alive.return_value = process_alive
+    platform.try_respawn_log_recovery_process.return_value = respawn_ok
     return platform
 
 
 @pytest.mark.parametrize(
-    "first_start,connected,should_run,process_alive,should_raise",
+    "fail_on_init_error,connected,should_run,respawn_ok,should_raise",
     [
         (True, True, True, False, True),
         (True, True, True, True, False),
@@ -241,20 +293,26 @@ def _restore_platforms_mock(mocker, *, connected=True, should_run=True, process_
         (True, True, False, False, False),
         (True, False, True, False, False),
     ],
-    ids=["first-start-missing", "first-start-running", "reconnect-missing", "recovery-disabled", "not-connected"],
+    ids=["init-error-missing", "init-error-running", "reconnect-missing", "recovery-disabled", "not-connected"],
 )
-def test_restore_platforms_enforces_log_recovery_on_first_start(
-    mocker, first_start, connected, should_run, process_alive, should_raise
+def test_restore_platforms_enforces_log_recovery_on_init(
+    mocker, fail_on_init_error, connected, should_run, respawn_ok, should_raise
 ):
     """Log recovery must be running after the initial connect when it is enabled."""
     as_conf = mocker.MagicMock()
     platform = _restore_platforms_mock(
-        mocker, connected=connected, should_run=should_run, process_alive=process_alive
+        mocker, connected=connected, should_run=should_run, respawn_ok=respawn_ok
     )
 
     if should_raise:
-        with pytest.raises(AutosubmitCritical):
-            restore_platforms([platform], as_conf=as_conf, first_start=first_start)
+        with pytest.raises(AutosubmitCritical) as exc_info:
+            restore_platforms([platform], as_conf=as_conf, fail_on_init_error=fail_on_init_error)
+        assert exc_info.value.code == 6008
     else:
-        restore_platforms([platform], as_conf=as_conf, first_start=first_start)
+        restore_platforms([platform], as_conf=as_conf, fail_on_init_error=fail_on_init_error)
+
+    if fail_on_init_error and connected and should_run:
+        platform.try_respawn_log_recovery_process.assert_called_once_with(as_conf)
+    else:
+        platform.try_respawn_log_recovery_process.assert_not_called()
 

@@ -26,6 +26,8 @@ from autosubmit.config.runtime import (
     RuntimeConfig,
     resolve_log_recovery_queue_size,
 )
+from autosubmit.config.utils import as_mapping
+from autosubmit.log.log import AutosubmitCritical
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -41,6 +43,27 @@ def test_runtime_defaults() -> None:
 
 def test_runtime_none_experiment_data() -> None:
     assert RuntimeConfig.from_experiment_data(None) == RuntimeConfig()
+
+
+@pytest.mark.parametrize(
+    "value,name,expected",
+    [
+        (None, "value", {}),
+        ({"a": 1}, "value", {"a": 1}),
+    ],
+    ids=["none", "mapping"],
+)
+def test_as_mapping(value, name, expected) -> None:
+    assert as_mapping(value, name) == expected
+
+
+@pytest.mark.parametrize("value", ["not-a-mapping", 1, ["a"]], ids=["str", "int", "list"])
+def test_as_mapping_raises_for_non_mapping(value) -> None:
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        as_mapping(value, "PLATFORMS")
+
+    assert exc_info.value.code == 7014
+    assert "PLATFORMS" in exc_info.value.message
 
 
 @pytest.mark.parametrize(
@@ -69,12 +92,18 @@ def test_runtime_log_recovery_parsing(log_recovery: dict, expected: LogRecoveryC
 
 
 @pytest.mark.parametrize(
-    "runtime",
-    ["not-a-dict", {"LOG_RECOVERY": "not-a-dict"}],
+    "runtime,name",
+    [
+        ("not-a-dict", "RUNTIME"),
+        ({"LOG_RECOVERY": "not-a-dict"}, "RUNTIME.LOG_RECOVERY"),
+    ],
     ids=["runtime-not-a-dict", "log-recovery-not-a-dict"],
 )
-def test_runtime_invalid_sections_fall_back_to_defaults(runtime) -> None:
-    assert RuntimeConfig.from_experiment_data({"RUNTIME": runtime}).log_recovery == LogRecoveryConfig()
+def test_runtime_invalid_sections_raise(runtime, name) -> None:
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        RuntimeConfig.from_experiment_data({"RUNTIME": runtime})
+
+    assert name in exc_info.value.message
 
 
 @pytest.mark.parametrize(
@@ -88,7 +117,7 @@ def test_runtime_invalid_sections_fall_back_to_defaults(runtime) -> None:
     ids=["invalid-restarts", "invalid-delay", "invalid-fallback", "invalid-fallback-type"],
 )
 def test_runtime_invalid_values_log_warning(mocker, log_recovery: dict, option_name: str) -> None:
-    warning = mocker.patch("autosubmit.config.runtime.Log.warning")
+    warning = mocker.patch("autosubmit.config.utils.Log.warning")
 
     RuntimeConfig.from_experiment_data({"RUNTIME": {"LOG_RECOVERY": log_recovery}})
 
@@ -97,7 +126,7 @@ def test_runtime_invalid_values_log_warning(mocker, log_recovery: dict, option_n
 
 
 def test_runtime_missing_values_do_not_log_warning(mocker) -> None:
-    warning = mocker.patch("autosubmit.config.runtime.Log.warning")
+    warning = mocker.patch("autosubmit.config.utils.Log.warning")
 
     RuntimeConfig.from_experiment_data({"RUNTIME": {"LOG_RECOVERY": {}}})
 
@@ -148,17 +177,17 @@ def test_is_recovery_threads_disabled_missing_platforms(autosubmit_config) -> No
         ({}, 200),
         ({"CONFIG": {"LOG_RECOVERY_QUEUE_SIZE": 50}}, 100),
         ({"CONFIG": {"TOTAL_JOBS": 30}}, 60),
-        ({"PLATFORMS": {"TOTAL_JOBS": 40}}, 80),
+        ({"PLATFORMS": {"MyPlatform": {"TOTAL_JOBS": 40}}}, 80),
         ({"PLATFORMS": {"MyPlatform": {"LOG_RECOVERY_QUEUE_SIZE": 20}}}, 40),
     ],
-    ids=["defaults", "config-queue-size", "config-total-jobs", "platforms-total-jobs", "platform-queue-size"],
+    ids=["defaults", "config-queue-size", "config-total-jobs", "platform-total-jobs", "platform-queue-size"],
 )
 def test_resolve_log_recovery_queue_size(experiment_data: dict, expected: int) -> None:
     assert resolve_log_recovery_queue_size(experiment_data, "MyPlatform") == expected
 
 
 def test_resolve_log_recovery_queue_size_invalid_logs_warning(mocker) -> None:
-    warning = mocker.patch("autosubmit.config.runtime.Log.warning")
+    warning = mocker.patch("autosubmit.config.utils.Log.warning")
 
     assert resolve_log_recovery_queue_size({"CONFIG": {"TOTAL_JOBS": "nope"}}, "MyPlatform") == 200
     warning.assert_called_once()

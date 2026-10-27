@@ -27,60 +27,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from autosubmit.log.log import Log
+from autosubmit.config.utils import as_bool, as_float, as_int, as_mapping
 
-__all__ = ["LogRecoveryConfig", "RuntimeConfig", "as_mapping", "resolve_log_recovery_queue_size"]
-
-_TRUTHY = frozenset({"true", "1", "yes", "on"})
-_FALSY = frozenset({"false", "0", "no", "off"})
-
-
-# TODO: move these  helpers to ``autosubmit/config/utils.py`` so other
-# configuration modules can reuse them. It is not possible yet because
-# ``config/utils.py`` imports ``upgrade_scripts``, which imports ``configcommon``,
-# which imports this module, creating an import cycle.
-def as_mapping(value: Any) -> Mapping[Any, Any]:
-    """Return the value when it is a mapping, otherwise an empty mapping.
-
-    :param value: Value to normalize.
-    :return: The original mapping, or an empty mapping.
-    """
-    return value if isinstance(value, Mapping) else {}
-
-
-def _as_bool(value: Any, default: bool, name: str) -> bool:
-    if value is None:
-        return default
-    elif isinstance(value, bool):
-        return value
-    elif isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in _TRUTHY:
-            return True
-        elif normalized in _FALSY:
-            return False
-    Log.warning(f"Invalid value for {name}: {value!r}. Using default {default}.")
-    return default
-
-
-def _as_int(value: Any, default: int, name: str) -> int:
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        Log.warning(f"Invalid value for {name}: {value!r}. Using default {default}.")
-        return default
-
-
-def _as_float(value: Any, default: float, name: str) -> float:
-    if value is None:
-        return default
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        Log.warning(f"Invalid value for {name}: {value!r}. Using default {default}.")
-        return default
+__all__ = ["LogRecoveryConfig", "RuntimeConfig", "resolve_log_recovery_queue_size"]
 
 
 @dataclass(frozen=True)
@@ -111,23 +60,23 @@ class RuntimeConfig:
         :param experiment_data: Experiment configuration dictionary.
         :return: The parsed runtime configuration.
         """
-        runtime = as_mapping(as_mapping(experiment_data).get("RUNTIME"))
-        log_recovery = as_mapping(runtime.get("LOG_RECOVERY"))
+        runtime = as_mapping(as_mapping(experiment_data, "experiment_data").get("RUNTIME"), "RUNTIME")
+        log_recovery = as_mapping(runtime.get("LOG_RECOVERY"), "RUNTIME.LOG_RECOVERY")
 
         defaults = LogRecoveryConfig()
         return cls(
             log_recovery=LogRecoveryConfig(
-                consecutive_max_restarts=_as_int(
+                consecutive_max_restarts=as_int(
                     log_recovery.get("CONSECUTIVE_MAX_RESTARTS"),
                     defaults.consecutive_max_restarts,
                     "RUNTIME.LOG_RECOVERY.CONSECUTIVE_MAX_RESTARTS",
                 ),
-                retry_delay=_as_float(
+                retry_delay=as_float(
                     log_recovery.get("RETRY_DELAY"),
                     defaults.retry_delay,
                     "RUNTIME.LOG_RECOVERY.RETRY_DELAY",
                 ),
-                inline_fallback=_as_bool(
+                inline_fallback=as_bool(
                     log_recovery.get("INLINE_FALLBACK"),
                     defaults.inline_fallback,
                     "RUNTIME.LOG_RECOVERY.INLINE_FALLBACK",
@@ -137,33 +86,46 @@ class RuntimeConfig:
 
 
 def resolve_log_recovery_queue_size(experiment_data: Mapping[str, Any] | None, platform_name: str) -> int:
-    """Resolve the recovery queue size for a platform.
+    """Resolve the pending log recovery tracking size for a platform.
 
-    Keeps the legacy ``CONFIG``/``PLATFORMS`` precedence used by the platform constructor.
-    ``TOTAL_JOBS`` takes precedence over ``LOG_RECOVERY_QUEUE_SIZE`` and the result is doubled.
+    Precedence, from highest to lowest: ``PLATFORMS.<platform>.TOTAL_JOBS``,
+    ``CONFIG.TOTAL_JOBS``, ``PLATFORMS.<platform>.LOG_RECOVERY_QUEUE_SIZE``,
+    ``CONFIG.LOG_RECOVERY_QUEUE_SIZE`` and the default ``100``. The result is doubled,
+    so the default is ``200``.
+
+    The result bounds how many pending recovery entries the platform keeps in memory, not
+    the capacity of the multiprocessing queue.
 
     :param experiment_data: Experiment configuration dictionary.
     :param platform_name: Name of the platform (case-insensitive).
-    :return: The recovery queue size.
+    :return: The pending log recovery tracking size.
     """
-    config = as_mapping(experiment_data)
-    platforms = as_mapping(config.get("PLATFORMS"))
+    config = as_mapping(experiment_data, "experiment_data")
+    platforms = as_mapping(config.get("PLATFORMS"), "PLATFORMS")
     platforms_by_name = {name.upper(): data for name, data in platforms.items()}
-    platform_config = as_mapping(platforms_by_name.get(platform_name.upper()))
-    global_config = as_mapping(config.get("CONFIG"))
+    platform_config = as_mapping(
+        platforms_by_name.get(platform_name.upper()), f"PLATFORMS.{platform_name}"
+    )
+    global_config = as_mapping(config.get("CONFIG"), "CONFIG")
 
-    default_queue_size = global_config.get("LOG_RECOVERY_QUEUE_SIZE", 100)
-    platform_default_queue_size = platform_config.get("LOG_RECOVERY_QUEUE_SIZE", default_queue_size)
-    config_total_jobs = global_config.get("TOTAL_JOBS", platform_default_queue_size)
-    # TODO: this reads ``PLATFORMS.TOTAL_JOBS`` (global) instead of the per-platform value. Kept as
-    #       is to preserve the existing behaviour.
-    platform_total_jobs = platforms.get("TOTAL_JOBS", config_total_jobs)
-
-    try:
-        return int(platform_total_jobs) * 2
-    except (TypeError, ValueError):
-        Log.warning(
-            f"Invalid value for LOG_RECOVERY_QUEUE_SIZE/TOTAL_JOBS on {platform_name}: "
-            f"{platform_total_jobs!r}. Using default 200."
-        )
-        return 200
+    global_queue_size = as_int(
+        global_config.get("LOG_RECOVERY_QUEUE_SIZE"),
+        100,
+        "CONFIG.LOG_RECOVERY_QUEUE_SIZE",
+    )
+    platform_queue_size = as_int(
+        platform_config.get("LOG_RECOVERY_QUEUE_SIZE"),
+        global_queue_size,
+        f"PLATFORMS.{platform_name}.LOG_RECOVERY_QUEUE_SIZE",
+    )
+    global_total_jobs = as_int(
+        global_config.get("TOTAL_JOBS"),
+        platform_queue_size,
+        "CONFIG.TOTAL_JOBS",
+    )
+    platform_total_jobs = as_int(
+        platform_config.get("TOTAL_JOBS"),
+        global_total_jobs,
+        f"PLATFORMS.{platform_name}.TOTAL_JOBS",
+    )
+    return platform_total_jobs * 2

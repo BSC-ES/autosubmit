@@ -1966,6 +1966,19 @@ def test_init(loaded_data):
         assert job.remote_logs == ('', '')
 
 
+def test_init_preserves_log_recovery_call_count_from_loaded_data():
+    state = {
+        "_name": "test_job",
+        "status": "COMPLETED",
+        "updated_log": 1,
+        "log_recovery_call_count": 3,
+    }
+
+    job = Job(loaded_data=state)
+
+    assert job.log_recovery_call_count == 3
+
+
 @pytest.fixture()
 def experiment_data() -> dict:
     return {

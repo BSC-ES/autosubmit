@@ -464,6 +464,8 @@ class Job:
         # hetjobs
         self.het = None
         self.updated_log = 0
+        self.log_recovery_call_count = 0
+        """Number of log recovery calls made for this job, persisted by ``save_jobs`` and capped against ``fail_count``."""
         self.submit_time_timestamp = None  # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
         self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
@@ -506,7 +508,8 @@ class Job:
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
         self.updated = False
-        self.log_recovery_call_count = copy.copy(self.updated_log)
+        if not loaded_data:
+            self.log_recovery_call_count = copy.copy(self.updated_log)
         self.finished_time = None
         self.validate_template = False
         self.finished_time = None
@@ -3100,6 +3103,10 @@ class Job:
 
     def recover_log(self, as_conf: 'AutosubmitConfig') -> None:
         """Recover log files and submit time for this job.
+
+        ``log_recovery_call_count`` caps how many recovery attempts are made for this job.
+        It is persisted so the cap survives Autosubmit restarts.
+
         :param as_conf: Experiment configuration.
         """
         if self.log_recovery_call_count > self.fail_count:
@@ -3108,9 +3115,9 @@ class Job:
         platform = self.platform
         platform_name = getattr(platform, "name", None) or self.platform_name
         if as_conf.is_recovery_threads_disabled(platform_name):
-            if self.platform.recover_log_inline(self, as_conf):
+            if platform.recover_log_inline(self, as_conf):
                 self.log_recovery_call_count += 1
-        elif self.platform.add_job_to_log_recover(self, as_conf):
+        elif platform.add_job_to_log_recover(self, as_conf):
             self.log_recovery_call_count += 1
 
     def recover_last_ready_date(self) -> None:

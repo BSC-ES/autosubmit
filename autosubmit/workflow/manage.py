@@ -243,7 +243,7 @@ def _prepare_run(
         exp_history = get_historical_database(expid, job_list, as_conf)
         # establish the connection to all platforms
         # Restore is misleading, it is actually a "connect" function when the recover flag is not set.
-        restore_platforms(job_list.submitter.platforms_object, as_conf=as_conf, first_start=True)
+        restore_platforms(job_list.submitter.platforms_object, as_conf=as_conf, fail_on_init_error=True)
         return (
             job_list,
             submitter,

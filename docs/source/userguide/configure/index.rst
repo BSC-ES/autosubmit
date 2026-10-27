@@ -490,8 +490,10 @@ There are some other parameters that you may need to specify:
     * - ``TOTAL_JOBS``
       - Maximum number of jobs to be running at the same time in this platform.
     * - ``LOG_RECOVERY_QUEUE_SIZE``
-      - A memory-consumption optimization for the recovery of logs.
-         Default: ``max(100,TOTAL_JOBS) * 2``, in case of issues with the recovery of logs, you can increase this value.
+      - A memory-consumption optimization for the recovery of logs. It bounds how many
+         pending recovery entries are kept in memory, not the multiprocessing queue capacity.
+         Default: ``100`` (doubled to ``200``). The per-platform ``TOTAL_JOBS`` or
+         ``LOG_RECOVERY_QUEUE_SIZE`` take precedence. Increase it if you see recovery issues.
     * - ``CLEAR_TO_SEND_TIMEOUT``
       - How long Autosubmit waits for the login server when it is busy. Raise it if you see "key-exchange timed out" errors.
          Default: ``180``.

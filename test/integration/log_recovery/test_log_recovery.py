@@ -57,7 +57,6 @@ def filesystem_as_conf(tmp_path):
 @pytest.fixture
 def filesystem_recovery_platform(filesystem_as_conf, tmp_path, mocker):
     """Filesystem-backed platform; only the external side effects are mocked."""
-    (tmp_path / "t000" / "db").mkdir(parents=True, exist_ok=True)
     platform = LocalPlatform("t000", "local", {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"})
     mocker.patch.object(Job, "stat_registered", return_value=False)
     mocker.patch.object(Job, "write_stats")
@@ -215,7 +214,6 @@ def _persist_unrecovered_job(db, job):
 
 def test_filter_pending_keeps_unrecovered_drops_recovered(tmp_path):
     """The filter keeps jobs the DB still reports as needing recovery, and drops the recovered ones."""
-    Path(tmp_path, "t000", "db").mkdir(parents=True, exist_ok=True)
     platform = LocalPlatform("t000", "local", {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"})
 
     needing = Job("needing", "1", Status.COMPLETED, 0)
@@ -306,7 +304,7 @@ def test_wait_for_work(
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
         for i in range(max_items):
-            local.recovery_queue.put_raw(CopyQueue.job_data(Job("t000", f"000{i}", Status.COMPLETED, 0)))
+            local.recovery_queue.put(CopyQueue.job_data(Job("t000", f"000{i}", Status.COMPLETED, 0)))
     process_log = local.wait_for_work()
     assert process_log == result
 
@@ -432,7 +430,7 @@ def test_clean_log_recovery_process_removes_worker_event(local, mocker):
     local.prepare_process()
     assert local.work_event in Platform.worker_events
 
-    local.clean_log_recovery_process(keep_pending=True)
+    local.clean_log_recovery_process(keep_pending_jobs=True)
 
     assert local.work_event is None
     assert Platform.worker_events == []
@@ -771,21 +769,20 @@ def test_spawn_failure_resets_state(local, as_conf, mocker):
     error.assert_called_once()
 
 
-def test_recover_log_inline_falls_back_to_memory_when_db_unavailable(
-    local, as_conf, mocker
-):
-    """Without the jobs database, inline recovery still retrieves logs in memory."""
+def test_recover_log_inline_requires_the_jobs_database(local, as_conf, mocker):
+    """Inline recovery fails when the jobs database cannot be opened."""
     mocker.patch(
         "autosubmit.platforms.platform.JobsDbManager",
         side_effect=Exception("db down"),
     )
-    retrieved = []
-    notified = []
     job = SimpleNamespace(
-        retrieve_logfiles=lambda: retrieved.append(True),
-        send_cpmip_notification=lambda as_conf: notified.append(as_conf),
+        name="t000",
+        retrieve_logfiles=mocker.Mock(),
+        send_cpmip_notification=mocker.Mock(),
     )
 
-    assert local.recover_log_inline(job, as_conf) is True
-    assert retrieved == [True]
-    assert notified == [as_conf]
+    with pytest.raises(Exception, match="db down"):
+        local.recover_log_inline(job, as_conf)
+
+    job.retrieve_logfiles.assert_not_called()
+    job.send_cpmip_notification.assert_not_called()
