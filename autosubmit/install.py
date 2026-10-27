@@ -27,7 +27,7 @@ from autosubmit.database.db_common import create_db
 from autosubmit.helpers.utils import get_rc_path
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
-__all__ = ["configure", "create_required_directories", "install"]
+__all__ = ["configure", "create_required_directories", "install", "check_required_directories"]
 
 
 _DEFAULT_DIRECTORY_MODE = 0o775
@@ -80,6 +80,25 @@ def create_required_directories() -> None:
     )
 
 
+def check_required_directories() -> None:
+    """Check that all required Autosubmit directories exist.
+
+    If any are missing, log a clear error message and exit with code 1.
+    This avoids unhandled tracebacks when users have deleted directories
+    that Autosubmit previously created.
+    """
+    directories = _get_required_directories()
+    missing = [str(path) for path in directories if not path.is_dir()]
+    if missing:
+        Log.error(
+            "Required Autosubmit directories are missing:\n"
+            + "\n".join(f"  - {p}" for p in missing)
+            + "\n\nPlease re-create them by running: autosubmit install\n"
+            "Or manually recreate the missing directories with appropriate permissions."
+        )
+        raise SystemExit(1)
+
+
 def _create_sqlite_database() -> bool:
     """Create the Autosubmit SQLite database.
 
@@ -91,16 +110,13 @@ def _create_sqlite_database() -> bool:
     if database_path.exists():
         Log.error("Database already exists.")
         return False
-
     Log.info("Creating autosubmit database...")
 
     query_file = files("autosubmit.database") / "data/autosubmit.sql"
     query = query_file.read_text()
-
     if not create_db(query):
         Log.error("Can not write database file")
         return False
-
     Log.result("Autosubmit database created successfully")
     return True
 
@@ -112,7 +128,6 @@ def _create_postgres_database() -> bool:
         ``False`` if the database could not be created.
     """
     Log.info("Creating autosubmit Postgres database...")
-
     if not create_db(""):
         Log.error("Failed to create Postgres database")
         return False
@@ -145,7 +160,7 @@ def install() -> bool:
 
 
 # TODO: configure needs some refactoring -- complex logic, exceptions can be better handled,
-#       duplicating code that exists/existed elsewhere...
+#        duplicating code that exists/existed elsewhere...
 def configure(
     advanced,
     database_path,
@@ -189,14 +204,13 @@ def configure(
             historicdb_path = home_path / "autosubmit/metadata/data"
             historiclog_path = home_path / "autosubmit/metadata/logs"
             database_filename = "autosubmit.db"
-
         if database_backend == "sqlite":
             while database_path is None:
                 database_path = input("Introduce Database path: ")
                 if database_path.find("~/") < 0:
                     database_path = None
                     Log.error(
-                        "Not a valid path. You must include '~/' at the beginning."
+                        "Not a valid path. You must include '~/ ' at the beginning."
                     )
             database_path = Path(database_path).expanduser().resolve()
             # if not os.path.exists(database_path):
@@ -209,7 +223,7 @@ def configure(
             local_root_path = input("Introduce path to experiments: ")
             if local_root_path.find("~/") < 0:
                 local_root_path = None
-                Log.error("Not a valid path. You must include '~/' at the beginning.")
+                Log.error("Not a valid path. You must include '~/ ' at the beginning.")
         local_root_path = Path(local_root_path).expanduser().resolve()
 
         global_logs_path = local_root_path / "logs"

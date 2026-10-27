@@ -24,13 +24,12 @@ from typing import TYPE_CHECKING
 
 from autosubmit.config.registry import load_config
 from autosubmit.log.log import Log
+from autosubmit.install import check_required_directories
 
 if TYPE_CHECKING:
     from autosubmit.scripts._args import AutosubmitOptions
 
-
 __all__ = ["initialise_command"]
-
 
 _COMMANDS_NOT_UPDATABLE = ["archive", "delete", "upgrade", "updateversion"]
 """List of commands that do not require the common code that updates AS version.
@@ -47,12 +46,13 @@ This means they do not get their configuration loaded, nor the last command
 set.
 
 This is important for commands that may deal with ALL experiments
-(e.g., describe).
+(e.g., describe). 
 
 Describe uses an expid, but with a different semantic. So the validator is
 disabled, since the user may provide N expids, where only one is invalid.
 In that case, we do not want the default validator to fail, and instead the
-command deal with the validation and initialisation another way."""
+command deal with the validation and initialisation another way.
+"""
 
 
 def _set_locale() -> None:
@@ -96,6 +96,11 @@ def initialise_command(command: str, opts: "AutosubmitOptions") -> None:
 
     if command in _COMMANDS_SKIP_INITIALISATION:
         return
+
+    # Ensure required directories exist before proceeding with most commands.
+    # Skip for install/configure which create them.
+    if command not in ("install", "configure"):
+        check_required_directories()
 
     expid = getattr(opts, "expid", None)
     if not expid:
