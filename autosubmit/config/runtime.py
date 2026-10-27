@@ -128,4 +128,6 @@ def resolve_log_recovery_queue_size(experiment_data: Mapping[str, Any] | None, p
         global_total_jobs,
         f"PLATFORMS.{platform_name}.TOTAL_JOBS",
     )
+    # The value is doubled as a historical safety margin for pending recovery entries.
+    # It is not related to stdout/stderr.
     return platform_total_jobs * 2

@@ -1234,6 +1234,11 @@ class Platform(ABC):
                             as_conf: 'AutosubmitConfig') -> None:
         """Recover the logs and stats of a single job from its serialized payload.
 
+        This method intentionally does not catch exceptions. The callers own the error
+        policy: ``recover_job_log`` runs in the recovery child process and reconnects
+        before continuing, while ``_recover_pending_from_db`` runs in the main process
+        and continues with the next pending job.
+
         :param job_data: Serialized payload of the job (at least ``name`` and ``id``).
         :param jobs_db_manager: Jobs database manager used to load and persist the job.
         :param as_conf: Experiment configuration.
@@ -1255,7 +1260,8 @@ class Platform(ABC):
 
         :param job: Job to recover.
         :param as_conf: Experiment configuration.
-        :return: ``True`` when the inline recovery was attempted.
+        :return: ``True`` when the inline recovery was attempted. ``Job.recover_log``
+            uses it to increment ``log_recovery_call_count``.
         """
         jobs_db_manager = JobsDbManager(schema=self.expid)
         try:
