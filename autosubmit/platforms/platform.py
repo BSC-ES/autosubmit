@@ -18,6 +18,7 @@
 import atexit
 import multiprocessing
 import os
+import queue
 import time
 import traceback
 from abc import ABC
@@ -236,6 +237,7 @@ class Platform(ABC):
         self._recovery_consecutive_failures: int = 0
         self._log_recovery_in_backoff: bool = False
         self._log_recovery_retry_at: float = 0.0
+        self._log_recovery_started_at: float = 0.0
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
         self.compress_remote_logs = False
         self.remote_logs_compress_type = "gzip"
@@ -817,12 +819,32 @@ class Platform(ABC):
             return dict(self._pending_recovery)
         return {name: data for name, data in self._pending_recovery.items() if name in needing}
 
-    def _start_retry_backoff(self, as_conf: 'AutosubmitConfig') -> None:
+    def _log_recovery_lived_long_enough(
+        self, now: float, log_recovery: LogRecoveryConfig
+    ) -> bool:
+        """Whether the last recovery process lived at least ``min_alive_seconds``.
+
+        A process that lived long enough proved it can run, so its death is a normal
+        death and the crash streak can be reset. A shorter life keeps the streak alive
+        so the backoff can engage.
+
+        :param now: Current timestamp.
+        :param log_recovery: Parsed ``RUNTIME.LOG_RECOVERY`` configuration.
+        :return: ``True`` when the last life reached the grace period.
+        """
+        return (
+            self._log_recovery_started_at > 0
+            and now - self._log_recovery_started_at >= log_recovery.min_alive_seconds
+        )
+
+    def _start_retry_backoff(
+        self, as_conf: 'AutosubmitConfig', log_recovery: LogRecoveryConfig
+    ) -> None:
         """Wait ``RETRY_DELAY`` before trying to start the recovery process again.
 
         :param as_conf: Experiment configuration.
+        :param log_recovery: Parsed ``RUNTIME.LOG_RECOVERY`` configuration.
         """
-        log_recovery = Platform._log_recovery_config(as_conf)
         attempts = self._recovery_consecutive_failures
         self._log_recovery_in_backoff = True
         self._recovery_consecutive_failures = 0
@@ -840,17 +862,41 @@ class Platform(ABC):
         Safe to call periodically: it only restarts a dead process and respects the retry
         backoff configured under ``RUNTIME.LOG_RECOVERY``.
 
+        A successful spawn only proves that the child started, not that it stayed alive.
+        Without the grace below, every crash would reset the failure counter (spawn
+        returns True), so ``CONSECUTIVE_MAX_RESTARTS`` and ``RETRY_DELAY`` would never
+        engage and the process would respawn in a tight crash loop. A child that dies
+        before ``MIN_ALIVE_SECONDS`` is counted as a failed attempt. One that lived longer
+        is treated as a normal death and does not count.
+
+        The lifetime is evaluated on the next liveness check, so this is a best-effort
+        check: a short-lived child that is checked long after it died may look healthy.
+
         :param as_conf: Experiment configuration.
         :return: ``True`` when a live recovery process is running.
         """
         if not self.should_run_log_recovery(as_conf):
             return False
 
+        log_recovery = Platform._log_recovery_config(as_conf)
+        now = time.time()
         if self.log_recovery_process_alive:
+            if self._log_recovery_lived_long_enough(now, log_recovery):
+                self._recovery_consecutive_failures = 0
             return True
 
+        # spawn() only reports that the child started. A child that lived long enough
+        # proves it can run, so its death is normal. A shorter life keeps the crash
+        # streak alive so the backoff can engage.
+        if self._log_recovery_started_at:
+            if self._log_recovery_lived_long_enough(now, log_recovery):
+                self._recovery_consecutive_failures = 0
+            else:
+                self._recovery_consecutive_failures += 1
+            self._log_recovery_started_at = 0.0
+
         if self._log_recovery_in_backoff:
-            if time.time() < self._log_recovery_retry_at:
+            if now < self._log_recovery_retry_at:
                 return False
             self._log_recovery_in_backoff = False
             self._recovery_consecutive_failures = 0
@@ -862,12 +908,10 @@ class Platform(ABC):
         self.clean_log_recovery_process(keep_pending_jobs=True)
         if not self.spawn_log_retrieval_process(as_conf):
             self._recovery_consecutive_failures += 1
-            max_restarts = Platform._log_recovery_config(as_conf).consecutive_max_restarts
-            if 0 < max_restarts <= self._recovery_consecutive_failures:
-                self._start_retry_backoff(as_conf)
+            if 0 < log_recovery.consecutive_max_restarts <= self._recovery_consecutive_failures:
+                self._start_retry_backoff(as_conf, log_recovery)
             return False
 
-        self._recovery_consecutive_failures = 0
         self._requeue_pending()
         return True
 
@@ -1039,6 +1083,7 @@ class Platform(ABC):
         self.log_recovery_process = None
         self.work_event = None
         self.processed_wrapper_logs = set()
+        self._log_recovery_started_at = 0.0
 
         if not keep_pending_jobs:
             self._pending_recovery = {}
@@ -1091,6 +1136,7 @@ class Platform(ABC):
             self.cleanup_event = self.ctx.Event()
         self.load_process_info(new_platform)
         if self.recovery_queue is not None:
+            self.recovery_queue.cancel_join_thread()
             self.recovery_queue.close()
             self.recovery_queue.join_thread()
             del self.recovery_queue
@@ -1120,17 +1166,27 @@ class Platform(ABC):
             self.ctx = multiprocessing.get_context('spawn')
         return self.ctx
 
-    def join_new_process(self):
-        # Check if the process is finished; prevent zombies
-        if self.log_recovery_process is not None:
-            ret_pid, _ret_status = os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
-            if ret_pid == 0:  # Process is still running
-                Log.info(f"Process {self.log_recovery_process.pid} is still running.")
-            else:
-                Log.result(
-                    f"Process {self.log_recovery_process.name} finished with pid {self.log_recovery_process.pid}")
-        else:
+    def join_new_process(self) -> None:
+        """Check whether the recovery process is running and reap it when it is not.
+
+        ``Process.is_alive()`` calls ``poll()``. ``poll()`` calls
+        ``os.waitpid(pid, os.WNOHANG)``, which reaps the child if it already exited.
+        Reaping through ``multiprocessing`` keeps ``is_alive()`` and ``exitcode``
+        accurate. Reaping with a raw ``os.waitpid`` outside ``multiprocessing`` leaves
+        the process object believing the child is still alive forever. The raw reap
+        makes ``poll()`` receive ``ECHILD`` and return ``None``, so ``is_alive()`` keeps
+        returning ``True``.
+        """
+        process = self.log_recovery_process
+        if process is None:
             Log.result("Log recovery process is not running (will not wait/join the process)")
+            return
+        if process.is_alive():
+            Log.info(f"Process {process.pid} is still running.")
+        else:
+            Log.result(
+                f"Process {process.name} finished with pid {process.pid} "
+                f"(exit code {process.exitcode})")
 
     def spawn_log_retrieval_process(self, as_conf: 'AutosubmitConfig | None') -> bool:
         """Spawn a process to recover the logs of the jobs completed on this platform.
@@ -1139,7 +1195,10 @@ class Platform(ABC):
         :return: ``True`` when a live recovery process is running.
         """
         if self.log_retrieval_process_active:
-            return self.log_recovery_process_alive
+            alive = self.log_recovery_process_alive
+            if not alive:
+                self.log_retrieval_process_active = False
+            return alive
 
         if not self.should_run_log_recovery(as_conf):
             return False
@@ -1154,6 +1213,8 @@ class Platform(ABC):
         if not alive:
             self.log_retrieval_process_active = False
             Log.error(f"Could not start the log recovery process for platform [{self.name}].")
+        else:
+            self._log_recovery_started_at = time.time()
         return alive
 
     def send_cleanup_signal(self) -> None:
@@ -1284,7 +1345,12 @@ class Platform(ABC):
             raise AutosubmitCritical("As the recovery job was initialized some of"
                                      "the variable were not properly initialized")
         while not self.recovery_queue.empty():
-            job_data = self.recovery_queue.get(timeout=5)
+            # ``Queue.empty()`` is not reliable. The queue can change between the check
+            # above and this ``get``, so a timeout means "no more items".
+            try:
+                job_data = self.recovery_queue.get(timeout=5)
+            except queue.Empty:
+                break
             try:
                 self._recover_single_log(job_data, jobs_db_manager, self._as_conf)
             except Exception as e:

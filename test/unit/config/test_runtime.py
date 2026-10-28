@@ -39,6 +39,7 @@ def test_runtime_defaults() -> None:
     assert runtime.log_recovery.consecutive_max_restarts == 2
     assert runtime.log_recovery.retry_delay == 600.0
     assert runtime.log_recovery.inline_fallback is True
+    assert runtime.log_recovery.min_alive_seconds == 5.0
 
 
 def test_runtime_none_experiment_data() -> None:
@@ -70,16 +71,26 @@ def test_as_mapping_raises_for_non_mapping(value) -> None:
     "log_recovery,expected",
     [
         (
-            {"CONSECUTIVE_MAX_RESTARTS": 5, "RETRY_DELAY": 30, "INLINE_FALLBACK": False},
-            LogRecoveryConfig(5, 30.0, False),
+            {
+                "CONSECUTIVE_MAX_RESTARTS": 5,
+                "RETRY_DELAY": 30,
+                "INLINE_FALLBACK": False,
+                "MIN_ALIVE_SECONDS": 1.5,
+            },
+            LogRecoveryConfig(5, 30.0, False, 1.5),
         ),
         (
-            {"CONSECUTIVE_MAX_RESTARTS": "5", "RETRY_DELAY": "30.5", "INLINE_FALLBACK": "false"},
-            LogRecoveryConfig(5, 30.5, False),
+            {
+                "CONSECUTIVE_MAX_RESTARTS": "5",
+                "RETRY_DELAY": "30.5",
+                "INLINE_FALLBACK": "false",
+                "MIN_ALIVE_SECONDS": "2.5",
+            },
+            LogRecoveryConfig(5, 30.5, False, 2.5),
         ),
         ({"INLINE_FALLBACK": "true"}, LogRecoveryConfig(2, 600.0, True)),
         (
-            {"CONSECUTIVE_MAX_RESTARTS": "nope", "RETRY_DELAY": "nope"},
+            {"CONSECUTIVE_MAX_RESTARTS": "nope", "RETRY_DELAY": "nope", "MIN_ALIVE_SECONDS": "nope"},
             LogRecoveryConfig(2, 600.0, True),
         ),
         ({"INLINE_FALLBACK": "nope"}, LogRecoveryConfig(2, 600.0, True)),
@@ -113,8 +124,9 @@ def test_runtime_invalid_sections_raise(runtime, name) -> None:
         ({"RETRY_DELAY": "nope"}, "RUNTIME.LOG_RECOVERY.RETRY_DELAY"),
         ({"INLINE_FALLBACK": "nope"}, "RUNTIME.LOG_RECOVERY.INLINE_FALLBACK"),
         ({"INLINE_FALLBACK": 1}, "RUNTIME.LOG_RECOVERY.INLINE_FALLBACK"),
+        ({"MIN_ALIVE_SECONDS": "nope"}, "RUNTIME.LOG_RECOVERY.MIN_ALIVE_SECONDS"),
     ],
-    ids=["invalid-restarts", "invalid-delay", "invalid-fallback", "invalid-fallback-type"],
+    ids=["invalid-restarts", "invalid-delay", "invalid-fallback", "invalid-fallback-type", "invalid-min-alive"],
 )
 def test_runtime_invalid_values_log_warning(mocker, log_recovery: dict, option_name: str) -> None:
     warning = mocker.patch("autosubmit.config.utils.Log.warning")
@@ -123,6 +135,19 @@ def test_runtime_invalid_values_log_warning(mocker, log_recovery: dict, option_n
 
     warning.assert_called_once()
     assert option_name in warning.call_args.args[0]
+
+
+@pytest.mark.parametrize("value", [-5, "-10.5"], ids=["negative-number", "negative-string"])
+def test_runtime_negative_min_alive_seconds(mocker, value) -> None:
+    warning = mocker.patch("autosubmit.config.runtime.Log.warning")
+
+    runtime = RuntimeConfig.from_experiment_data(
+        {"RUNTIME": {"LOG_RECOVERY": {"MIN_ALIVE_SECONDS": value}}}
+    )
+
+    assert runtime.log_recovery.min_alive_seconds == 0.0
+    warning.assert_called_once()
+    assert "MIN_ALIVE_SECONDS" in warning.call_args.args[0]
 
 
 def test_runtime_missing_values_do_not_log_warning(mocker) -> None:
@@ -142,6 +167,7 @@ def test_autosubmit_config_runtime_property(autosubmit_config) -> None:
     assert as_conf.runtime.log_recovery.consecutive_max_restarts == 4
     assert as_conf.runtime.log_recovery.inline_fallback is False
     assert as_conf.runtime.log_recovery.retry_delay == 600.0
+    assert as_conf.runtime.log_recovery.min_alive_seconds == 5.0
 
 
 @pytest.mark.parametrize(

@@ -46,7 +46,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
 - Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
 - Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
-- Added `RUNTIME.LOG_RECOVERY` options to configure log recovery resiliency: `CONSECUTIVE_MAX_RESTARTS` (consecutive restart attempts before waiting to retry, default `2`, `0` disables the limit), `RETRY_DELAY` (seconds to wait after exhausting those attempts before trying to start the recovery process again, default `600`) and `INLINE_FALLBACK` (recover pending logs in the main process while the separate process is unavailable, default `true`) #3342
+- Added `RUNTIME.LOG_RECOVERY` options to configure log recovery resiliency: `CONSECUTIVE_MAX_RESTARTS` (consecutive restart attempts before waiting to retry, default `2`, `0` disables the limit), `RETRY_DELAY` (seconds to wait after exhausting those attempts before trying to start the recovery process again, default `600`), `MIN_ALIVE_SECONDS` (minimum time a recovery process must stay alive to be considered healthy, default `5`) and `INLINE_FALLBACK` (recover pending logs in the main process while the separate process is unavailable, default `true`) #3342
 - Add `[database] backup` option to `autosubmitrc` to disable SQLite backups #3129
 
 **Migration from `job_list.pkl` to Database**
