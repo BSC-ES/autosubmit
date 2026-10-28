@@ -1223,7 +1223,6 @@ def inspect(
     :param check_wrapper: If true, checks the wrapper.
     :param quick: If true, performs a quick inspect.
     :return: True if run to the end, False otherwise
-    :raises BaseLockException: If the experiment is already locked by another command.
     :raises AutosubmitCritical: If there is a critical error during the inspection process.
     """
     Log.info(f"Inspecting experiment {expid}")

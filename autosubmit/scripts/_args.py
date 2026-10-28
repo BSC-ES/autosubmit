@@ -26,8 +26,6 @@ from inspect import cleandoc
 from re import split, sub
 from typing import Any, TypeVar, cast, get_type_hints
 
-from portalocker.exceptions import BaseLockException
-
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.profiler.profiler import Profiler
 
@@ -329,11 +327,13 @@ def exit_from_error(e: BaseException) -> int:
     Prints the exception in ``CRITICAL`` if it is an ``AutosubmitCritical`` or an
     ``AutosubmitError`` exception, including any trace attached to the exception.
 
-    Exceptions raised by the ``portalocker`` library print a message informing the user
-    that another process holds the experiment lock.
+    Exceptions raised when trying to obtain or release a lock (file- or DB-based)
+    results in a user warning saying that another process holds the experiment lock.
 
     :param e: The exception being raised.
     """
+    from autosubmit.exceptions import ExperimentLockException
+
     err_code = 1
     trace = traceback.format_exc()
     try:
@@ -341,10 +341,10 @@ def exit_from_error(e: BaseException) -> int:
     except Exception:
         print(trace)
 
-    is_portalocker_error = isinstance(e, BaseLockException)
+    is_lock_error = isinstance(e, ExperimentLockException)
     is_autosubmit_error = isinstance(e, (AutosubmitCritical, AutosubmitError))
 
-    if isinstance(e, BaseLockException):
+    if is_lock_error:
         Log.warning(
             "Another Autosubmit process is using this experiment. Wait for it to finish, "
             "or stop it, before running this command again."
@@ -359,7 +359,7 @@ def exit_from_error(e: BaseException) -> int:
         Log.critical(f"{as_error.message} [eCode={as_error.code}]")
         err_code = as_error.code
 
-    if not is_portalocker_error and not is_autosubmit_error:
+    if not is_lock_error and not is_autosubmit_error:
         msg = "Unexpected error: {0}.\n Please report it to Autosubmit Developers through Git: https://github.com/BSC-ES/autosubmit/issues"
         args = [str(e)]
         Log.critical(msg.format(*args))

@@ -16,8 +16,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
-from portalocker.exceptions import BaseLockException
 
+from autosubmit.exceptions import ExperimentAlreadyLockedException
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.scripts._args import exit_from_error
 
@@ -50,7 +50,7 @@ _TEST_EXCEPTION.trace = "a trace"
     "exception,expected_code,critical_calls",
     [
         (ValueError(), 7000, 2),
-        (BaseLockException(), 1, 1),
+        (ExperimentAlreadyLockedException(), 1, 1),
         (AutosubmitCritical(), 7000, 2),
         (_TEST_EXCEPTION, 7000, 3),
         (AutosubmitError(), 6000, 2),
