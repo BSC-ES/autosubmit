@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-import multiprocessing
+import multiprocessing as mp
 import os
 import pwd
 import time
@@ -85,7 +85,7 @@ def _create_recovery_files(tmp_path, platform: LocalPlatform, expid: str = "t000
 def test_log_recovery_no_keep_alive(prepare_test, local, as_conf: 'AutosubmitConfig', mocker):
     # Exercise the production start method. Spawn starts a fresh interpreter,
     # which is also the path that needs separate coverage collection.
-    fork_context = multiprocessing.get_context("fork")
+    fork_context = mp.get_context("fork")
 
     mocker.patch(
         "autosubmit.platforms.platform.multiprocessing.get_context",
@@ -108,7 +108,7 @@ def test_log_recovery_no_keep_alive(prepare_test, local, as_conf: 'AutosubmitCon
 
 
 def test_log_recovery_keep_alive(prepare_test, local, as_conf: 'AutosubmitConfig', mocker):
-    fork_context = multiprocessing.get_context("fork")
+    fork_context = mp.get_context("fork")
 
     mocker.patch(
         "autosubmit.platforms.platform.multiprocessing.get_context",
@@ -127,7 +127,7 @@ def test_log_recovery_keep_alive(prepare_test, local, as_conf: 'AutosubmitConfig
 
 
 def test_log_recovery_keep_alive_cleanup(prepare_test, local, as_conf: 'AutosubmitConfig', mocker):
-    fork_context = multiprocessing.get_context("fork")
+    fork_context = mp.get_context("fork")
 
     mocker.patch(
         "autosubmit.platforms.platform.multiprocessing.get_context",
@@ -295,7 +295,7 @@ def test_wait_for_work(
     recovery_queue_full: bool,
     result: bool,
 ):
-    fork_context = multiprocessing.get_context("fork")
+    fork_context = mp.get_context("fork")
 
     mocker.patch(
         "autosubmit.platforms.platform.multiprocessing.get_context",
@@ -425,7 +425,7 @@ def test_worker_events_no_duplicates(local):
 
 def test_clean_log_recovery_process_removes_worker_event(local, mocker):
     """Cleaning the process must not leave stale worker events behind on respawn."""
-    fork_context = multiprocessing.get_context("fork")
+    fork_context = mp.get_context("fork")
 
     mocker.patch(
         "autosubmit.platforms.platform.multiprocessing.get_context",
@@ -480,7 +480,7 @@ def test_add_job_returns_false_without_queueing(local, as_conf, job_id, disable_
 
 def test_clean_log_recovery_process_with_dead_child(local, as_conf: 'AutosubmitConfig', mocker):
     """Verify clean-up does not hang when child has crashed."""
-    fork_context = multiprocessing.get_context("fork")
+    fork_context = mp.get_context("fork")
 
     mocker.patch(
         "autosubmit.platforms.platform.multiprocessing.get_context",
@@ -501,9 +501,11 @@ def test_clean_log_recovery_process_with_dead_child(local, as_conf: 'AutosubmitC
 
 def test_add_job_to_log_recover_respawns_dead_process(local, as_conf, mocker):
     """Issue #3342: a dead log recovery process must be respawned, not silently dropped."""
+    fork_context = mp.get_context("fork")
+
     mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
     )
     local.config["LOG_RECOVERY_TIMEOUT"] = 10
     local.spawn_log_retrieval_process(as_conf)

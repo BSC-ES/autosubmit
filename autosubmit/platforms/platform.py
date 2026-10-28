@@ -237,7 +237,7 @@ class Platform(ABC):
         self._log_recovery_in_backoff: bool = False
         self._log_recovery_retry_at: float = 0.0
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
-        self.compress_remote_logs = False
+        self.compress_remote_logs: bool = False
         self.remote_logs_compress_type = "gzip"
         self.compression_level = 9
         log_queue_size = 200
@@ -1116,7 +1116,7 @@ class Platform(ABC):
             return False
 
         self.log_retrieval_process_active = True
-        self.ctx = self.get_mp_context()
+        self.ctx = multiprocessing.get_context("spawn")
         new_platform = self.prepare_process()
         self.create_new_process(new_platform, as_conf)
         self.join_new_process()
