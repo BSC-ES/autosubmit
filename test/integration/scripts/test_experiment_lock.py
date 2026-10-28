@@ -62,12 +62,16 @@ def test_lock_removed_when_command_raises(autosubmit_exp, mocker):
     assert not _lock_file(exp).exists()
 
 
-def test_command_blocked_while_lock_held(autosubmit_exp, mocker):
+def test_command_blocked_while_lock_held(autosubmit_exp, mocker, monkeypatch):
     exp = autosubmit_exp()
+
+    monkeypatch.setattr(BasicConfig, "EXPERIMENT_LOCK_TIMEOUT", 0.1)
+    monkeypatch.setattr(BasicConfig, "EXPERIMENT_LOCK_RETRY_INTERVAL", 0.05)
+
     create = mocker.patch("autosubmit.experiment.manage.create")
 
     with experiment_lock(exp.expid):
-        assert create_main(exp.expid) == 1
+        assert create_main(exp.expid) == 1  # type: ignore
         assert _lock_file(exp).exists()
 
     create.assert_not_called()

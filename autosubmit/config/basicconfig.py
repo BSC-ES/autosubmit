@@ -20,10 +20,16 @@ import os
 from configparser import ConfigParser
 from pathlib import Path
 
+__all__ = ["BasicConfig"]
+
 
 class BasicConfig:
-    """
-    Class to manage configuration for Autosubmit path, database and default values for new experiments
+    """Autosubmit site configuration.
+
+    This contains configuration used by Autosubmit, before any experiment is created.
+    For instance, the paths of Autosubmit folders and database.
+
+    It also contains the default values for new experiments.
     """
     def props(self) -> dict:
         pr = {}
@@ -60,6 +66,20 @@ class BasicConfig:
     DATABASE_CONN_URL = ""
     DATABASE_BACKUP = True
     LOG_RECOVERY_TIMEOUT: int = 60 * 5
+    EXPERIMENT_LOCK_TIMEOUT: float = 10.0
+    """Default timeout used when locking an experiment access.
+    
+    Measured in seconds.
+    
+    Used when no configuration file is provided.
+    """
+    EXPERIMENT_LOCK_RETRY_INTERVAL: float = 0.5
+    """Default retry interval used when locking an experiment access.
+
+    Measured in seconds.
+    
+    Used when no configuration file is provided.
+    """
 
     # TODO: BasicConfig contains site configuration, but this function returns the experiment directory.
     #       BasicConfig.read() loads the object, and this static function is completely unrelated; it is
@@ -203,6 +223,29 @@ class BasicConfig:
                 'autosubmitapi', 'url')
         if parser.has_option('config', 'log_recovery_timeout'):
             BasicConfig.LOG_RECOVERY_TIMEOUT = int(parser.get('config', 'log_recovery_timeout'))
+
+        # Locking.
+        if parser.has_option("experiment_lock", "timeout"):
+            timeout = parser.getfloat("experiment_lock", "timeout")
+            if timeout <= 0:
+                raise ValueError("[experiment_lock][timeout] must be greater than zero")
+            BasicConfig.EXPERIMENT_LOCK_TIMEOUT = timeout
+        if parser.has_option("experiment_lock", "retry_interval"):
+            retry_interval = parser.getfloat("experiment_lock", "retry_interval")
+            if retry_interval <= 0:
+                raise ValueError(
+                    "[experiment_lock][retry_interval] must be greater than zero"
+                )
+            BasicConfig.EXPERIMENT_LOCK_RETRY_INTERVAL = retry_interval
+
+        if (
+            BasicConfig.EXPERIMENT_LOCK_RETRY_INTERVAL
+            > BasicConfig.EXPERIMENT_LOCK_TIMEOUT
+        ):
+            raise ValueError(
+                "[experiment_lock][retry_interval] must not be greater than "
+                "[experiment_lock][timeout]"
+            )
 
     @staticmethod
     def read():

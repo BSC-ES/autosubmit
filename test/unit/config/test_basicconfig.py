@@ -16,10 +16,23 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
+from re import escape
 
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
+
+
+def test_props():
+    """Return configuration attributes without methods."""
+    config = BasicConfig()
+
+    result = config.props()
+
+    assert "DB_DIR" in result
+    assert "EXPERIMENT_LOCK_TIMEOUT" in result
+    assert "props" not in result
+    assert "read" not in result
 
 
 def test_read_file_config(tmp_path, monkeypatch):
@@ -85,6 +98,214 @@ def test_read_file_config(tmp_path, monkeypatch):
     assert BasicConfig.MAIL_FROM == "test@bsc.es"
     assert BasicConfig.SMTP_SERVER == "127.0.0.1"
     assert BasicConfig.STRUCTURES_DIR == f"{tmp_path}"
+
+
+def test_read_file_config_missing_file(tmp_path, monkeypatch):
+    """Do nothing when the configuration file does not exist."""
+    config_file = tmp_path / "missing_autosubmitrc"
+    monkeypatch.setattr(BasicConfig, "CONFIG_FILE_FOUND", False)
+    # noinspection PyUnresolvedReferences
+    BasicConfig._BasicConfig__read_file_config(config_file)
+    assert BasicConfig.CONFIG_FILE_FOUND is False
+
+
+@pytest.mark.parametrize(
+    "existing_paths, expected_calls",
+    [
+        (
+            {"cwd"},
+            ["cwd"],
+        ),
+        (
+            {"home"},
+            ["home"],
+        ),
+        (
+            {"legacy"},
+            ["legacy"],
+        ),
+        (
+            {"legacy", "etc"},
+            ["legacy", "etc"],
+        ),
+        (
+            {"etc"},
+            ["etc"],
+        ),
+        (
+            {"cwd", "home", "legacy", "etc"},
+            ["cwd"],
+        ),
+    ],
+)
+def test_read_configuration_search_order(
+    monkeypatch, tmp_path, existing_paths, expected_calls
+):
+    """Load configuration files according to the configured search priority."""
+
+    cwd = tmp_path / "cwd"
+    home = tmp_path / "home"
+
+    paths = {
+        "cwd": cwd / ".autosubmitrc",
+        "home": home / ".autosubmitrc",
+        "legacy": Path("/etc/.autosubmitrc"),
+        "etc": Path("/etc/autosubmitrc"),
+    }
+
+    monkeypatch.delenv("AUTOSUBMIT_CONFIGURATION", raising=False)
+
+    monkeypatch.setattr(Path, "cwd", lambda: cwd)
+    monkeypatch.setattr(Path, "home", lambda: home)
+
+    monkeypatch.setattr(
+        Path,
+        "exists",
+        lambda self: any(self == paths[name] for name in existing_paths),
+    )
+
+    calls = []
+
+    def mock_read_file_config(path):
+        calls.append(next(name for name, value in paths.items() if value == path))
+
+    # noinspection PyUnresolvedReferences
+    monkeypatch.setattr(
+        BasicConfig,
+        "_BasicConfig__read_file_config",
+        mock_read_file_config,
+    )
+
+    BasicConfig.read()
+
+    assert calls == expected_calls
+
+
+@pytest.mark.parametrize(
+    "option, expected",
+    [
+        (
+            "authorized",
+            {
+                "run": ["host1", "host2"],
+                "check": ["host1", "host2"],
+                "cancel": ["host3"],
+                "other": ["host4", "host5"],
+                "inspect": ["host6"],
+            },
+        ),
+        (
+            "forbidden",
+            {
+                "run": ["host1", "host2"],
+                "check": ["host1", "host2"],
+                "cancel": ["host3"],
+                "other": ["host4", "host5"],
+                "inspect": ["host6"],
+            },
+        ),
+    ],
+)
+def test_read_host_restrictions(tmp_path, monkeypatch, option, expected):
+    """Parse host restrictions with single and multiple commands and hosts."""
+    config_file = tmp_path / "autosubmitrc"
+
+    config_file.write_text(
+        f"""
+        [hosts]
+        {option} = [run,check host1,host2] [cancel host3] [other host4,host5] [inspect host6]
+        """
+    )
+
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    BasicConfig.read()
+
+    result = (
+        BasicConfig.ALLOWED_HOSTS
+        if option == "authorized"
+        else BasicConfig.DENIED_HOSTS
+    )
+
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "option, restriction, expected",
+    [
+        (
+            "authorized",
+            "[run,check host1]",
+            {
+                "run": ["host1"],
+                "check": ["host1"],
+            },
+        ),
+        (
+            "authorized",
+            "[run host1,host2]",
+            {
+                "run": ["host1", "host2"],
+            },
+        ),
+        (
+            "forbidden",
+            "[run,check host1]",
+            {
+                "run": ["host1"],
+                "check": ["host1"],
+            },
+        ),
+        (
+            "forbidden",
+            "[run host1,host2]",
+            {
+                "run": ["host1", "host2"],
+            },
+        ),
+    ],
+)
+def test_read_host_restrictions_combinations(
+    tmp_path, monkeypatch, option, restriction, expected
+):
+    """Cover all combinations of commands and hosts."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text(
+        f"""
+        [hosts]
+        {option} = {restriction}
+        """
+    )
+
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+    monkeypatch.setattr(BasicConfig, "EXPERIMENT_LOCK_TIMEOUT", 10.0)
+    monkeypatch.setattr(BasicConfig, "EXPERIMENT_LOCK_RETRY_INTERVAL", 0.5)
+
+    BasicConfig.read()
+
+    result = (
+        BasicConfig.ALLOWED_HOSTS
+        if option == "authorized"
+        else BasicConfig.DENIED_HOSTS
+    )
+
+    assert result == expected
+
+
+def test_read_autosubmit_api_url(tmp_path, monkeypatch):
+    """Read the Autosubmit API URL from the configuration."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text(
+        """
+        [autosubmitapi]
+        url = http://localhost:8081
+        """
+    )
+
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+    BasicConfig.read()
+
+    assert BasicConfig.AUTOSUBMIT_API_URL == "http://localhost:8081"
 
 
 @pytest.mark.parametrize(
@@ -157,3 +378,127 @@ def test_read_database_backup_option(
 
     assert BasicConfig.DATABASE_BACKUP is expected
 
+
+def test_expid_lock_file():
+    """Return the expected experiment lock file path."""
+    expid = "a123"
+
+    expected = BasicConfig.expid_tmp_dir(expid) / "autosubmit.lock"
+
+    assert BasicConfig.expid_lock_file(expid) == expected
+
+
+def test_read_experiment_lock_configuration(tmp_path, monkeypatch):
+    """Read experiment lock timeout and retry interval from autosubmitrc."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text(
+        """
+        [experiment_lock]
+        timeout = 5.0
+        retry_interval = 0.5
+        """
+    )
+
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    BasicConfig.read()
+
+    assert BasicConfig.EXPERIMENT_LOCK_TIMEOUT == 5.0
+    assert BasicConfig.EXPERIMENT_LOCK_RETRY_INTERVAL == 0.5
+
+
+@pytest.mark.parametrize(
+    "option,value",
+    [
+        ("timeout", "invalid"),
+        ("retry_interval", "invalid"),
+    ],
+)
+def test_read_experiment_lock_configuration_invalid_float(
+    tmp_path, monkeypatch, option, value
+):
+    """Raise ValueError when an experiment lock option is not a float."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text(
+        f"""
+        [experiment_lock]
+        {option} = {value}
+        """
+    )
+
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    with pytest.raises(ValueError):
+        BasicConfig.read()
+
+
+@pytest.mark.parametrize(
+    "option,value",
+    [
+        ("timeout", "-1"),
+        ("retry_interval", "0"),
+        ("retry_interval", "-0.5"),
+    ],
+)
+def test_read_experiment_lock_configuration_invalid_values(
+    tmp_path, monkeypatch, option, value
+):
+    """Reject invalid experiment lock configuration values."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text(
+        f"""
+        [experiment_lock]
+        {option} = {value}
+        """
+    )
+
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    with pytest.raises(ValueError):
+        BasicConfig.read()
+
+
+def test_read_experiment_lock_retry_interval_greater_than_timeout(
+    tmp_path, monkeypatch
+):
+    """Reject a retry interval greater than the lock timeout."""
+
+    # Preserve and restore the original class attributes.
+    monkeypatch.setattr(BasicConfig, "EXPERIMENT_LOCK_TIMEOUT", 300.0)
+    monkeypatch.setattr(BasicConfig, "EXPERIMENT_LOCK_RETRY_INTERVAL", 0.5)
+
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text(
+        """
+        [experiment_lock]
+        timeout = 1.0
+        retry_interval = 2.0
+        """
+    )
+
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    with pytest.raises(
+        ValueError,
+        match=escape(
+            "[experiment_lock][retry_interval] must not be greater than "
+            "[experiment_lock][timeout]"
+        ),
+    ):
+        BasicConfig.read()
+
+
+def test_read_experiment_lock_configuration_defaults(tmp_path, monkeypatch):
+    """Keep default lock settings when options are not configured."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text("[database]\nbackup = true\n")
+
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    monkeypatch.setattr(BasicConfig, "EXPERIMENT_LOCK_TIMEOUT", 10.0)
+    monkeypatch.setattr(BasicConfig, "EXPERIMENT_LOCK_RETRY_INTERVAL", 0.5)
+
+    BasicConfig.read()
+
+    assert BasicConfig.EXPERIMENT_LOCK_TIMEOUT == 10.0
+    assert BasicConfig.EXPERIMENT_LOCK_RETRY_INTERVAL == 0.5

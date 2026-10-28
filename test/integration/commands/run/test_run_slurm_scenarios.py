@@ -659,6 +659,7 @@ def test_wrapper_config(
                 filter_section=None,  # type: ignore
                 filter_status=None,  # type: ignore
                 quick=run_type == "quick-inspect",
+                lock_acquired=True,
             )
         templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
         asthread_files = list(templates_dir.rglob("*ASThread*"))
@@ -1110,6 +1111,7 @@ def test_inspect_wrappers(
         filter_section=None,  # type: ignore
         filter_status=None,  # type: ignore
         quick=False,
+        lock_acquired=True,
     )
 
     templates_dir = (
@@ -1602,6 +1604,7 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
             filter_section=None,  # type: ignore
             filter_status=None,  # type: ignore
             quick=False,
+            lock_acquired=True,
         )
 
         # Verify preview wrapper tables
