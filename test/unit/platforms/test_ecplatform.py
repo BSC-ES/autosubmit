@@ -110,6 +110,7 @@ def test_ec_retry_count_fallback(
 
 def test_file_read_size_and_send(ec_platform: EcPlatform, mocker):
     path = ec_platform.config.get("LOCAL_ROOT_DIR")
+    # mocker.patch.object(ec_platform, "files_path", side_effect=path)
     assert isinstance(path, str)
     random_file = Path(path) / "random_file"
     assert isinstance(random_file, Path)
@@ -503,7 +504,7 @@ def test_check_remote_log_dir_creates_all_path_levels(
     ec_platform.project = "proj"
     ec_platform.user = "user1"
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/proj/user1/t000/LOG_t000")
 
     import subprocess as sp
     called: list[str] = []
@@ -543,7 +544,7 @@ def test_check_remote_log_dir_does_not_raise_when_dir_already_exists(
     ec_platform.project = "proj"
     ec_platform.user = "user1"
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/proj/user1/t000/LOG_t000")
 
     import subprocess as sp
 
@@ -604,7 +605,7 @@ def test_delete_previous_run_files_by_job_names_calls_del_cmd(
     :param monkeypatch: Pytest monkeypatch fixture.
     """
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
     ec_platform.host = "hpc"
     ec_platform.del_cmd = "ecaccess-file-delete"
 
@@ -636,7 +637,7 @@ def test_delete_previous_run_files_by_job_names_skips_when_expid_not_in_log_dir(
     :param monkeypatch: Pytest monkeypatch fixture.
     """
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/other/LOG_other"
+    ec_platform.remote_log_dir = Path("/scratch/other/LOG_other")
 
     called: list[str] = []
     import subprocess as sp
@@ -657,7 +658,7 @@ def test_delete_previous_stat_files_by_job_names_removes_matching_stat_files(
     :param monkeypatch: Pytest monkeypatch fixture.
     """
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
     ec_platform.host = "hpc"
     ec_platform.del_cmd = "ecaccess-file-delete"
 
@@ -835,7 +836,7 @@ def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
 ) -> None:
     """Verify confirm_done_jobs_via_stat uses ecaccess-file-dir and ecaccess-file-get."""
     ec_platform.host = "hpc"
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
     ec_platform.tmp_path = str(tmp_path)
     ec_platform.get_cmd = "ecaccess-file-get"
 
@@ -892,7 +893,7 @@ def test_confirm_done_jobs_via_stat_handles_download_outcomes(
 ) -> None:
     """Verify confirm_done_jobs_via_stat handles both download failure and success correctly."""
     ec_platform.host = "hpc"
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
     ec_platform.tmp_path = str(tmp_path)
     ec_platform.get_cmd = "ecaccess-file-get"
 
@@ -933,7 +934,7 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
 ) -> None:
     """Verify set_start_time_from_remote_stat_file uses ecaccess-file-dir and ecaccess-file-get."""
     ec_platform.host = "hpc"
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
     ec_platform.tmp_path = str(tmp_path)
     ec_platform.get_cmd = "ecaccess-file-get"
 
@@ -1014,7 +1015,7 @@ def test_ecplatform_header_selected(
 
 def test_get_remote_log_dir(ec_platform):
     """The remote log dir will have the value specified in the constructor."""
-    assert ec_platform.get_remote_log_dir() == f'{_EXPID}/LOG_{_EXPID}'
+    assert ec_platform.get_remote_log_dir() == Path(f'{_EXPID}/LOG_{_EXPID}')
 
 
 def test_check_remote_log_dir_failed_mkdir(ec_platform, mocker):
