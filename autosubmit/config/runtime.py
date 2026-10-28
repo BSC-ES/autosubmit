@@ -31,14 +31,31 @@ from autosubmit.config.utils import as_bool, as_float, as_int, as_mapping
 
 __all__ = ["LogRecoveryConfig", "RuntimeConfig", "resolve_log_recovery_queue_size"]
 
+_DEFAULT_CONSECUTIVE_MAX_RESTARTS = 2
+"""Default number of consecutive log recovery failures before the retry backoff."""
+
+_DEFAULT_RETRY_DELAY = 600.0
+"""Default seconds to wait before retrying the log recovery process after a failure."""
+
+_DEFAULT_INLINE_FALLBACK = True
+"""Whether pending logs are recovered in the main process by default while the child is unavailable."""
+
 
 @dataclass(frozen=True)
 class LogRecoveryConfig:
-    """Options configured under ``RUNTIME.LOG_RECOVERY``."""
+    """Options configured under ``RUNTIME.LOG_RECOVERY``.
 
-    consecutive_max_restarts: int = 2
-    retry_delay: float = 600.0
-    inline_fallback: bool = True
+    :param consecutive_max_restarts: Consecutive restart attempts before waiting
+        ``retry_delay``. ``0`` disables the limit.
+    :param retry_delay: Seconds to wait after the restart attempts are exhausted before
+        trying to start the recovery process again.
+    :param inline_fallback: Whether pending logs are recovered in the main process while
+        the separate recovery process is unavailable.
+    """
+
+    consecutive_max_restarts: int = _DEFAULT_CONSECUTIVE_MAX_RESTARTS
+    retry_delay: float = _DEFAULT_RETRY_DELAY
+    inline_fallback: bool = _DEFAULT_INLINE_FALLBACK
 
 
 @dataclass(frozen=True)

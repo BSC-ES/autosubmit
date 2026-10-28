@@ -754,3 +754,46 @@ def test_recover_log_inline_requires_the_jobs_database(local, as_conf, mocker):
 
     job.retrieve_logfiles.assert_not_called()
     job.send_cpmip_notification.assert_not_called()
+
+
+def test_dead_process_without_ready_event_counts_as_failure(local, as_conf, mocker):
+    """A child that dies before reporting readiness counts as a failed attempt."""
+    _set_runtime_log_recovery(
+        as_conf, CONSECUTIVE_MAX_RESTARTS=5, RETRY_DELAY=123, INLINE_FALLBACK=False,
+    )
+    local.ctx = mp.get_context("fork")
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    local._log_recovery_ready = local.ctx.Event()
+    local.cleanup_event = local.ctx.Event()
+    local.log_recovery_process = SimpleNamespace(
+        is_alive=lambda: False, exitcode=0, pid=123, name="child"
+    )
+    local._log_recovery_started_at = time.time() - 1
+    local._recovery_consecutive_failures = 0
+    mocker.patch.object(local, "clean_log_recovery_process")
+    mocker.patch.object(local, "_pending_still_needing_recovery", return_value={})
+    mocker.patch.object(local, "spawn_log_retrieval_process", return_value=True)
+
+    assert local.try_respawn_log_recovery_process(as_conf) is True
+    assert local._recovery_consecutive_failures == 1
+
+
+def test_dead_ready_process_with_zero_exit_resets_streak(local, as_conf, mocker):
+    """A ready child that exits zero is a normal idle exit and resets the streak."""
+    _set_runtime_log_recovery(as_conf, CONSECUTIVE_MAX_RESTARTS=5, INLINE_FALLBACK=False)
+    local.ctx = mp.get_context("fork")
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    local._log_recovery_ready = local.ctx.Event()
+    local._log_recovery_ready.set()
+    local.cleanup_event = local.ctx.Event()
+    local.log_recovery_process = SimpleNamespace(
+        is_alive=lambda: False, exitcode=0, pid=123, name="child"
+    )
+    local._log_recovery_started_at = time.time() - 60
+    local._recovery_consecutive_failures = 3
+    mocker.patch.object(local, "clean_log_recovery_process")
+    mocker.patch.object(local, "_pending_still_needing_recovery", return_value={})
+    mocker.patch.object(local, "spawn_log_retrieval_process", return_value=True)
+
+    assert local.try_respawn_log_recovery_process(as_conf) is True
+    assert local._recovery_consecutive_failures == 0
