@@ -68,6 +68,7 @@ def do_inspect(
         force=False,
         check_wrapper=check_wrapper,
         quick=quick,
+        lock_acquired=True,
     )
 
     return [p.name for p in templates.glob("*.cmd")]

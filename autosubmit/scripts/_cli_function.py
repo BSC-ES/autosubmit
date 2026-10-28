@@ -19,11 +19,9 @@
 
 from argparse import ArgumentParser
 from collections.abc import Callable
-from contextlib import nullcontext
 from functools import wraps
 from typing import TYPE_CHECKING
 
-from autosubmit.experiment.lock import experiment_lock
 from autosubmit.log import setup_log_files
 from autosubmit.scripts._args import (
     CommandGroup,
@@ -33,6 +31,7 @@ from autosubmit.scripts._args import (
     normalise_return_value,
     parse_expids,
 )
+from autosubmit.scripts._lock import LockPolicy, manage_experiment_lock
 from autosubmit.scripts._validation import (
     validate_host_prohibited_commands,
     validate_required_files,
@@ -172,11 +171,20 @@ def cli_function(
 
                     opts._profiler = profiler
 
-                with (
-                    experiment_lock(opts.expid)
-                    if getattr(options_type, "acquires_lock", False)
-                    else nullcontext()
-                ):
+                lock_policy: LockPolicy | None = getattr(
+                    options_type, "lock_policy", None
+                )
+
+                if lock_policy is not None:
+                    if not hasattr(options_type, "_is_locked"):
+                        raise TypeError(
+                            f"{options_type.__name__} defines 'lock_policy' "
+                            "but does not define '_is_locked'."
+                        )
+
+                    with manage_experiment_lock(lock_policy, opts):
+                        return_value = func(opts, **kwargs)
+                else:
                     return_value = func(opts, **kwargs)
 
                 return normalise_return_value(return_value)

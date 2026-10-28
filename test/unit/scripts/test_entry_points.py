@@ -32,7 +32,14 @@ from autosubmit.scripts._entry_points import (
     parse_docstring,
 )
 
-_LOCKED_COMMANDS = {"create", "recovery", "run", "setstatus","archive","delete"}
+# noinspection PyProtectedMember
+from autosubmit.scripts._lock import LockPolicy
+
+_LOCKED_COMMANDS = {"create", "recovery", "run", "setstatus", "archive", "delete"}
+"""Autosubmit sub-commands that require the lock."""
+
+_OPTIONALLY_LOCKED_COMMANDS = {"inspect"}
+"""Autosubmit sub-commands that optionally accept a lock."""
 
 
 def test_execute_cmd_missing_dependency(capsys, mocker):
@@ -295,5 +302,6 @@ def test_entry_points_have_short_names():
 def test_command_lock_declaration(cmd):
     """Only commands that change the experiment state hold the experiment lock."""
     options_type = get_commands()[cmd].load().options_type
-    assert getattr(options_type, "acquires_lock", False) == (cmd in _LOCKED_COMMANDS)
-
+    lock_policy = getattr(options_type, "lock_policy", LockPolicy.NONE)
+    assert (lock_policy is LockPolicy.REQUIRED) == (cmd in _LOCKED_COMMANDS)
+    assert (lock_policy is LockPolicy.OPTIONAL) == (cmd in _OPTIONALLY_LOCKED_COMMANDS)

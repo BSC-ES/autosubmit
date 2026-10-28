@@ -48,6 +48,7 @@ from autosubmit.scripts._args import (
     create_argparse_parser,
 )
 from autosubmit.scripts._cli_function import cli_function
+from autosubmit.scripts._lock import LockPolicy
 from autosubmit.scripts._validation import validate_expid
 
 
@@ -62,11 +63,15 @@ class InspectOptions(ExpidOptions):
     filter_status: str
     filter_type: str
 
+    lock_policy = LockPolicy.OPTIONAL
+
 
 def args_parser() -> ArgumentParser:
     parser = create_argparse_parser(__doc__)
 
-    parser.add_argument("-f", "--force", action="store_true", help="Overwrite all command files.")
+    parser.add_argument(
+        "-f", "--force", action="store_true", help="Overwrite all command files."
+    )
     parser.add_argument(
         "-cw",
         "--check_wrapper",
@@ -129,6 +134,7 @@ def args_parser() -> ArgumentParser:
 def main(opts: InspectOptions) -> int | bool | None:
     from autosubmit.workflow.manage import inspect
 
+    # noinspection PyProtectedMember
     return inspect(
         opts.expid,
         opts.list,
@@ -138,4 +144,5 @@ def main(opts: InspectOptions) -> int | bool | None:
         opts.force,
         opts.check_wrapper,
         opts.quick,
+        opts._is_locked,
     )

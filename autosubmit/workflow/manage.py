@@ -1211,6 +1211,7 @@ def inspect(
     force=False,
     check_wrapper=False,
     quick=False,
+    lock_acquired=False,
 ) -> bool:
     """Generates cmd files experiment.
 
@@ -1222,14 +1223,14 @@ def inspect(
     :param force: If true, forces the generation of all cmd files.
     :param check_wrapper: If true, checks the wrapper.
     :param quick: If true, performs a quick inspect.
+    :param lock_acquired: Whether this invocation successfully acquired the
+        experiment lock. If ``False``, another process may be using the experiment.
     :return: True if run to the end, False otherwise
-    :raises BaseLockException: If the experiment is already locked by another command.
     :raises AutosubmitCritical: If there is a critical error during the inspection process.
     """
     Log.info(f"Inspecting experiment {expid}")
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
     tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
-    locked = (tmp_path / "autosubmit.lock").exists()
     Log.info("Starting inspect command")
     os.system("clear")
     signal.signal(signal.SIGINT, _signal_handler)
@@ -1256,17 +1257,18 @@ def inspect(
     jobs = []
     jobs_cw = []
 
-    if not isinstance(job_list, type([])):
-        if check_wrapper and (not locked or (force and locked)):
+    if not isinstance(job_list, list):
+        if check_wrapper and (lock_acquired or force):
             job_list.clear_wrappers_db(preview=True)
             Log.info("Generating all cmd script adapted for wrappers")
             jobs = job_list.get_uncompleted()
             if force:
                 jobs_cw = job_list.get_completed()
         else:
-            if locked:
+            if not lock_acquired:
                 Log.warning(
-                    "There is a .lock file and not -f, generating only all unsubmitted cmd scripts"
+                    "Another process holds the experiment lock; "
+                    "generating only unsubmitted cmd scripts"
                 )
                 jobs = job_list.get_unsubmitted()
             elif force:
@@ -1298,8 +1300,6 @@ def inspect(
                     )
 
                     jobs = [job for job in jobs if job.name in selected_job_names]
-                else:
-                    jobs = job_list.get_job_list()
     if quick:
         wrapped_sections = []
         if check_wrapper:
@@ -1323,11 +1323,11 @@ def inspect(
             if job.section not in sections_added or job.section in wrapped_sections:
                 sections_added.add(job.section)
                 jobs_aux.append(job)
-            jobs_cw = jobs_aux
+        jobs_cw = jobs_aux
         del jobs_aux
     file_paths = ""
 
-    if isinstance(jobs, type([])):
+    if isinstance(jobs, list):
         for job in jobs:
             file_paths += f"{str(tmp_path / (job.name + '.cmd'))} | {job.file}\n"
             job.status = Status.WAITING

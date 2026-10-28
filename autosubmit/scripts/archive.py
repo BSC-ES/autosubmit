@@ -30,6 +30,7 @@ from autosubmit.scripts._args import (
     create_argparse_parser,
 )
 from autosubmit.scripts._cli_function import cli_function
+from autosubmit.scripts._lock import LockPolicy
 from autosubmit.scripts._validation import validate_expid
 
 
@@ -40,7 +41,7 @@ class ArchiveOptions(ExpidOptions):
     uncompress: bool
     rocrate: bool
 
-    acquires_lock = True
+    lock_policy = LockPolicy.REQUIRED
 
 def args_parser() -> ArgumentParser:
     parser = create_argparse_parser(__doc__)
