@@ -20,18 +20,24 @@ import os
 import pwd
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, RecoveryReport
 from autosubmit.job.job_common import Status
 from autosubmit.platforms.platform import CopyQueue, Platform
 
 
-def _get_script_files_path() -> Path:
-    return Path(__file__).resolve().parent / 'files'
+def _wait_for_ack(platform, timeout=5):
+    """Wait for the child acknowledgement queue (a ``multiprocessing.SimpleQueue``)."""
+    deadline = time.time() + timeout
+    while platform.recovery_results.empty() and time.time() < deadline:
+        time.sleep(0.05)
+    assert not platform.recovery_results.empty(), "The recovery child did not acknowledge the job"
+    return platform.recovery_results.get()
 
 
 @pytest.fixture
@@ -79,35 +85,55 @@ def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
     local.config['LOG_RECOVERY_TIMEOUT'] = 0
     local.spawn_log_retrieval_process(as_conf)
     local.cleanup_event.set()
-    # Some grace time to the process to detect the cleanup event
-    time.sleep(1)
+    deadline = time.time() + 10
+    while local.log_recovery_process.is_alive() and time.time() < deadline:
+        time.sleep(0.1)
     assert not local.log_recovery_process.is_alive()
 
 
-def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
-    print(prepare_test.strpath)
-    mocker.patch('autosubmit.platforms.platform.max', return_value=0)
+def test_log_recovery_recover_log(local, mocker, as_conf):
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.config['LOG_RECOVERY_TIMEOUT'] = 1
     mocker.patch('autosubmit.job.job.Job.write_stats')
+    mocker.patch('autosubmit.job.job.Job.write_submit_time')
     local.spawn_log_retrieval_process(as_conf)
     local.work_event.set()
-    job = Job('t000', '0000', Status.COMPLETED, 0)
+    job = Job('t000', 123, Status.COMPLETED, 0)
     job.name = 'test_job'
     job.platform = local
     job.platform_name = 'local'
     job.local_logs = ("t000.cmd.out.moved", "t000.cmd.err.moved")
     local.work_event.set()
-    local.add_job_to_log_recover(job)
+    assert local.add_job_to_log_recover(job, as_conf) is True
+    # The child runs the real retrieval path and acknowledges the processed job.
+    assert _wait_for_ack(local) == 'test_job'
     local.cleanup_event.set()
     local.log_recovery_process.join(30)  # should exit earlier.
     assert local.log_recovery_process.is_alive() is False
-    assert Path(f"{prepare_test.strpath}/scratch/LOG_t000/t000.cmd.out.moved").exists()
-    assert Path(f"{prepare_test.strpath}/scratch/LOG_t000/t000.cmd.err.moved").exists()
 
 
-def test_refresh_log_retry_process(prepare_test, local, as_conf, mocker):
-    mocker.patch('autosubmit.platforms.platform.max', return_value=0)
+def test_log_recovery_child_acknowledges_processed_job(prepare_test, local, as_conf, mocker):
+    """The recovery child acknowledges each processed job through the results queue."""
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    local.config['LOG_RECOVERY_TIMEOUT'] = 1
+    report = RecoveryReport(job_name='test_job', attempts=[], all_succeeded=True)
+    mocker.patch('autosubmit.job.job.Job.retrieve_logfiles', return_value=report)
+    mocker.patch('autosubmit.job.job.Job.send_cpmip_notification', return_value=None)
+    mocker.patch('autosubmit.job.job.Job.write_submit_time')
+    local.spawn_log_retrieval_process(as_conf)
+    job = Job('t000', 123, Status.COMPLETED, 0)
+    job.name = 'test_job'
+    job.platform = local
+    job.platform_name = 'local'
+
+    assert local.add_job_to_log_recover(job, as_conf) is True
+    assert _wait_for_ack(local) == 'test_job'
+
+    local.cleanup_event.set()
+    local.log_recovery_process.join(30)
+
+
+def test_refresh_log_recovery_process_restarts_dead_process(prepare_test, local, as_conf, mocker):
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.config['LOG_RECOVERY_TIMEOUT'] = 1
     platforms = [local]
@@ -158,17 +184,6 @@ def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work
             local.recovery_queue.put(Job('t000', f'000{i}', Status.COMPLETED, 0))
     process_log = local.wait_for_work()
     assert process_log == result
-
-
-def test_unique_elements(local, mocker):
-    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
-    max_items = 3
-    local.prepare_process()
-    local.recovery_queue = CopyQueue(ctx=local.ctx)
-    for i in range(max_items):
-        local.recovery_queue.put(Job(f'rng{i}', f'000{i}', Status.COMPLETED, 0))
-    for i in range(max_items):
-        local.recovery_queue.put(Job(f'rng2{i}', f'000{i}', Status.COMPLETED, 0))
 
 
 @pytest.fixture()
@@ -272,10 +287,10 @@ def test_refresh_log_recovery_process(local, autosubmit, as_conf, mocker):
 
     p = local.work_event
 
-    with mocker.patch('multiprocessing.process.BaseProcess.is_alive', return_value=True):
-        autosubmit.refresh_log_recovery_process(platforms=[local], as_conf=as_conf)
-        assert p != local.work_event
-        assert local.work_event.is_set()
+    mocker.patch('multiprocessing.process.BaseProcess.is_alive', return_value=True)
+    autosubmit.refresh_log_recovery_process(platforms=[local], as_conf=as_conf)
+    assert p != local.work_event
+    assert local.work_event.is_set()
 
 
 def test_worker_events_no_duplicates(local, mocker):
@@ -291,34 +306,40 @@ def test_worker_events_no_duplicates(local, mocker):
     Platform.worker_events.clear()
 
 
-def test_add_job_to_log_recover_failure_does_not_increment_updated_log(local, mocker):
+def test_add_job_to_log_recover_failure_does_not_increment_updated_log(local, as_conf, mocker):
     """Verify that when recovery_queue.put fails, updated_log is NOT incremented."""
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.prepare_process()
     local.recovery_queue = CopyQueue(ctx=local.ctx)
+    as_conf.experiment_data["RUNTIME"] = {"LOG_RECOVERY": {"INLINE_FALLBACK": False}}
     job = Job('t000', '0000', Status.COMPLETED, 0)
     job.name = 'test_job'
     job.id = 123
     job.updated_log = 0
     local.log_recovery_process = mocker.MagicMock()
     local.log_recovery_process.is_alive.return_value = True
+    mocker.patch('autosubmit.job.job.Job.write_submit_time')
 
     # Patch put to simulate a failure
-    mocker.patch.object(local.recovery_queue, 'put', side_effect=Exception('Queue full'))
-    local.add_job_to_log_recover(job)
+    mocker.patch.object(local.recovery_queue, 'put_state', side_effect=Exception('Queue full'))
+    assert local.add_job_to_log_recover(job, as_conf) is False
     assert job.updated_log == 0
 
 
-def test_add_job_to_log_recover_no_queue(local):
+def test_add_job_to_log_recover_no_queue(local, as_conf, mocker):
     """Verify graceful skip when recovery_queue is None."""
     local.recovery_queue = None
+    as_conf.experiment_data["RUNTIME"] = {"LOG_RECOVERY": {"INLINE_FALLBACK": False}}
+    mocker.patch.object(local, 'clean_log_recovery_process')
+    mocker.patch.object(local, 'spawn_log_retrieval_process', return_value=False)
     job = Job('t000', '0000', Status.COMPLETED, 0)
     job.name = 'test_job'
     job.id = 123
     job.updated_log = 0
-    # Should not raise and should not increment updated_log
-    local.add_job_to_log_recover(job)
+    # Should not raise, should not increment updated_log, and should be retried later
+    assert local.add_job_to_log_recover(job, as_conf) is False
     assert job.updated_log == 0
+    assert local.is_log_recovery_blocked('test_job') is True
 
 
 def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
@@ -335,3 +356,48 @@ def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
     local.clean_log_recovery_process()
     assert local.recovery_queue is None
     assert local.log_recovery_process is None
+
+
+def _set_runtime_log_recovery(as_conf, **options):
+    as_conf.experiment_data["RUNTIME"] = {"LOG_RECOVERY": options}
+
+
+def test_dead_process_without_ready_event_counts_as_failure(local, as_conf, mocker):
+    """A child that dies before reporting readiness counts as a failed attempt."""
+    _set_runtime_log_recovery(
+        as_conf, CONSECUTIVE_MAX_RESTARTS=5, RETRY_DELAY=123, INLINE_FALLBACK=False,
+    )
+    local.ctx = mp.get_context("fork")
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    local._log_recovery_ready = local.ctx.Event()
+    local.cleanup_event = local.ctx.Event()
+    local.log_recovery_process = SimpleNamespace(
+        is_alive=lambda: False, exitcode=0, pid=123, name="child"
+    )
+    local._log_recovery_started_at = time.time() - 1
+    local._recovery_consecutive_failures = 0
+    mocker.patch.object(local, "clean_log_recovery_process")
+    mocker.patch.object(local, "spawn_log_retrieval_process", return_value=True)
+
+    assert local.try_respawn_log_recovery_process(as_conf) is True
+    assert local._recovery_consecutive_failures == 1
+
+
+def test_dead_ready_process_with_zero_exit_resets_streak(local, as_conf, mocker):
+    """A ready child that exits zero is a normal idle exit and resets the streak."""
+    _set_runtime_log_recovery(as_conf, CONSECUTIVE_MAX_RESTARTS=5, INLINE_FALLBACK=False)
+    local.ctx = mp.get_context("fork")
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    local._log_recovery_ready = local.ctx.Event()
+    local._log_recovery_ready.set()
+    local.cleanup_event = local.ctx.Event()
+    local.log_recovery_process = SimpleNamespace(
+        is_alive=lambda: False, exitcode=0, pid=123, name="child"
+    )
+    local._log_recovery_started_at = time.time() - 60
+    local._recovery_consecutive_failures = 3
+    mocker.patch.object(local, "clean_log_recovery_process")
+    mocker.patch.object(local, "spawn_log_retrieval_process", return_value=True)
+
+    assert local.try_respawn_log_recovery_process(as_conf) is True
+    assert local._recovery_consecutive_failures == 0

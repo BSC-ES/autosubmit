@@ -880,6 +880,43 @@ def test_confirm_done_jobs_via_stat_handles_download_outcomes(
     assert not (tmp_path / "t000_INI_STAT_0").exists()
 
 
+@pytest.mark.parametrize(
+    "certificate_output,connected",
+    [(b"yes", True), (b"no", False)],
+    ids=["connected", "not-connected"],
+)
+def test_connect_spawns_log_recovery_only_when_connected(
+    ec_platform: EcPlatform, mocker, certificate_output: bytes, connected: bool
+) -> None:
+    """The recovery process is only spawned when the main connection succeeded."""
+    mocker.patch(
+        "autosubmit.platforms.ecplatform.subprocess.check_output",
+        return_value=certificate_output,
+    )
+    spawn = mocker.patch.object(ec_platform, "spawn_log_retrieval_process")
+
+    ec_platform.connect(None)
+
+    assert ec_platform.connected is connected
+    if connected:
+        spawn.assert_called_once()
+    else:
+        spawn.assert_not_called()
+
+
+def test_connect_does_not_spawn_from_recovery_process(ec_platform: EcPlatform, mocker) -> None:
+    """The recovery child must never spawn a nested recovery process."""
+    mocker.patch(
+        "autosubmit.platforms.ecplatform.subprocess.check_output",
+        return_value=b"yes",
+    )
+    spawn = mocker.patch.object(ec_platform, "spawn_log_retrieval_process")
+
+    ec_platform.connect(None, log_recovery_process=True)
+
+    spawn.assert_not_called()
+
+
 def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     ec_platform: EcPlatform,
     monkeypatch: pytest.MonkeyPatch,

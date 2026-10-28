@@ -473,8 +473,13 @@ There are some other parameters that you may need to specify:
     * - ``TOTAL_JOBS``
       - Maximum number of jobs to be running at the same time in this platform.
     * - ``LOG_RECOVERY_QUEUE_SIZE``
-      - A memory-consumption optimization for the recovery of logs.
-         Default: ``max(100,TOTAL_JOBS) * 2``, in case of issues with the recovery of logs, you can increase this value.
+      - A memory-consumption optimization for the recovery of logs. The result is used as
+         the capacity of the log recovery queue, which also bounds how many pending recovery
+         entries are kept in memory.
+         Precedence, from highest to lowest: ``PLATFORMS.<name>.TOTAL_JOBS`` (or ``TOTALJOBS``),
+         ``CONFIG.TOTAL_JOBS`` (or ``TOTALJOBS``), ``PLATFORMS.<name>.LOG_RECOVERY_QUEUE_SIZE``,
+         ``CONFIG.LOG_RECOVERY_QUEUE_SIZE`` and the default ``100``. The result is doubled
+         (default ``200``). Increase it if you see recovery issues.
     * - ``CLEAR_TO_SEND_TIMEOUT``
       - How long Autosubmit waits for the login server when it is busy. Raise it if you see "key-exchange timed out" errors.
          Default: ``180``.
@@ -484,6 +489,11 @@ There are some other parameters that you may need to specify:
     * - ``MAX_TRANSPORT_RETRIALS``
       - Number of consecutive SSH transport failures tolerated before Autosubmit stops the run instead of retrying the recovery.
          Default: ``3``. Set to ``0`` to disable the limit.
+
+.. seealso::
+
+    Log recovery is resilient to the recovery process dying unexpectedly.
+    See :ref:`log-recovery-resiliency` in :doc:`../log_operations`.
 
 .. _request-exclusivity-reservation:
 

@@ -65,3 +65,58 @@ You can configure Autosubmit to remove log files from the remote platform after 
         MAX_WALLCLOCK: <HH:MM>
         QUEUE: <hpc_queue>
         REMOVE_LOG_FILES_ON_TRANSFER: true
+
+
+.. _log-recovery-resiliency:
+
+Log recovery resiliency
+-----------------------
+
+Autosubmit recovers the logs and stats of the finished jobs in a separate process.
+When that process is enabled, the first start is mandatory: if it cannot be started
+from the main process, the run stops instead of silently losing logs and stats.
+
+If the recovery process dies during the run, Autosubmit restarts it and re-queues the
+jobs that were still pending. A job that was being processed when the process died may
+be recovered again after the restart; that duplicate work is harmless. Once the restart
+attempts are exhausted, or when a job cannot be queued, pending logs are recovered in
+the main process when ``INLINE_FALLBACK`` is enabled.
+
+If an individual download fails, the error is logged. The recovery process keeps
+working on the remaining jobs, but that failed attempt is not retried automatically.
+
+The options below control how the process is restarted when it dies unexpectedly. They
+live in the ``RUNTIME`` section of the experiment configuration.
+
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
+
+    * - Parameter
+      - Description
+    * - ``CONSECUTIVE_MAX_RESTARTS``
+      - Number of consecutive restart attempts before waiting ``RETRY_DELAY`` and trying
+        again. Default: ``2``. Set to ``0`` to disable the limit.
+    * - ``RETRY_DELAY``
+      - Seconds to wait after the consecutive restart attempts are exhausted before trying
+        to start the recovery process again. Default: ``600``. Applies with
+        ``INLINE_FALLBACK`` both enabled and disabled.
+    * - ``INLINE_FALLBACK``
+      - If ``true``, while the separate process is not available, pending logs are recovered
+        in the main process. Default: ``true``. This option does not apply to the mandatory
+        first start of the process.
+
+The recovery process is considered healthy once it has connected to the platform
+and exits with code ``0``. It counts as a failed attempt if it dies before
+connecting, or if it exits with a non-zero code after connecting.
+
+Example:
+
+.. code-block:: yaml
+
+    RUNTIME:
+        LOG_RECOVERY:
+            CONSECUTIVE_MAX_RESTARTS: 2
+            RETRY_DELAY: 600
+            INLINE_FALLBACK: true
+

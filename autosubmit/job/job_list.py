@@ -2624,21 +2624,39 @@ class JobList(object):
                     non_completed_parents_current.append(parent[0])
         return non_completed_parents_current, completed_parents
 
-    def _recover_log(self, job: Job) -> None:
+    def _recover_log(self, job: Job) -> bool:
         """Recover the log for a given job.
+
+        The recovery runs inline when the recovery threads are disabled for the job's
+        platform, otherwise the job is handed over to the platform recovery process.
+        Blocked jobs are skipped without advancing ``updated_log``: the pkl keeps them
+        pending for the next recovery pass or the next run.
+
         :param job: The job object to recover the log for.
         :type job: Job
+        :return: ``True`` when the pass made progress, ``False`` when the job is blocked.
+        :rtype: bool
         """
-        if str(self._config.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                 "false")).lower() == "true":
-            job.retrieve_logfiles()
-            job.send_cpmip_notification(self._config)
+        before = job.updated_log
+        platform = job.platform
+        if platform is not None and platform.is_log_recovery_blocked(job.name):
+            return False
+        platform_name = getattr(platform, "name", None) or job.platform_name
+        if self._config.is_recovery_threads_disabled(platform_name):
+            platform.recover_log_inline(job, self._config)
         else:
-            # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
-            job.write_submit_time()
-            job.platform.add_job_to_log_recover(job)
-
-        job.updated_log += 1
+            if platform.add_job_to_log_recover(job, self._config):
+                # The queued snapshot keeps the pre-increment updated_log, so the child
+                # recovers every pending attempt. Mark the job as handled in one go so the
+                # same job is not queued again by the next recovery scan.
+                job.updated_log = job.fail_count + 1
+            elif platform.is_log_recovery_blocked(job.name):
+                # The recovery process is unavailable and inline recovery is disabled.
+                # Keep updated_log untouched so the pkl retries this job later.
+                return False
+        if job.updated_log == before:
+            job.updated_log += 1
+        return True
 
     def recover_logs(self) -> bool:
         """Update jobs' log recovered status.
@@ -2646,16 +2664,24 @@ class JobList(object):
         Iterate over the current job list and mark jobs whose stdout/stderr logs
         have been recovered.
 
+        :return: ``True`` when this pass made progress, ``False`` otherwise.
+        :rtype: bool
         """
         jobs_to_recover = [job for job in self._job_list if
                            job.status in self._FINAL_STATUSES and job.updated_log <= job.fail_count]
+        progress = False
         for job in jobs_to_recover:
+            platform = job.platform
+            if platform is not None and platform.is_log_recovery_blocked(job.name):
+                continue
             if not job.id or not job.has_valid_submit_time():
                 Log.debug(f"Skipping the log recovery of {job.name} because the id/submit_time is not valid, probably lost in the recovery")
                 job.updated_log = job.fail_count + 1
+                progress = True
                 continue
-            self._recover_log(job)
-        return len(jobs_to_recover) > 0
+            if self._recover_log(job):
+                progress = True
+        return progress
 
 
     def check_completed_jobs_after_recovery(self):
