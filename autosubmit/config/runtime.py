@@ -28,17 +28,31 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from autosubmit.config.utils import as_bool, as_float, as_int, as_mapping
+from autosubmit.log.log import Log
 
 __all__ = ["LogRecoveryConfig", "RuntimeConfig", "resolve_log_recovery_queue_size"]
 
 
 @dataclass(frozen=True)
 class LogRecoveryConfig:
-    """Options configured under ``RUNTIME.LOG_RECOVERY``."""
+    """Options configured under ``RUNTIME.LOG_RECOVERY``.
+
+    :param consecutive_max_restarts: Consecutive restart attempts before waiting
+        ``retry_delay``. ``0`` disables the limit.
+    :param retry_delay: Seconds to wait after the restart attempts are exhausted before
+        trying to start the recovery process again.
+    :param inline_fallback: Whether pending logs are recovered in the main process while
+        the separate recovery process is unavailable.
+    :param min_alive_seconds: Minimum time a recovery process must stay alive to be
+        considered healthy and reset the consecutive-restart counter. ``0`` disables the
+        grace period. It distinguishes a crash loop (the child starts and dies) from the
+        normal death of a long-lived process.
+    """
 
     consecutive_max_restarts: int = 2
     retry_delay: float = 600.0
     inline_fallback: bool = True
+    min_alive_seconds: float = 5.0
 
 
 @dataclass(frozen=True)
@@ -64,6 +78,17 @@ class RuntimeConfig:
         log_recovery = as_mapping(runtime.get("LOG_RECOVERY"), "RUNTIME.LOG_RECOVERY")
 
         defaults = LogRecoveryConfig()
+        min_alive_seconds = as_float(
+            log_recovery.get("MIN_ALIVE_SECONDS"),
+            defaults.min_alive_seconds,
+            "RUNTIME.LOG_RECOVERY.MIN_ALIVE_SECONDS",
+        )
+        if min_alive_seconds < 0:
+            Log.warning(
+                "Invalid value for RUNTIME.LOG_RECOVERY.MIN_ALIVE_SECONDS: "
+                f"{min_alive_seconds!r}. Using 0."
+            )
+            min_alive_seconds = 0.0
         return cls(
             log_recovery=LogRecoveryConfig(
                 consecutive_max_restarts=as_int(
@@ -81,6 +106,7 @@ class RuntimeConfig:
                     defaults.inline_fallback,
                     "RUNTIME.LOG_RECOVERY.INLINE_FALLBACK",
                 ),
+                min_alive_seconds=min_alive_seconds,
             )
         )
 

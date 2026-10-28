@@ -103,6 +103,11 @@ live in the ``RUNTIME`` section of the experiment configuration.
       - Seconds to wait after the consecutive restart attempts are exhausted before trying
         to start the recovery process again. Default: ``600``. Applies with
         ``INLINE_FALLBACK`` both enabled and disabled.
+    * - ``MIN_ALIVE_SECONDS``
+      - Minimum time the recovery process must stay alive to be considered healthy and
+        reset the consecutive-restart counter. Default: ``5``. Set to ``0`` to disable the
+        grace period. The value is evaluated on the next liveness check, so the effective
+        resolution is the main loop interval.
     * - ``INLINE_FALLBACK``
       - If ``true``, while the separate process is not available, pending logs are recovered
         in the main process. If an individual job fails, it stays pending for the next
@@ -117,4 +122,5 @@ Example:
         LOG_RECOVERY:
             CONSECUTIVE_MAX_RESTARTS: 2
             RETRY_DELAY: 600
+            MIN_ALIVE_SECONDS: 5
             INLINE_FALLBACK: true

@@ -18,10 +18,13 @@
 """This file contains tests for the ``platform``."""
 
 import multiprocessing as mp
+import queue
+import time
 from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
 
+import psutil
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -315,4 +318,163 @@ def test_restore_platforms_enforces_log_recovery_on_init(
         platform.try_respawn_log_recovery_process.assert_called_once_with(as_conf)
     else:
         platform.try_respawn_log_recovery_process.assert_not_called()
+
+
+def _noop():
+    pass
+
+
+def test_join_new_process_does_not_use_raw_waitpid(mocker):
+    """Reaping goes through multiprocessing so is_alive()/exitcode stay accurate."""
+    platform = LocalPlatform("t000", "test_platform", {})
+    is_alive = mocker.Mock(return_value=False)
+    process = SimpleNamespace(is_alive=is_alive, pid=123, name="child", exitcode=0)
+    platform.log_recovery_process = process
+    waitpid = mocker.patch("autosubmit.platforms.platform.os.waitpid")
+
+    platform.join_new_process()
+
+    waitpid.assert_not_called()
+    is_alive.assert_called_once()
+
+
+def test_join_new_process_reaps_exited_child():
+    """After join_new_process, an exited child is reaped and is_alive() is false."""
+    try:
+        ctx = mp.get_context("fork")
+    except ValueError:
+        pytest.skip("The fork context is not available on this platform")
+
+    process = ctx.Process(target=_noop)
+    process.start()
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.log_recovery_process = process
+    try:
+        deadline = time.time() + 5
+        status = None
+        while time.time() < deadline:
+            try:
+                status = psutil.Process(process.pid).status()
+            except psutil.NoSuchProcess:
+                break
+            if status == psutil.STATUS_ZOMBIE:
+                break
+            time.sleep(0.05)
+        if status != psutil.STATUS_ZOMBIE:
+            pytest.skip("The child was not observed as a zombie on this platform")
+
+        platform.join_new_process()
+
+        assert process.is_alive() is False
+        assert process.exitcode == 0
+        with pytest.raises(psutil.NoSuchProcess):
+            psutil.Process(process.pid).status()
+    finally:
+        if process.is_alive():
+            process.kill()
+        process.join(timeout=5)
+
+
+def _recovery_platform(as_conf, *, alive=True):
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.log_recovery_process = SimpleNamespace(is_alive=lambda: alive)
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+    return platform
+
+
+@pytest.mark.parametrize(
+    "min_alive_seconds,elapsed,expected_failures",
+    [
+        (1.0, 5.0, 0),
+        (10.0, 5.0, 3),
+        (5.0, 5.0, 0),
+        (5.0, 4.0, 3),
+        (0.0, 0.0, 0),
+    ],
+    ids=["alive-enough", "not-alive-enough", "boundary", "below-threshold", "grace-disabled"],
+)
+def test_min_alive_seconds_is_configurable(
+    autosubmit_config, mocker, min_alive_seconds, elapsed, expected_failures
+):
+    """The grace period comes from RUNTIME.LOG_RECOVERY.MIN_ALIVE_SECONDS."""
+    as_conf = autosubmit_config("t000", {
+        "RUNTIME": {"LOG_RECOVERY": {"MIN_ALIVE_SECONDS": min_alive_seconds}},
+        "PLATFORMS": {"test_platform": {}},
+    })
+    platform = _recovery_platform(as_conf)
+    platform._recovery_consecutive_failures = 3
+    platform._log_recovery_started_at = 1000.0 - elapsed
+    mocker.patch("autosubmit.platforms.platform.time.time", return_value=1000.0)
+
+    assert platform.try_respawn_log_recovery_process(as_conf) is True
+    assert platform._recovery_consecutive_failures == expected_failures
+
+
+def test_spawn_resets_active_flag_when_process_is_dead(mocker, autosubmit_config):
+    """A stale active flag must not prevent a new recovery process from starting."""
+    as_conf = autosubmit_config("t000", {"PLATFORMS": {"test_platform": {}}})
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.log_retrieval_process_active = True
+    platform.log_recovery_process = SimpleNamespace(is_alive=lambda: False, pid=123, name="child")
+    mocker.patch.object(platform, "prepare_process", return_value=None)
+    mocker.patch.object(platform, "join_new_process")
+
+    def _start_new_process(*_args, **_kwargs):
+        platform.log_recovery_process = SimpleNamespace(is_alive=lambda: True, pid=456, name="child")
+
+    mocker.patch.object(platform, "create_new_process", side_effect=_start_new_process)
+
+    # The stale flag is cleared and this call cannot spawn.
+    assert platform.spawn_log_retrieval_process(as_conf) is False
+    assert platform.log_retrieval_process_active is False
+
+    # A later call starts a new process.
+    assert platform.spawn_log_retrieval_process(as_conf) is True
+    assert platform.log_retrieval_process_active is True
+    assert platform._log_recovery_started_at > 0
+
+
+@pytest.mark.parametrize(
+    "min_alive_seconds,elapsed,expected_failures",
+    [
+        (0.0, 1.0, 0),
+        (10.0, 1.0, 1),
+        (10.0, 10.0, 0),
+        (10.0, 20.0, 0),
+    ],
+    ids=["grace-disabled", "short-death", "boundary", "long-life"],
+)
+def test_min_alive_seconds_for_dead_process(
+    autosubmit_config, mocker, min_alive_seconds, elapsed, expected_failures
+):
+    """A dead process counts as a failure only if it lived less than the grace."""
+    as_conf = autosubmit_config("t000", {
+        "RUNTIME": {"LOG_RECOVERY": {"MIN_ALIVE_SECONDS": min_alive_seconds, "CONSECUTIVE_MAX_RESTARTS": 5}},
+        "PLATFORMS": {"test_platform": {}},
+    })
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.log_recovery_process = None
+    platform._log_recovery_started_at = time.time() - elapsed
+    platform._recovery_consecutive_failures = 0
+    mocker.patch.object(platform, "_pending_still_needing_recovery", return_value={})
+    mocker.patch.object(platform, "spawn_log_retrieval_process", return_value=True)
+
+    assert platform.try_respawn_log_recovery_process(as_conf) is True
+    assert platform._recovery_consecutive_failures == expected_failures
+
+
+def test_recover_job_log_stops_when_queue_turns_empty(mocker):
+    """A timeout while draining the queue must stop the loop without raising."""
+    platform = LocalPlatform("t000", "test_platform", {})
+    recovery_queue = mocker.MagicMock()
+    recovery_queue.empty.return_value = False
+    recovery_queue.get.side_effect = queue.Empty
+    platform.recovery_queue = recovery_queue
+    platform._as_conf = object()
+
+    platform.recover_job_log(mocker.MagicMock())
+
+    recovery_queue.get.assert_called_once()
 

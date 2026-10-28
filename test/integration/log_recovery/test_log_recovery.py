@@ -786,3 +786,31 @@ def test_recover_log_inline_requires_the_jobs_database(local, as_conf, mocker):
 
     job.retrieve_logfiles.assert_not_called()
     job.send_cpmip_notification.assert_not_called()
+
+
+def test_min_alive_seconds_counts_short_death_as_failure(local, as_conf, mocker):
+    """A process that dies before MIN_ALIVE_SECONDS counts as a failed attempt."""
+    _set_runtime_log_recovery(
+        as_conf, CONSECUTIVE_MAX_RESTARTS=5, RETRY_DELAY=123, MIN_ALIVE_SECONDS=10, INLINE_FALLBACK=False,
+    )
+    local.ctx = mp.get_context("fork")
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    local.log_recovery_process = None
+    local._log_recovery_started_at = time.time() - 1
+    local._recovery_consecutive_failures = 0
+    mocker.patch.object(local, "_pending_still_needing_recovery", return_value={})
+    mocker.patch.object(local, "spawn_log_retrieval_process", return_value=True)
+
+    assert local.try_respawn_log_recovery_process(as_conf) is True
+    assert local._recovery_consecutive_failures == 1
+
+
+def test_min_alive_seconds_resets_after_healthy_life(local, as_conf):
+    """A process that lived at least MIN_ALIVE_SECONDS is considered healthy."""
+    _set_runtime_log_recovery(as_conf, MIN_ALIVE_SECONDS=5, INLINE_FALLBACK=False)
+    local._log_recovery_started_at = time.time() - 60
+    local._recovery_consecutive_failures = 3
+    local.log_recovery_process = SimpleNamespace(is_alive=lambda: True)
+
+    assert local.try_respawn_log_recovery_process(as_conf) is True
+    assert local._recovery_consecutive_failures == 0
