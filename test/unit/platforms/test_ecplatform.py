@@ -46,6 +46,30 @@ def ec_platform(tmp_path: 'LocalPath'):
     yield EcPlatform(expid=_EXPID, name='pytest-slurm', config=config, scheduler='slurm')
 
 
+@pytest.mark.parametrize(
+    "certificate_output,connected",
+    [(b"yes", True), (b"no", False)],
+    ids=["connected", "not-connected"],
+)
+def test_connect_spawns_log_recovery_only_when_connected(
+    ec_platform: EcPlatform, mocker, certificate_output: bytes, connected: bool
+) -> None:
+    """The recovery process is only spawned when the main connection succeeded."""
+    mocker.patch(
+        "autosubmit.platforms.ecplatform.subprocess.check_output",
+        return_value=certificate_output,
+    )
+    spawn = mocker.patch.object(ec_platform, "spawn_log_retrieval_process")
+
+    ec_platform.connect(None)
+
+    assert ec_platform.connected is connected
+    if connected:
+        spawn.assert_called_once()
+    else:
+        spawn.assert_not_called()
+
+
 @pytest.mark.parametrize("config_retry,expected", [
     (None, 100),
     (50, 50),

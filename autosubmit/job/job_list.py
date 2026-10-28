@@ -3226,9 +3226,13 @@ class JobList:
             self.save_jobs(jobs_to_recover)
 
             if from_db:
-                used_platforms = {job.platform for job in jobs_to_recover if self._as_conf.experiment_data.get(job.platform_name, {}).get('DISABLE_RECOVERY_THREADS', "false").lower() == "true"}
+                used_platforms = {
+                    job.platform
+                    for job in jobs_to_recover
+                    if not self._as_conf.is_recovery_threads_disabled(job.platform_name)
+                }
                 for p in used_platforms:
-                    if p.work_event is not None:
+                    if p is not None and p.work_event is not None and p.recovery_queue is not None:
                         p.work_event.set()
                         start = time.time()
                         while (time.time() - start) < min(60,p.keep_alive_timeout):

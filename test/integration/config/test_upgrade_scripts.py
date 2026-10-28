@@ -26,7 +26,8 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.upgrade_scripts import ini_to_yaml, upgrade_scripts
+from autosubmit.config.upgrade_scripts import upgrade_scripts
+from autosubmit.config.utils import ini_to_yaml
 from autosubmit.experiment.manage import create
 from autosubmit.workflow.manage import inspect
 
@@ -166,7 +167,7 @@ def test_ini_to_yaml_backup_exists(tmp_path: "LocalPath", mocker):
     """)
     )
 
-    mocked_log = mocker.patch("autosubmit.config.upgrade_scripts.Log")
+    mocked_log = mocker.patch("autosubmit.config.utils.Log")
     _ = ini_to_yaml(ini_file)
     assert backup_file_size == backup_file.stat().st_size, (
         "ini_to_yaml replaced the existing backup file"

@@ -1966,6 +1966,19 @@ def test_init(loaded_data):
         assert job.remote_logs == ('', '')
 
 
+def test_init_preserves_log_recovery_call_count_from_loaded_data():
+    state = {
+        "_name": "test_job",
+        "status": "COMPLETED",
+        "updated_log": 1,
+        "log_recovery_call_count": 3,
+    }
+
+    job = Job(loaded_data=state)
+
+    assert job.log_recovery_call_count == 3
+
+
 @pytest.fixture()
 def experiment_data() -> dict:
     return {
@@ -3121,14 +3134,41 @@ def test_calendar_chunk_last_chunk_consistency(chunk_unit, chunk_size):
     assert result['CHUNK_END_DATE'] == result['CHUNK_END_DATE_LAST']
     assert result['CHUNK_SECOND_TO_LAST_DATE'] == result['LDATE']
 
-def test_recover_log_queues_recovery(mocker):
+
+@pytest.mark.parametrize(
+    "threads_disabled,recovered,increment_expected",
+    [
+        (False, True, True),
+        (False, False, False),
+        (True, True, True),
+        (True, False, False),
+    ],
+    ids=["queued", "queue-failed", "recovered-inline", "inline-failed"],
+)
+def test_recover_log_updates_call_count(
+    autosubmit_config, mocker, threads_disabled, recovered, increment_expected
+):
     job = Job("test", 1, Status.COMPLETED, 0)
-    as_conf = mocker.MagicMock()
-    as_conf.platforms_data.get.return_value = {}
-    job.platform = mocker.MagicMock()
+    platform = LocalPlatform("t000", "pytest-ps", {})
+    platform.serial_platform = platform
+    job.platform = platform
+    job.platform_name = "PYTEST-PS"
+    inline = mocker.patch.object(platform, "recover_log_inline", return_value=recovered)
+    queue = mocker.patch.object(platform, "add_job_to_log_recover", return_value=recovered)
+    as_conf = autosubmit_config(
+        "t000",
+        {"PLATFORMS": {"PYTEST-PS": {"DISABLE_RECOVERY_THREADS": threads_disabled}}},
+    )
+
     job.recover_log(as_conf)
-    job.platform.add_job_to_log_recover.assert_called_once_with(job)
-    assert job.log_recovery_call_count == 1
+
+    if threads_disabled:
+        inline.assert_called_once_with(job, as_conf)
+        queue.assert_not_called()
+    else:
+        queue.assert_called_once_with(job, as_conf)
+        inline.assert_not_called()
+    assert job.log_recovery_call_count == (1 if increment_expected else 0)
 
 
 def test_compute_inner_job_status_returns_stat_when_done(mocker):
@@ -3140,16 +3180,3 @@ def test_compute_inner_job_status_returns_stat_when_done(mocker):
     result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
 
     assert result == Status.FAILED
-
-
-def test_recover_log_disabled_threads(mocker):
-    job = Job("test", 1, Status.COMPLETED, 0)
-    as_conf = mocker.MagicMock()
-    as_conf.platforms_data.get.return_value = {"DISABLE_RECOVERY_THREADS": "true"}
-    mock_retrieve = mocker.patch("autosubmit.job.job.Job.retrieve_logfiles")
-    mock_notify = mocker.patch("autosubmit.job.job.Job.send_cpmip_notification")
-    job.recover_log(as_conf)
-    mock_retrieve.assert_called_once()
-    mock_notify.assert_called_once_with(as_conf)
-    assert job.log_recovery_call_count == 1
-
