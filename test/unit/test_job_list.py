@@ -1102,3 +1102,72 @@ def test_recover_logs(job_list, mocker, job, expected_calls):
     if expected_calls == 0:
         assert job.updated_log == job.fail_count + 1
         assert job_list.recover_logs() is False
+
+
+def _recover_log_job(mocker, platform_name, platform=None):
+    """Build a finished job wired to a fake platform for ``_recover_log`` tests."""
+    platform = platform or mocker.Mock()
+    platform.name = platform_name
+    platform.serial_platform = platform
+    platform.recover_log_inline.return_value = True
+    platform.add_job_to_log_recover.return_value = True
+    job = Job("job", "42", Status.COMPLETED, 0)
+    job.platform = platform
+    job.platform_name = platform_name
+    return job, platform
+
+
+def test_recover_log_uses_platform_name_for_disable_lookup(as_conf, mocker):
+    """DISABLE_RECOVERY_THREADS must be looked up by platform name, not job name."""
+    as_conf.experiment_data["PLATFORMS"] = {
+        "MyPlatform": {"DISABLE_RECOVERY_THREADS": True},
+    }
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job, platform = _recover_log_job(mocker, "MyPlatform")
+
+    job_list._recover_log(job)
+
+    platform.recover_log_inline.assert_called_once_with(job, as_conf)
+    platform.add_job_to_log_recover.assert_not_called()
+    assert job.updated_log == 1
+
+
+def test_recover_log_queues_when_threads_enabled(as_conf, mocker):
+    """With recovery threads enabled, the job is handed to the platform process."""
+    as_conf.experiment_data["PLATFORMS"] = {"MyPlatform": {}}
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job, platform = _recover_log_job(mocker, "MyPlatform")
+    mocker.patch.object(Job, "write_submit_time")
+
+    job_list._recover_log(job)
+
+    platform.add_job_to_log_recover.assert_called_once_with(job, as_conf)
+    platform.recover_log_inline.assert_not_called()
+    assert job.updated_log == 1
+
+
+def test_recover_log_marks_all_attempts_when_queued(as_conf, mocker):
+    """A queued job is handled in one go; the snapshot keeps the pending attempts."""
+    as_conf.experiment_data["PLATFORMS"] = {"MyPlatform": {}}
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job, platform = _recover_log_job(mocker, "MyPlatform")
+    job.fail_count = 1
+    job.updated_log = 0
+    mocker.patch.object(Job, "write_submit_time")
+
+    job_list._recover_log(job)
+
+    assert job.updated_log == 2
+
+
+def test_recover_log_still_advances_when_queue_fails(as_conf, mocker):
+    """A failed queueing attempt still counts, so recover_logs cannot spin forever."""
+    as_conf.experiment_data["PLATFORMS"] = {"MyPlatform": {}}
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job, platform = _recover_log_job(mocker, "MyPlatform")
+    platform.add_job_to_log_recover.return_value = False
+    mocker.patch.object(Job, "write_submit_time")
+
+    job_list._recover_log(job)
+
+    assert job.updated_log == 1

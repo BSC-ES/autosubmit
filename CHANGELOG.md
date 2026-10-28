@@ -1,9 +1,16 @@
-### 4.1.17.3: Vertical wrapper fixes: script truncation and wallclock kill
+### 4.1.17.3: Vertical wrapper fixes and log recovery resiliency
 
 **Bug fixes:**
 
 - Fixed vertical wrappers silently reporting jobs as `COMPLETED` when the inner job script was truncated. The wrapper ran the script through `bash -s` on stdin, so any command in the job body that read stdin swallowed the rest of the script. The inner script now runs as a regular file, with its stdin detached from the wrapper. jira-external#1494
 - Fixed vertical wrappers not stopping an inner job that ignored `SIGTERM`, which could let the job outlive its wallclock inside the wrapper. The per-job `timeout` now also forces a `SIGKILL` after a grace period. jira-external#1494
+- Fixed the log recovery process being silently skipped when it died, which lost the logs and stats of the affected jobs. Autosubmit now restarts it and re-queues the pending jobs #3342
+- Fixed the log recovery process being reported as alive after it exited early, because the child was reaped outside `multiprocessing`. The process is now reaped through the process API, so the automatic restart works and the child does not stay as a zombie #3342
+- Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name instead of platform name #3342
+
+**New Features:**
+
+- Added `RUNTIME.LOG_RECOVERY` options to configure log recovery resiliency: `CONSECUTIVE_MAX_RESTARTS` (consecutive restart attempts before waiting to retry, default `2`, `0` disables the limit), `RETRY_DELAY` (seconds to wait after exhausting those attempts before trying to start the recovery process again, default `600`), `MIN_ALIVE_SECONDS` (minimum time a recovery process must stay alive to be considered healthy, default `5`) and `INLINE_FALLBACK` (recover pending logs in the main process while the separate process is unavailable, default `true`) #3342
 
 ### 4.1.17.2: SSH transport recovery (port of #3309)
 

@@ -2626,19 +2626,30 @@ class JobList(object):
 
     def _recover_log(self, job: Job) -> None:
         """Recover the log for a given job.
+
+        The recovery runs inline when the recovery threads are disabled for the job's
+        platform, otherwise the job is handed over to the platform recovery process.
+        The attempt is always counted so a pass over the finished jobs makes progress
+        even when the recovery process is unavailable (avoids busy loops).
+
         :param job: The job object to recover the log for.
         :type job: Job
         """
-        if str(self._config.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                 "false")).lower() == "true":
-            job.retrieve_logfiles()
-            job.send_cpmip_notification(self._config)
+        before = job.updated_log
+        platform = job.platform
+        platform_name = getattr(platform, "name", None) or job.platform_name
+        if self._config.is_recovery_threads_disabled(platform_name):
+            platform.recover_log_inline(job, self._config)
         else:
             # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
             job.write_submit_time()
-            job.platform.add_job_to_log_recover(job)
-
-        job.updated_log += 1
+            if platform.add_job_to_log_recover(job, self._config):
+                # The queued snapshot keeps the pre-increment updated_log, so the child
+                # recovers every pending attempt. Mark the job as handled in one go so the
+                # same job is not queued again by the next recovery scan.
+                job.updated_log = job.fail_count + 1
+        if job.updated_log == before:
+            job.updated_log += 1
 
     def recover_logs(self) -> bool:
         """Update jobs' log recovered status.

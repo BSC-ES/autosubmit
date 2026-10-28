@@ -2050,7 +2050,7 @@ class Autosubmit:
             exp_history = Autosubmit.get_historical_database(expid, job_list, as_conf)
             # establish the connection to all platforms
             # Restore is misleading, it is actually a "connect" function when the recover flag is not set.
-            Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf)
+            Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf, fail_on_init_error=True)
             return job_list, submitter, exp_history, host, as_conf, list(platforms_to_test), False
 
         return job_list, submitter, None, None, as_conf, list(platforms_to_test), True
@@ -2079,11 +2079,9 @@ class Autosubmit:
 
     @staticmethod
     def refresh_log_recovery_process(platforms: list[Platform], as_conf: AutosubmitConfig) -> None:
-        """Relaunch the log recovery processes for each platform if necessary."""
-        for p in platforms:  # Send keep_alive signal
-            if not p.log_recovery_process or not p.log_recovery_process.is_alive():
-                p.clean_log_recovery_process()
-                p.spawn_log_retrieval_process(as_conf)
+        """Ensure the log recovery processes are running and send the keep-alive signal."""
+        for p in platforms:
+            p.try_respawn_log_recovery_process(as_conf)
             if p.work_event:
                 p.work_event.set()
 
@@ -2365,10 +2363,18 @@ class Autosubmit:
                 pending_logs = job_list.recover_logs()
                 while pending_logs:
                     pending_logs = job_list.recover_logs()
+                # Platforms that got a recovery process on demand (for jobs that were
+                # already completed when the run started) are not in platforms_to_test.
+                recovery_platforms = list(platforms_to_test)
+                for platform in submitter.platforms.values():
+                    if platform not in recovery_platforms and (
+                            platform.log_recovery_process is not None or platform.has_pending_log_recovery):
+                        recovery_platforms.append(platform)
+                Autosubmit.refresh_log_recovery_process(recovery_platforms, as_conf)
                 job_list.save()
 
                 Log.info("Waiting for all logs to be updated")
-                for p in platforms_to_test:
+                for p in recovery_platforms:
                     if (p.log_recovery_process is not None and p.log_recovery_process.is_alive()
                             and p.cleanup_event is not None):
                         p.cleanup_event.set()  # Send cleanup event
@@ -2431,7 +2437,16 @@ class Autosubmit:
 
     # TODO: move to utils
     @staticmethod
-    def restore_platforms(platforms_to_test, mail_notify=False, as_conf=None, expid=None):
+    def restore_platforms(platforms_to_test, mail_notify=False, as_conf=None, expid=None, fail_on_init_error=False):
+        """Try to restore each platform used in an experiment.
+
+        :param platforms_to_test: List of platforms to test.
+        :param mail_notify: Whether to notify users by email or not.
+        :param as_conf: Autosubmit configuration.
+        :param expid: Experiment identifier.
+        :param fail_on_init_error: Whether a failure to initialise the log recovery process must
+            abort the run. Used for the initial connection at the start of a run.
+        """
         Log.info("Checking the connection to all platforms in use")
         issues = ""
         ssh_config_issues = ""
@@ -2470,6 +2485,19 @@ class Autosubmit:
                 platform_issues += f"\n[{platform_to_test.name}] Connection Unsuccessful to host {platform_to_test.host} "
                 issues += platform_issues
                 continue
+            log_recovery_expected = (
+                as_conf is not None
+                and platform_to_test.connected
+                and platform_to_test.should_run_log_recovery(as_conf)
+            )
+            if (fail_on_init_error
+                    and log_recovery_expected
+                    and not platform_to_test.try_respawn_log_recovery_process(as_conf)):
+                raise AutosubmitCritical(
+                    f"[{platform_to_test.name}] Log recovery is enabled for this run, but its process "
+                    f"could not be started. Aborting to avoid losing logs and stats.",
+                    6008,
+                )
             if platform_to_test.check_remote_permissions():
                 Log.result(f"[{platform_to_test.name}] Correct user privileges for host {platform_to_test.host}")
             else:
