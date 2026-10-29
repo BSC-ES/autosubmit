@@ -436,7 +436,7 @@ class JobList:
         if differences:
             Log.info(
                 "Differences found in sections, the whole graph will be updated accordingly. This may take a while.")
-        return False if not differences else True
+        return bool(differences)
 
     def remove_outdated_information_from_database(self, differences: dict[str, Any]) -> None:
         """Removes outdated information from the database based on the differences found in sections.
@@ -2627,8 +2627,7 @@ class JobList:
         for job in self.job_list:
             if not job.updated:
                 job.submitter = self.submitter
-                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
-                        self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
+                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=job.status not in self._IN_SCHEDULER + self._FINAL_STATUSES)
         Log.debug(f"Jobs loaded: {len(self.job_list)}")
         for j in sorted(self.job_list, key=lambda j: j.name):
             Log.debug(f"  {j.name:50s} status={Status().VALUE_TO_KEY.get(j.status, j.status):12s} sec={j.section:15s} chunk={j.chunk} mem={j.member} date={j.date}")
@@ -3227,9 +3226,13 @@ class JobList:
             self.save_jobs(jobs_to_recover)
 
             if from_db:
-                used_platforms = {job.platform for job in jobs_to_recover if self._as_conf.experiment_data.get(job.platform_name, {}).get('DISABLE_RECOVERY_THREADS', "false").lower() == "true"}
+                used_platforms = {
+                    job.platform
+                    for job in jobs_to_recover
+                    if not self._as_conf.is_recovery_threads_disabled(job.platform_name)
+                }
                 for p in used_platforms:
-                    if p.work_event is not None:
+                    if p is not None and p.work_event is not None and p.recovery_queue is not None:
                         p.work_event.set()
                         start = time.time()
                         while (time.time() - start) < min(60,p.keep_alive_timeout):
@@ -4170,8 +4173,7 @@ class JobList:
             data = jobs_data.get(job.name)
             if data:
                 job.id = int(data["job_id"])
-                job.local_logs = data["out"]
-                job.remote_logs = data["err"]
+                job.local_logs = (data["out"], data["err"])
                 if data.get("submit", 0) > 0:
                     job.submit_time_timestamp = datetime.datetime.fromtimestamp(
                         int(data["submit"])).strftime("%Y%m%d%H%M%S")

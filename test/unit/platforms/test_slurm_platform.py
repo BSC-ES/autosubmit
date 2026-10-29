@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import (
@@ -38,8 +39,8 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform
 def platform(autosubmit_config):
     expid = 'a000'
     as_conf = autosubmit_config(expid, experiment_data={})
-    exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, expid)
-    aslogs_dir = exp_path / as_conf.basic_config.LOCAL_TMP_DIR / as_conf.basic_config.LOCAL_ASLOG_DIR
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid)
+    aslogs_dir = exp_path / BasicConfig.LOCAL_TMP_DIR / BasicConfig.LOCAL_ASLOG_DIR
     submit_platform_script = aslogs_dir / 'submit_local.sh'
     Path(submit_platform_script).touch()
     return SlurmPlatform(expid='a000', name='local', config=as_conf.experiment_data)

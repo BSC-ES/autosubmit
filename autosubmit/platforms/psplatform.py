@@ -47,7 +47,7 @@ class PsPlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = []
         self.job_status['FAILED'] = []
         self.update_cmds()
-        self.has_scheduler = False
+        self.has_scheduler: bool = False
 
     def get_check_all_jobs_cmd(self, jobs_id: str) -> str:
         """Return a shell command that checks the status of all given process IDs.

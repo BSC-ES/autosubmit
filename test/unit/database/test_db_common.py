@@ -22,12 +22,69 @@ the ``test/integration/test_db_common.py`` for more tests.
 """
 
 import inspect
+import shutil
+import sqlite3
+import subprocess
+from contextlib import closing
+from pathlib import Path
+from typing import TYPE_CHECKING, NamedTuple
+from unittest.mock import MagicMock
 
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
+from autosubmit.database.db_common import TIMEOUT, database_backup
 from autosubmit.log.log import AutosubmitCritical
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+
+_EXPID = "a000"
+_PREVIOUS_BACKUP = "-- previous good backup\n"
+_DUMP_OUTPUT = "BEGIN TRANSACTION;\nCOMMIT;\n"
+_JOB_DATA_ROWS = [("job list line\n" * 100,), ("single job",)]
+
+
+class JobDataPaths(NamedTuple):
+    """Paths of an experiment's jobs historical database and its backup files."""
+
+    db: Path
+    sql: Path
+    tmp_sql: Path
+
+
+@pytest.fixture
+def job_data_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> JobDataPaths:
+    """Use a temporary SQLite jobdata directory with backups enabled and an existing database."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKUP", True)
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+    paths = JobDataPaths(
+        db=tmp_path / f"job_data_{_EXPID}.db",
+        sql=tmp_path / f"job_data_{_EXPID}.sql",
+        tmp_sql=tmp_path / f"job_data_{_EXPID}.sql.tmp",
+    )
+    paths.db.touch()
+    return paths
+
+
+@pytest.fixture
+def mocked_log(mocker: "MockerFixture") -> MagicMock:
+    """Mock the logger used by ``db_common``."""
+    return mocker.patch("autosubmit.database.db_common.Log")
+
+
+def _fake_dump(cmd: list[str], stdout, **_) -> subprocess.CompletedProcess:
+    """Simulate a successful ``sqlite3 .dump`` writing to the given file."""
+    stdout.write(_DUMP_OUTPUT)
+    return subprocess.CompletedProcess(cmd, 0)
+
+
+def _partial_dump_then_fail(cmd: list[str], stdout, **_) -> None:
+    """Simulate ``sqlite3 .dump`` writing part of the output and then exiting with an error."""
+    stdout.write("BEGIN TRANSACTION;\n-- truncated")
+    raise subprocess.CalledProcessError(1, cmd, stderr="Error: database disk image is malformed")
 
 
 @pytest.mark.parametrize(
@@ -105,3 +162,97 @@ def test_save_experiment_integrity_error(monkeypatch, tmp_path, mocker):
     with pytest.raises(AutosubmitCritical) as e:
         db_common.save_experiment('', '', '')
         assert "could not register experiment" in str(e.value)
+
+
+def test_database_backup_disabled(
+    job_data_paths: JobDataPaths, mocked_log: MagicMock, mocker: "MockerFixture", monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With backups disabled, no dump runs and an existing backup is left untouched."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKUP", False)
+    job_data_paths.sql.write_text(_PREVIOUS_BACKUP)
+    mocked_run = mocker.patch("autosubmit.database.db_common.subprocess.run")
+
+    database_backup(_EXPID)
+
+    mocked_run.assert_not_called()
+    assert job_data_paths.sql.read_text() == _PREVIOUS_BACKUP
+    assert not job_data_paths.tmp_sql.exists()
+    mocked_log.warning.assert_not_called()
+
+
+def test_database_backup_success(
+    job_data_paths: JobDataPaths, mocked_log: MagicMock, mocker: "MockerFixture"
+) -> None:
+    """A successful dump runs without a shell, replaces the backup and removes the temporary file."""
+    job_data_paths.sql.write_text(_PREVIOUS_BACKUP)
+    mocked_run = mocker.patch("autosubmit.database.db_common.subprocess.run", side_effect=_fake_dump)
+
+    database_backup(_EXPID)
+
+    args, kwargs = mocked_run.call_args
+    assert args[0] == ["sqlite3", "-cmd", f".timeout {TIMEOUT * 1000}", str(job_data_paths.db), ".dump"]
+    assert kwargs["check"] is True
+    assert "shell" not in kwargs
+    assert job_data_paths.sql.read_text() == _DUMP_OUTPUT
+    assert not job_data_paths.tmp_sql.exists()
+    mocked_log.warning.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "side_effect,expected_reason",
+    [
+        pytest.param(_partial_dump_then_fail, "malformed", id="sqlite3-error-after-partial-dump"),
+        pytest.param(FileNotFoundError("sqlite3"), "sqlite3", id="sqlite3-not-installed"),
+    ],
+)
+def test_database_backup_failure_keeps_previous_backup(
+    job_data_paths: JobDataPaths,
+    mocked_log: MagicMock,
+    mocker: "MockerFixture",
+    side_effect,
+    expected_reason: str,
+) -> None:
+    """A failed dump logs a warning, keeps the previous backup and removes the temporary file."""
+    job_data_paths.sql.write_text(_PREVIOUS_BACKUP)
+    mocker.patch("autosubmit.database.db_common.subprocess.run", side_effect=side_effect)
+
+    database_backup(_EXPID)
+
+    assert job_data_paths.sql.read_text() == _PREVIOUS_BACKUP
+    assert not job_data_paths.tmp_sql.exists()
+    mocked_log.warning.assert_called_once()
+    assert expected_reason in mocked_log.warning.call_args[0][0]
+
+
+def test_database_backup_missing_database(
+    job_data_paths: JobDataPaths, mocked_log: MagicMock, mocker: "MockerFixture"
+) -> None:
+    """A missing jobs historical database logs a warning without running ``sqlite3``."""
+    job_data_paths.db.unlink()
+    mocked_run = mocker.patch("autosubmit.database.db_common.subprocess.run")
+
+    database_backup(_EXPID)
+
+    mocked_run.assert_not_called()
+    assert not job_data_paths.sql.exists()
+    mocked_log.warning.assert_called_once()
+    assert str(job_data_paths.db) in mocked_log.warning.call_args[0][0]
+
+
+@pytest.mark.skipif(shutil.which("sqlite3") is None, reason="sqlite3 CLI not installed")
+def test_database_backup_dump_can_be_restored(job_data_paths: JobDataPaths, mocked_log: MagicMock) -> None:
+    """The real ``sqlite3`` CLI accepts the arguments and its dump restores the original data."""
+    with closing(sqlite3.connect(job_data_paths.db)) as conn:
+        conn.execute("CREATE TABLE job_data (id INTEGER PRIMARY KEY, platform_output TEXT)")
+        conn.executemany("INSERT INTO job_data (platform_output) VALUES (?)", _JOB_DATA_ROWS)
+        conn.commit()
+
+    database_backup(_EXPID)
+
+    mocked_log.warning.assert_not_called()
+    assert not job_data_paths.tmp_sql.exists()
+    with closing(sqlite3.connect(":memory:")) as restored:
+        restored.executescript(job_data_paths.sql.read_text())
+        rows = restored.execute("SELECT platform_output FROM job_data ORDER BY id").fetchall()
+    assert rows == _JOB_DATA_ROWS
+

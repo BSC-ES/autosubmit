@@ -37,6 +37,8 @@ from pyparsing import nested_expr
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.runtime import RuntimeConfig
+from autosubmit.config.utils import as_bool, as_mapping
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_utils import calendar_chunk_section
@@ -51,20 +53,17 @@ if TYPE_CHECKING:
 class AutosubmitConfig:
     """Class to handle experiment configuration coming from a file or database.
 
-    :param expid: experiment identifier
-    :type expid: str
+    :param expid: The experiment identifier.
     """
 
-    def __init__(self, expid, basic_config=BasicConfig, parser_factory=YAMLParserFactory()):
+    def __init__(self, expid: str):
         self.data_changed = False
         self.ignore_undefined_platforms = False
         self.ignore_file_path = False
         self.expid = expid
-        self.basic_config = basic_config
-        self.basic_config.read()
         if not Path(BasicConfig.LOCAL_ROOT_DIR, expid).exists():
             raise OSError(f"Experiment {expid} does not exist")
-        self.parser_factory = parser_factory
+        self.parser_factory = YAMLParserFactory()
         self.experiment_data = {}
         self.last_experiment_data = {}
         self.data_loops = set()
@@ -125,6 +124,33 @@ class AutosubmitConfig:
                 f"Error while reading PLATFORMS section: {exc}", 7014
             )
 
+    @property
+    def runtime(self) -> RuntimeConfig:
+        """Parsed ``RUNTIME`` section of the experiment configuration.
+
+        :return: The runtime configuration with normalized values and defaults.
+        """
+        return RuntimeConfig.from_experiment_data(self.experiment_data)
+
+    def is_recovery_threads_disabled(self, platform_name: str | None) -> bool:
+        """Whether the recovery threads are disabled for the given platform.
+
+        :param platform_name: Name of the platform (case-insensitive).
+        :return: ``True`` when ``DISABLE_RECOVERY_THREADS`` is enabled for the platform.
+        """
+        if not platform_name:
+            return False
+        platforms = as_mapping(self.experiment_data.get("PLATFORMS"), "PLATFORMS")
+        platforms_by_name = {name.upper(): data for name, data in platforms.items()}
+        platform_data = as_mapping(
+            platforms_by_name.get(platform_name.upper()), f"PLATFORMS.{platform_name}"
+        )
+        return as_bool(
+            platform_data.get("DISABLE_RECOVERY_THREADS"),
+            False,
+            f"PLATFORMS.{platform_name}.DISABLE_RECOVERY_THREADS",
+        )
+
     def get_wrapper_export(self, wrapper=None) -> str:
         """Returns modules variable from the wrapper
 
@@ -173,7 +199,7 @@ class AutosubmitConfig:
         :rtype: str
         """
         dir_templates = Path(
-            self.basic_config.LOCAL_ROOT_DIR,
+            BasicConfig.LOCAL_ROOT_DIR,
             self.expid,
             BasicConfig.LOCAL_PROJ_DIR,
             self.get_project_destination()
@@ -1888,7 +1914,7 @@ class AutosubmitConfig:
         :param parameters: Dictionary to populate with HPC values. If None, use self.experiment_data.
         """
         platforms = self.experiment_data.get("PLATFORMS", {})
-        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", PlatformType.LOCAL)
+        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", PlatformType.LOCAL.upper())
         hpcarch_data: dict = platforms.get(hpcarch, {})
 
         target = parameters if parameters is not None else self.experiment_data
@@ -2731,7 +2757,7 @@ class AutosubmitConfig:
         if not datelist or not chunks:
             return
 
-        if isinstance(datelist, str) or isinstance(datelist, int):
+        if isinstance(datelist, (str, int)):
             datelist = str(datelist).split()
 
         for section_name, section_data in self.jobs_data.items():

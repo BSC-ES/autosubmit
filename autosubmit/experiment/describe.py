@@ -29,7 +29,7 @@ from pathlib import Path
 from pwd import getpwnam
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.registry import load_config
 from autosubmit.database.db_common import (
     get_experiment_description,
     get_experiment_expids,
@@ -119,7 +119,7 @@ def describe_experiment(experiment_id: str) -> ExperimentDescription:
         read and no database snapshot is available.
     """
     try:
-        as_conf = AutosubmitConfig(experiment_id)
+        as_conf = load_config(experiment_id)
         as_conf.check_conf_files(False, no_log=True)
 
         conf_path = Path(as_conf.conf_folder_yaml)

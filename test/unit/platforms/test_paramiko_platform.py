@@ -1207,7 +1207,7 @@ def test_exec_command_reconnects_on_transport_error(paramiko_platform, mocker, e
 
     assert result == (False, False, False)
     assert mocked_restore.call_count == (1 if expect_reconnect else 0)
-    assert platform.connected is (False if expect_reconnect else True)
+    assert platform.connected is (not expect_reconnect)
 
 
 @pytest.mark.parametrize(

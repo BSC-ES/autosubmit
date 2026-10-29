@@ -25,10 +25,6 @@ class BasicConfig:
     """
     Class to manage configuration for Autosubmit path, database and default values for new experiments
     """
-
-    def __init__(self):
-        pass
-
     def props(self) -> dict:
         pr = {}
         for name in dir(self):
@@ -64,11 +60,27 @@ class BasicConfig:
     CONFIG_FILE_FOUND = False
     DATABASE_BACKEND = "sqlite"
     DATABASE_CONN_URL = ""
+    DATABASE_BACKUP = True
+    LOG_RECOVERY_TIMEOUT: int = 60 * 5
 
+    # TODO: BasicConfig contains site configuration, but this function returns the experiment directory.
+    #       BasicConfig.read() loads the object, and this static function is completely unrelated; it is
+    #       used right now as it already existed, but it should be moved to a proper place later.
+    #       Validation of expids must also be centralised, as this is not the only place where it is done.
     @staticmethod
     def expid_dir(exp_id):
-        if not isinstance(exp_id, str) or len(exp_id) != 4 or "/" in exp_id:
-            raise TypeError("Experiment ID must be a string of 4 characters without the folder separator symbol")
+        """Return the experiment directory.
+
+        Fails if the experiment ID is not valid. The expid must be a string,
+        with at least 4 characters, and without the slash folder separator.
+
+        :param exp_id: Experiment ID.
+        :raises TypeError: If the experiment ID is not valid.
+        """
+        if not isinstance(exp_id, str) or len(exp_id) < 4 or "/" in exp_id:
+            raise TypeError(
+                "Experiment ID must be a string of at least 4 characters without the folder separator symbol"
+            )
         return Path(BasicConfig.LOCAL_ROOT_DIR, exp_id)
 
     @staticmethod
@@ -121,6 +133,8 @@ class BasicConfig:
             BasicConfig.DATABASE_BACKEND = parser.get('database', 'backend')
         if parser.has_option('database', 'connection_url'):
             BasicConfig.DATABASE_CONN_URL = parser.get('database', 'connection_url')
+        if parser.has_option('database', 'backup'):
+            BasicConfig.DATABASE_BACKUP = parser.getboolean('database', 'backup')
         if parser.has_option('local', 'path'):
             BasicConfig.LOCAL_ROOT_DIR = parser.get('local', 'path')
         if parser.has_option('conf', 'platforms'):

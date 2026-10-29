@@ -723,6 +723,96 @@ def test_recover_logs_skips_jobs_without_valid_id_or_submit_time(as_conf, mocker
     mocked_save.assert_called_once()
 
 
+class _RecoveryPlatform:
+    """Minimal platform stand-in for the ``recover_logs`` wake logic."""
+
+    def __init__(self, work_event, recovery_queue):
+        self.work_event = work_event
+        self.recovery_queue = recovery_queue
+        self.keep_alive_timeout = 60
+        self.serial_platform = self
+
+
+def _recovery_platform(mocker, *, recovery_queue=True):
+    """Build a fake platform with the attributes used by ``recover_logs``."""
+    return _RecoveryPlatform(
+        work_event=mocker.Mock(),
+        recovery_queue=mocker.Mock() if recovery_queue else None,
+    )
+
+
+@pytest.mark.parametrize(
+    "platform_config,has_recovery_queue,expected_wake",
+    [
+        ({}, True, True),
+        ({"DISABLE_RECOVERY_THREADS": True}, True, False),
+        ({}, False, False),
+    ],
+    ids=["enabled", "disabled", "no-queue"],
+)
+def test_recover_logs_wakes_only_platforms_with_recovery_threads(
+    as_conf, mocker, platform_config, has_recovery_queue, expected_wake
+):
+    """Persisted jobs wake the separate recovery process only when it can be used."""
+    platform_name = "platform"
+    as_conf.experiment_data["PLATFORMS"] = {platform_name: platform_config}
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), disable_save=True)
+    job_list.dbmanager = mocker.Mock()
+    job_list.dbmanager.select_finished_jobs_needing_log_recovery.return_value = [
+        {"name": "job", "platform_name": platform_name},
+    ]
+    platform = _recovery_platform(mocker, recovery_queue=has_recovery_queue)
+    job = Job("job", "42", Status.COMPLETED, 0)
+    job.submit_time_timestamp = "20200101000000"
+    job.platform = platform
+    job.platform_name = platform_name
+    job_list.graph.add_node("job", job=job)
+
+    mocker.patch.object(job_list, "_add_job_node_with_platform")
+    mocker.patch.object(Job, "recover_log")
+
+    assert job_list.recover_logs(from_db=True) is True
+
+    if expected_wake:
+        platform.work_event.set.assert_called_once()
+    else:
+        platform.work_event.set.assert_not_called()
+
+
+def test_recover_logs_does_not_wake_disabled_platform(as_conf, mocker):
+    """A disabled platform is not woken when another platform is enabled."""
+    as_conf.experiment_data["PLATFORMS"] = {
+        "enabled": {},
+        "disabled": {"DISABLE_RECOVERY_THREADS": True},
+    }
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), disable_save=True)
+    job_list.dbmanager = mocker.Mock()
+    job_list.dbmanager.select_finished_jobs_needing_log_recovery.return_value = [
+        {"name": "job_enabled", "platform_name": "enabled"},
+        {"name": "job_disabled", "platform_name": "disabled"},
+    ]
+    enabled_platform = _recovery_platform(mocker)
+    disabled_platform = _recovery_platform(mocker)
+
+    for name, platform, platform_name in (
+        ("job_enabled", enabled_platform, "enabled"),
+        ("job_disabled", disabled_platform, "disabled"),
+    ):
+        job = Job(name, "42", Status.COMPLETED, 0)
+        job.submit_time_timestamp = "20200101000000"
+        job.platform = platform
+        job.platform_name = platform_name
+        job_list.graph.add_node(name, job=job)
+
+    mocker.patch.object(job_list, "_add_job_node_with_platform")
+    mocker.patch.object(Job, "recover_log")
+
+    assert job_list.recover_logs(from_db=True) is True
+
+    enabled_platform.work_event.set.assert_called_once()
+    disabled_platform.work_event.set.assert_not_called()
+
+
 def test_recover_last_data_restores_and_marks_finished_jobs(as_conf, mocker):
     """recover_last_data leaves meaningful jobs untouched and restores/marks the rest."""
     job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
@@ -743,8 +833,7 @@ def test_recover_last_data_restores_and_marks_finished_jobs(as_conf, mocker):
     assert meaningful.id == "5"
     assert meaningful.updated_log == 0
     assert lost.id == 7
-    assert lost.local_logs == "out.log"
-    assert lost.remote_logs == "err.log"
+    assert lost.local_logs == ("out.log", "err.log")
     assert lost.has_valid_submit_time()
     assert lost.updated_log == lost.fail_count + 1
 
@@ -1079,3 +1168,34 @@ def test_parse_jobs_by_filter(setup_job_list, unparsed_jobs, expected):
     job_list.parse_jobs_by_filter(unparsed_jobs)
 
     assert {job.name for job in job_list.rerun_job_list} == expected
+
+
+def test_finished_job_log_recovery_keeps_local_logs_in_db(as_conf, mocker, tmp_path):
+    """Restoring logs from job_data must keep an (out, err) tuple so save_jobs persists both (#3176)."""
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+
+    job = Job("a000_SIM", 0, Status.COMPLETED, 0)
+    job.platform_name = "LOCAL"
+
+    history = mocker.patch("autosubmit.job.job_list.ExperimentHistory")
+    history.return_value.manager.get_jobs_data_last_row.return_value = {
+        "a000_SIM": {
+            "job_id": 123,
+            "out": "a000_SIM.20260101000000.out",
+            "err": "a000_SIM.20260101000000.err",
+            "submit": 0,
+        }
+    }
+
+    job_list.recover_last_data(finished_jobs=[job])
+
+    assert job.local_logs == ("a000_SIM.20260101000000.out", "a000_SIM.20260101000000.err")
+
+    job_list.dbmanager.save_jobs([job])
+    row = job_list.dbmanager.load_job_by_name("a000_SIM")
+
+    assert row["local_logs_out"] == "a000_SIM.20260101000000.out"
+    assert row["local_logs_err"] == "a000_SIM.20260101000000.err"
+    assert row["platform_name"] == "LOCAL"
+

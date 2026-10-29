@@ -80,7 +80,7 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: st
 
 
 def check_experiment_ownership(
-        expid: str, basic_config: type[BasicConfig], raise_error=False, logger: Log | None = None
+        expid: str, basic_config: type[BasicConfig], raise_error=False, logger: type[Log] | None = None
 ) -> tuple[bool, bool, str]:
     # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available
     my_user_id = os.getuid()
@@ -140,7 +140,7 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
                 if mail_notify:
                     email = as_conf.get_mails_to()
                     if "@" in email[0]:
-                        Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, platform)
+                        Notifier.notify_experiment_status(MailNotifier(), expid, email, platform)
             platform_issues += f"\n[{platform.name}] Connection Unsuccessful to host {platform.host} "
             issues += platform_issues
             Log.warning(f"Error restoring platform [{platform.name}] host [{platform.host}]: {str(e)}")

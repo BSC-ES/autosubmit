@@ -157,7 +157,7 @@ class EcPlatform(ParamikoPlatform):
         self.check_remote_permissions_remove_cmd = ""
         self.update_cmds()
         self.scheduler = scheduler
-        self._uses_local_api = True
+        self._uses_local_api: bool = True
         # Pre-submission snapshot used by get_submitted_jobs_by_name to exclude
         # stale jobs from previous runs.
         self._pre_submission_ids: dict[str, set[int]] = {}
@@ -398,7 +398,7 @@ class EcPlatform(ParamikoPlatform):
                 self.connected = False
         except Exception:
             self.connected = False
-        if not log_recovery_process:
+        if self.connected and not log_recovery_process:
             self.spawn_log_retrieval_process(as_conf)
 
     def create_a_new_copy(self):

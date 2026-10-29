@@ -30,6 +30,7 @@ import paramiko
 import pytest
 from paramiko import ChannelFile  # type: ignore[import]
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
@@ -100,7 +101,7 @@ def get_experiment(autosubmit_exp) -> Callable[['FixtureRequest'], 'AutosubmitEx
 
 def _get_platform(exp: 'AutosubmitExperiment') -> 'PsPlatform':
     # We load the platforms with the submitter so that the platforms have all attributes.
-    # NOTE: The set up of platforms is done partially in the platform constructor and
+    # NOTE: The setup of platforms is done partially in the platform constructor and
     #       partially by a submitter (i.e., they are tightly coupled, which makes it hard
     #       to maintain and test).
     submitter = ParamikoSubmitter(as_conf=exp.as_conf)
@@ -131,15 +132,14 @@ class CreateJobParametersPlatformFixture(Protocol):
 
 
 @pytest.fixture
-def create_job_parameters_platform(
-        autosubmit_exp, get_next_expid: Callable[[], str]) -> CreateJobParametersPlatformFixture:
+def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatformFixture:
     def job_parameters_platform(
             experiment_data: dict | None = None,
             /,
             *args: Any,
             **kwargs: Any
     ) -> JobParametersPlatform:
-        exp = autosubmit_exp(get_next_expid(), experiment_data=experiment_data, include_jobs=True)
+        exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=True)
         slurm_platform: SlurmPlatform = cast('SlurmPlatform', exp.platform)
 
         job = Job(f"{exp.expid}_SIM", 10000, Status.SUBMITTED, 0)
@@ -210,7 +210,7 @@ def test_send_file(
             f'LOG_{exp.expid}/{filename}'
         )
         result = ssh_server.exec_run(f'ls {str(file)}')
-        assert result.exit_code == 0
+        assert 0 == result.exit_code
     finally:
         exp_ps_platform.close_connection()
 
@@ -1041,7 +1041,7 @@ def test_failed_connection_raises_as_error(
     """Test that failing to restore a connection, even with retries, results in ``AutosubmitError``."""
     exp = autosubmit_exp()
     platform_config = {
-        "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
+        "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
         "LOCAL_TMP_DIR": str(tmp_path),
         "LOCAL_ASLOG_DIR": str(tmp_path)
     }

@@ -103,9 +103,9 @@ def test_copy_code_local_project_local_destination_does_not_exist(
     )
 
     exp_project_path = Path(
-        exp.as_conf.basic_config.LOCAL_ROOT_DIR,
+        BasicConfig.LOCAL_ROOT_DIR,
         exp.expid,
-        exp.as_conf.basic_config.LOCAL_PROJ_DIR,
+        BasicConfig.LOCAL_PROJ_DIR,
     )
     project_destination = exp.as_conf.get_project_destination()
     local_destination = exp_project_path / project_destination
@@ -177,9 +177,9 @@ def test_copy_code_local_project_local_destination_exists_force(
     )
 
     exp_project_path = Path(
-        exp.as_conf.basic_config.LOCAL_ROOT_DIR,
+        BasicConfig.LOCAL_ROOT_DIR,
         exp.expid,
-        exp.as_conf.basic_config.LOCAL_PROJ_DIR,
+        BasicConfig.LOCAL_PROJ_DIR,
     )
     project_destination = exp.as_conf.get_project_destination()
     local_destination = exp_project_path / project_destination
@@ -198,7 +198,7 @@ def test_copy_code_local_project_local_destination_exists_force(
     # And since the folder already exists, we should have informed the user nothing was synced.
     # There will be a few calls to ``Log.info``, but here we confirm that at least one is right.
     assert any(
-        ["will not sync" in call[0][0] for call in mocked_log.info.call_args_list]
+        "will not sync" in call[0][0] for call in mocked_log.info.call_args_list
     )
 
     # Refresh does.
@@ -223,9 +223,9 @@ def test_copy_code_local_project_rsync_error(autosubmit_exp, tmp_path, mocker):
     )
 
     exp_project_path = Path(
-        exp.as_conf.basic_config.LOCAL_ROOT_DIR,
+        BasicConfig.LOCAL_ROOT_DIR,
         exp.expid,
-        exp.as_conf.basic_config.LOCAL_PROJ_DIR,
+        BasicConfig.LOCAL_PROJ_DIR,
     )
     project_destination = exp.as_conf.get_project_destination()
     local_destination = exp_project_path / project_destination

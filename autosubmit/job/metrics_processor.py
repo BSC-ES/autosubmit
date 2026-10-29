@@ -76,9 +76,7 @@ class MetricSpecSelector:
             key = data.get("KEY", None)
             if isinstance(key, str):
                 key = key.split(".")
-            elif isinstance(key, list):
-                key = key
-            else:
+            elif not isinstance(key, list):
                 raise ValueError("Invalid key for JSON selector")
             return MetricSpecSelector(type=selector_type, key=key)
 

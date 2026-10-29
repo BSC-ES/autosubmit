@@ -199,7 +199,7 @@ def test_describe_experiment_from_configuration(mocker, tmp_path: Path) -> None:
 
     created = datetime(2026, 8, 31, 10, 52, 39)
 
-    mock_config = mocker.patch("autosubmit.experiment.describe.AutosubmitConfig")
+    mock_config = mocker.patch("autosubmit.experiment.describe.load_config")
     mock_config_instance = mock_config.return_value
     mock_config_instance.conf_folder_yaml = str(conf_path)
     mock_config_instance.get_svn_project_url.return_value = ""
@@ -250,7 +250,7 @@ def test_describe_experiment_uses_svn_url_for_model_and_branch(
     conf_path = tmp_path / "autosubmit.yml"
     conf_path.touch()
 
-    mock_config = mocker.patch("autosubmit.experiment.describe.AutosubmitConfig")
+    mock_config = mocker.patch("autosubmit.experiment.describe.load_config")
     mock_config_instance = mock_config.return_value
     mock_config_instance.conf_folder_yaml = str(conf_path)
     mock_config_instance.get_svn_project_url.return_value = (
@@ -318,7 +318,7 @@ def test_describe_experiment_missing_git_values(
     conf_path = tmp_path / "autosubmit.yml"
     conf_path.touch()
 
-    mock_config = mocker.patch("autosubmit.experiment.describe.AutosubmitConfig")
+    mock_config = mocker.patch("autosubmit.experiment.describe.load_config")
     mock_config_instance = mock_config.return_value
     mock_config_instance.conf_folder_yaml = str(conf_path)
     mock_config_instance.get_svn_project_url.return_value = ""
@@ -357,7 +357,7 @@ def test_describe_experiment_uses_uid_when_owner_is_deleted(
     conf_path = tmp_path / "autosubmit.yml"
     conf_path.touch()
 
-    mock_config = mocker.patch("autosubmit.experiment.describe.AutosubmitConfig")
+    mock_config = mocker.patch("autosubmit.experiment.describe.load_config")
     mock_config_instance = mock_config.return_value
     mock_config_instance.conf_folder_yaml = str(conf_path)
     mock_config_instance.get_svn_project_url.return_value = ""
@@ -391,7 +391,7 @@ def test_describe_experiment_uses_database_snapshot_when_configuration_fails(
     :param mocker: Pytest mocker fixture.
     """
     mocker.patch(
-        "autosubmit.experiment.describe.AutosubmitConfig",
+        "autosubmit.experiment.describe.load_config",
         side_effect=OSError("configuration unavailable"),
     )
     mocker.patch(
@@ -435,7 +435,7 @@ def test_describe_experiment_raises_when_configuration_and_snapshot_fail(
         can provide the experiment details.
     """
     mocker.patch(
-        "autosubmit.experiment.describe.AutosubmitConfig",
+        "autosubmit.experiment.describe.load_config",
         side_effect=OSError("configuration unavailable"),
     )
     mocker.patch(
@@ -460,7 +460,7 @@ def test_describe_experiment_raises_when_no_platforms_are_available(
     conf_path = tmp_path / "autosubmit.yml"
     conf_path.touch()
 
-    mock_config = mocker.patch("autosubmit.experiment.describe.AutosubmitConfig")
+    mock_config = mocker.patch("autosubmit.experiment.describe.load_config")
     mock_config_instance = mock_config.return_value
     mock_config_instance.conf_folder_yaml = str(conf_path)
 

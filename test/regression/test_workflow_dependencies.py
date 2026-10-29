@@ -27,22 +27,18 @@ import pytest
 from autosubmit.config.basicconfig import BasicConfig
 from test.regression.utils.common import create_database, init_expid
 
-PROFILE = False  # Enable/disable profiling ( speed up the tests )
+PROFILE = False
+"""Enable/disable profiling (speed up the tests)."""
 
 
 def prepare_custom_config_tests(default_yaml_file: dict[str, Any], project_yaml_files: dict[str, dict[str, str]],
                                 current_tmpdir: Path) -> dict[str, Any]:
-    """
-    Prepare custom configuration tests by creating necessary YAML files.
+    """Prepare custom configuration tests by creating necessary YAML files.
 
     :param default_yaml_file: Default YAML file content.
-    :type default_yaml_file: Dict[str, Any]
     :param project_yaml_files: Dictionary of project YAML file paths and their content.
-    :type project_yaml_files: Dict[str, Dict[str, str]]
     :param current_tmpdir: Temporary folder .
-    :type current_tmpdir: Path
     :return: Updated default YAML file content.
-    :rtype: Dict[str, Any]
     """
     yaml_file_path = Path(f"{str(current_tmpdir)}/test_exp_data.yml")
     for path, content in project_yaml_files.items():
@@ -56,7 +52,7 @@ def prepare_custom_config_tests(default_yaml_file: dict[str, Any], project_yaml_
     return default_yaml_file
 
 
-@pytest.fixture()
+@pytest.fixture
 def prepare_basic_config(current_tmpdir):
     basic_conf = BasicConfig()
     BasicConfig.DB_DIR = (current_tmpdir / "workflows")
@@ -78,10 +74,9 @@ def prepare_basic_config(current_tmpdir):
 
 @pytest.fixture
 def prepare_workflow_runs(current_tmpdir: Path) -> None:
-    """
-    factory creating path and directories for test execution
+    """Factory creating path and directories for test execution.
+
     :param current_tmpdir: mktemp
-    :return: LocalPath
     """
 
     # Write an autosubmitrc file in the temporary directory
@@ -138,13 +133,10 @@ class SimpleJoblist:
 
 
 def parse_job_list(lines: list[str]) -> list[SimpleJoblist]:
-    """
-    Parse a list of lines representing a job list and return a list of root nodes.
+    """Parse a list of lines representing a job list and return a list of root nodes.
 
     :param lines: List of lines to parse.
-    :type lines: List[str]
     :return: List of root nodes.
-    :rtype: List[SimpleJoblist]
     """
     roots = []
     stack: list[SimpleJoblist] = []
@@ -169,8 +161,7 @@ def parse_job_list(lines: list[str]) -> list[SimpleJoblist]:
 
 
 def compare_and_print_differences(node1: SimpleJoblist | None, node2: SimpleJoblist | None) -> list[str]:
-    """
-    Compare two job list nodes and return a list of differences.
+    """Compare two job list nodes and return a list of differences.
 
     :param node1: The first job list node to compare.
     :param node2: The second job list node to compare.
@@ -204,15 +195,12 @@ def compare_and_print_differences(node1: SimpleJoblist | None, node2: SimpleJobl
 
 
 def remove_noise_from_list(lines: list[str]) -> list[str]:
-    """
-    Remove noise from a list of lines by stripping whitespace and specific substrings.
+    """Remove noise from a list of lines by stripping whitespace and specific substrings.
 
     :param lines: List of lines to process.
-    :type lines: List[str]
     :return: List of cleaned lines.
-    :rtype: List[str]
     """
-    lines = [line.strip().rstrip(' [WAITING]').rstrip(' [READY]').strip() for line in lines]
+    lines = [line.strip().removesuffix(' [WAITING]').removesuffix(' [READY]').strip() for line in lines]
     lines = [line.replace("child", "children") if "child" in line and "children" not in line else line for line in
              lines]
     if lines and lines[0].strip() == '':
@@ -222,11 +210,9 @@ def remove_noise_from_list(lines: list[str]) -> list[str]:
 
 
 def get_project_root() -> Path:
-    """
-    Find the autosubmit project root.
+    """Find the autosubmit project root.
 
     :return: The project root path.
-    :rtype: Path
     :raises FileNotFoundError: If the project root directory is not found.
     """
     project_root = Path(__file__).resolve().parent
@@ -238,11 +224,9 @@ def get_project_root() -> Path:
 
 
 def get_workflow_folder() -> list[str]:
-    """
-    Get a sorted list of workflow folder names in the 'test/regression/workflows' directory.
+    """Get a sorted list of workflow folder names in the 'test/regression/workflows' directory.
 
     :return: A sorted list of workflow folder names.
-    :rtype: List[str]
     """
     workflow_dir = get_project_root() / 'test' / 'regression' / 'workflows'
     # The test will be performed on all the workflows in the 'workflows' directory
@@ -252,19 +236,13 @@ def get_workflow_folder() -> list[str]:
 @pytest.mark.parametrize("expid", get_workflow_folder())
 def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_tmpdir: Path, mocker: Any,
                                 prepare_basic_config: Any) -> None:
-    """
-    Compare current workflow dependencies with the reference ones.
+    """Compare current workflow dependencies with the reference ones.
 
     :param prepare_workflow_runs: Fixture to prepare workflow runs.
-    :type prepare_workflow_runs: Any
     :param expid: Experiment ID.
-    :type expid: str
     :param current_tmpdir: Temporary directory for the current test.
-    :type current_tmpdir: Path
     :param mocker: Mocking object for patching.
-    :type mocker: Any
     :param prepare_basic_config: Fixture to prepare basic configuration.
-    :type prepare_basic_config: Any
     """
     # Modify this section to add a new test, debugging...
     add_new_test = False  # Enable when adding a new test
