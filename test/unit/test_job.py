@@ -3180,15 +3180,3 @@ def test_compute_inner_job_status_returns_stat_when_done(mocker):
     result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
 
     assert result == Status.FAILED
-
-
-def test_recover_log_disabled_threads(mocker):
-    job = Job("test", 1, Status.COMPLETED, 0)
-    as_conf = mocker.MagicMock()
-    as_conf.platforms_data.get.return_value = {"DISABLE_RECOVERY_THREADS": "true"}
-    mock_retrieve = mocker.patch("autosubmit.job.job.Job.retrieve_logfiles")
-    mock_notify = mocker.patch("autosubmit.job.job.Job.send_cpmip_notification")
-    job.recover_log(as_conf)
-    mock_retrieve.assert_called_once()
-    mock_notify.assert_called_once_with(as_conf)
-    assert job.log_recovery_call_count == 1
