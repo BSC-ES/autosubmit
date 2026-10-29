@@ -57,3 +57,17 @@ def test_slurm_monitor_energy_values():
     assert slurm_monitor.total_energy == total_energy
 
     assert slurm_monitor.header.energy == header_energy
+
+
+def test_slurm_monitor_energy_values_without_extern():
+    """Test that energy is calculated when Slurm does not report an extern step."""
+    output = '''15994954  COMPLETED        448        2 2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30        883.55K                                                     
+15994954.batch  COMPLETED        224        1 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30        497.36K                    18111K                    18111K 
+   15994954.0  COMPLETED        224        1 2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52              0                     3486K                     3486K 
+   15994954.1  COMPLETED        448        2 2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22        844.90K                 29740154K              27008625.50K 
+'''
+    slurm_monitor = SlurmMonitor(output)
+
+    assert slurm_monitor.extern is None
+    assert slurm_monitor.steps_energy == 844900.0
+    assert slurm_monitor.total_energy == 883550.0
