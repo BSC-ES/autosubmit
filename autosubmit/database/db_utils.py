@@ -31,10 +31,15 @@ __all__ = ["batch_size_for", "chunked", "max_params"]
 
 T = TypeVar("T")
 
-# Conservative floor: SQLite builds vary (999 / 32766).
 SQLITE_MAX_PARAMS = 999
-# PostgreSQL protocol limit.
+"""Conservative floor: SQLite builds vary (999 / 32766).
+
+SQLite 3.32.0 (2020) raised the default limit to 32766, but older builds still
+cap it at 999, so the conservative value is kept.
+"""
+
 POSTGRES_MAX_PARAMS = 65535
+"""PostgreSQL protocol limit for bound parameters per statement."""
 
 
 def max_params(dialect_name: str) -> int:
@@ -54,8 +59,17 @@ def batch_size_for(num_columns: int, dialect_name: str) -> int:
     :param num_columns: Number of bound parameters per row.
     :param dialect_name: The SQLAlchemy dialect name.
     :return: Number of rows per batch (at least 1).
+    :raises ValueError: If ``num_columns`` is less than 1 or greater than the
+        dialect parameter limit, since a single row would not fit.
     """
-    return max(1, max_params(dialect_name) // max(1, num_columns))
+    limit = max_params(dialect_name)
+    if num_columns < 1:
+        raise ValueError(f"num_columns must be at least 1, got {num_columns}")
+    if num_columns > limit:
+        raise ValueError(
+            f"A single row needs {num_columns} parameters but {dialect_name} allows at most {limit}"
+        )
+    return limit // num_columns
 
 
 def chunked(items: Iterable[T], size: int) -> Iterator[list[T]]:

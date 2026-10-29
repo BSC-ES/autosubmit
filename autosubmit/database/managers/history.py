@@ -50,7 +50,10 @@ from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.log.log import Log
 
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
-DEFAULT_MAX_COUNTER = 0
+"""Minimum schema version required for the experiment header to be ready."""
+
+_DEFAULT_MAX_COUNTER = 0
+"""Fallback counter value used when no job_data row exists."""
 
 class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
     """A SQLAlchemy experiment history database manager.
@@ -121,7 +124,7 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
             if not pending:
                 continue
             qualified_name = f"{quote(self.schema)}.{quote(model_table.name)}" if self.schema else quote(model_table.name)
-            with self.engine.connect() as conn:
+            with self.engine.begin() as conn:
                 for col in pending:
                     parts = [col.type.compile(dialect=dialect)]
                     if not col.nullable:
@@ -137,7 +140,6 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
                     conn.execute(
                         text(f"ALTER TABLE {qualified_name} ADD COLUMN {quote(col.name)} {' '.join(parts)}")
                     )
-                conn.commit()
 
         if inspector.has_table(JobDataTable.name, schema=self.schema):
             with self.engine.begin() as conn:
@@ -240,7 +242,7 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
             result = conn.execute(query).first()
         return result[0] if result and result[0] is not None else 0
 
-    def is_there_a_last_experiment_run(self) -> bool:
+    def has_any_experiment_run(self) -> bool:
         """Return ``True`` if there is at least one experiment run in the database. ``False`` otherwise."""
         experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
@@ -426,7 +428,9 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
             }
             for change in changes
         ]
-        batch_size = batch_size_for(4, self.engine.dialect.name)
+        if not params:
+            return
+        batch_size = batch_size_for(len(params[0]), self.engine.dialect.name)
         with self.engine.begin() as conn:
             for batch in chunked(params, batch_size):
                 conn.execute(query, batch)
@@ -521,11 +525,10 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
             query = query.where(job_data_table.c.job_name == job_name)  # type: ignore
         with self.engine.connect() as conn:
             max_counter = conn.execute(query).scalar()
-        return max_counter if max_counter else DEFAULT_MAX_COUNTER
+        return max_counter if max_counter else _DEFAULT_MAX_COUNTER
 
-    # Columns needed to recover a job's log data. Selecting only these keeps the
-    # result small on large experiments.
     _JOB_DATA_LAST_ROW_COLUMNS = ("job_name", "counter", "job_id", "out", "err", "submit", "status")
+    """Columns needed to recover a job's log data, kept small for large experiments."""
 
     def get_jobs_data_last_row(self, job_names: list[str]) -> dict[str, Any]:
         """Return the last job_data row for each requested job name.
@@ -601,10 +604,9 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
             job_data_table.c.job_name == job_name,
             job_data_table.c.fail_count == fail_count
         ).values(start=start, finish=finish)
-        with self.engine.connect() as conn:
+        with self.engine.begin() as conn:
             result = conn.execute(stmt)
-            conn.commit()
-            return result.rowcount
+        return result.rowcount
 
 
 def get_last_run_id(expid: str) -> int | None:
@@ -618,6 +620,5 @@ def get_last_run_id(expid: str) -> int | None:
         run = manager.get_experiment_run_dc_with_max_id_or_none()
         return run.run_id if run else None
     except Exception as exp:
-        Log.warning(f"Could not get last experiment run ID for {expid}: {exp}")
-        Log.debug(traceback.format_exc())
+        Log.warning(f"Could not get last experiment run ID for {expid}: {exp}\n{traceback.format_exc()}")
         return None

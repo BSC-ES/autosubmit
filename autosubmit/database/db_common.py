@@ -262,10 +262,11 @@ def delete_experiment(experiment_id: str) -> bool:
     """Remove an experiment from the database.
 
     :param experiment_id: Experiment identifier.
-    :return: ``True`` if the experiment was deleted.
+    :return: ``True`` if the experiment was deleted, ``False`` if it did not exist
+        or no row was deleted.
     """
     if not check_experiment_exists(experiment_id, False):
-        return True
+        return False
 
     with _get_engine().begin() as conn:
         result = conn.execute(
@@ -286,7 +287,7 @@ def delete_experiment(experiment_id: str) -> bool:
 
         if result.rowcount > 0:
             Log.debug(f"The experiment {experiment_id} has been deleted!!!")
-    return True
+    return result.rowcount > 0
 
 
 def get_experiment_id(name: str) -> int:

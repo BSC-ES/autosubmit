@@ -413,7 +413,7 @@ class ExperimentHistory:
         return self.manager.update_experiment_run_dc_by_id(current_experiment_run_dc)
 
     def finish_current_experiment_run(self):
-        if self.manager.is_there_a_last_experiment_run():
+        if self.manager.has_any_experiment_run():
             current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
             current_experiment_run_dc.finish = int(time())
             return self.manager.update_experiment_run_dc_by_id(current_experiment_run_dc)

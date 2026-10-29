@@ -22,6 +22,7 @@ from functools import cached_property
 from sqlalchemy import (
     Boolean,
     Column,
+    DateTime,
     Float,
     ForeignKey,
     Integer,
@@ -304,8 +305,33 @@ JOBLISTTABLES = {
 JobListTable = JobsTable
 
 
+def schema_version_table(metadata: MetaData, name: str) -> Table:
+    """Build the schema-version table for a single target.
+
+    The table name and metadata vary per target (general, job_list, history) and
+    per PostgreSQL schema, so it is built on demand instead of registered in
+    ``get_all_tables_by_name``.
+
+    :param metadata: The metadata the table belongs to.
+    :param name: The table name.
+    :return: The ``schema_version`` table.
+    """
+    return Table(
+        name,
+        metadata,
+        Column("version", Integer, primary_key=True, nullable=False),
+        Column("applied_at", DateTime(timezone=True), nullable=False),
+    )
+
+
 def get_all_tables_by_name() -> dict[str, Table]:
-    """Return a dictionary of all tables, combining general and job-list tables."""
+    """Return the module-level tables with a fixed name, keyed by name.
+
+    These are created once at import time, even when a factory such as
+    :func:`create_wrapper_tables` builds them. Per-target tables such as the
+    schema-version table are built at runtime for each target and schema, so
+    they are not registered here.
+    """
     return {**GENERALTABLES, **JOBLISTTABLES}
 
 
