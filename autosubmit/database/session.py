@@ -26,19 +26,26 @@ from autosubmit.config.basicconfig import BasicConfig
 
 __all__ = ["get_engine"]
 
-# SQLite waits up to this many seconds for a lock before raising
-# "database is locked". The pysqlite default (5 seconds) is too low on the
-# shared filesystems where experiment databases usually live.
 _SQLITE_TIMEOUT_SECONDS = 30
+"""SQLite waits up to this many seconds for a lock before raising "database is locked".
 
-# Recycle PostgreSQL connections older than this many seconds, so a connection
-# silently dropped by the infrastructure is not reused.
+The pysqlite default (5 seconds) is too low on the shared filesystems where
+experiment databases usually live.
+"""
+
 _POSTGRES_POOL_RECYCLE_SECONDS = 1800
+"""Recycle PostgreSQL connections older than this many seconds.
 
-# Engines are cached so that repeated calls reuse the same connection pool.
-# PostgreSQL is keyed by connection URL and SQLite by resolved file path.
+This avoids reusing a connection silently dropped by the infrastructure.
+"""
+
 _ENGINE_CACHE: dict[tuple[str, str], Engine] = {}
+"""Engines are cached so that repeated calls reuse the same connection pool.
+
+PostgreSQL is keyed by connection URL and SQLite by resolved file path.
+"""
 _ENGINE_CACHE_LOCK = threading.Lock()
+"""Serialize creation of cached engines."""
 
 
 def _is_in_memory(url: URL) -> bool:

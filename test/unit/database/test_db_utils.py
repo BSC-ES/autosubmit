@@ -49,6 +49,21 @@ def test_batch_size_for_accounts_for_columns(num_columns: int, dialect: str, exp
     assert batch_size_for(num_columns, dialect) == expected
 
 
+@pytest.mark.parametrize(
+    "num_columns,dialect",
+    [
+        (0, "sqlite"),
+        (-1, "sqlite"),
+        (1000, "sqlite"),
+        (65536, "postgresql"),
+    ],
+)
+def test_batch_size_for_rejects_invalid_columns(num_columns: int, dialect: str) -> None:
+    """A non-positive width or one wider than the dialect limit is a caller error."""
+    with pytest.raises(ValueError):
+        batch_size_for(num_columns, dialect)
+
+
 @pytest.mark.parametrize("size", [1, 2, 3, 10])
 def test_chunked_keeps_order_and_size(size: int) -> None:
     """Chunking preserves order and never exceeds the requested size."""

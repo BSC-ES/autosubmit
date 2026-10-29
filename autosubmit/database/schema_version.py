@@ -52,11 +52,13 @@ Alternatives to evaluate:
 
 import datetime
 
-from sqlalchemy import Column, DateTime, Integer, MetaData, Table, func, inspect, select
+from sqlalchemy import Table, func, inspect, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.schema import CreateTable
+
+from autosubmit.database.models.tables import schema_version_table
 
 # Schema versions for every target. Each target has an independent migration
 # sequence, even when several targets share a PostgreSQL schema.
@@ -73,21 +75,6 @@ __all__ = [
     "record_schema_version",
     "schema_version_table",
 ]
-
-
-def schema_version_table(metadata: MetaData, name: str) -> Table:
-    """Build the table that records the schema version of a target.
-
-    :param metadata: The metadata the table belongs to.
-    :param name: The table name.
-    :return: The ``schema_version`` table.
-    """
-    return Table(
-        name,
-        metadata,
-        Column("version", Integer, primary_key=True, nullable=False),
-        Column("applied_at", DateTime(timezone=True), nullable=False),
-    )
 
 
 def _now() -> datetime.datetime:
@@ -124,7 +111,7 @@ def get_schema_version(engine: Engine, table: Table, schema: str | None = None) 
 
 
 def record_schema_version(conn: Connection, table: Table, version: int) -> None:
-    """Record the current schema version for a target. Safe to call more than once.
+    """Record the current schema version for a target. Idempotent for sqlite and postgres.
 
     Uses a dialect upsert (``ON CONFLICT DO NOTHING``) so concurrent writers do
     not race on the check-then-insert.

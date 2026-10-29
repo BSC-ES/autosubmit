@@ -81,13 +81,13 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
 
     # Test experiment run history methods
     # Test run insertion
-    assert database_manager.is_there_a_last_experiment_run() is False
+    assert database_manager.has_any_experiment_run() is False
     new_experiment_run = ExperimentRun(
         run_id=1,
         start=int(time.time()),
     )
     database_manager.register_experiment_run_dc(new_experiment_run)
-    assert database_manager.is_there_a_last_experiment_run() is True
+    assert database_manager.has_any_experiment_run() is True
 
     # Test last run retrieval
     last_experiment_run = database_manager.get_experiment_run_dc_with_max_id()
