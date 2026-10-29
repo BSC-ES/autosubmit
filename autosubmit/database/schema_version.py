@@ -1,0 +1,138 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Per-target schema version tracking.
+
+This module keeps track of a schema version per target. Targets are the general
+database (which also holds ``experiment`` and ``details``), ``as_times``
+(``experiment_status``), and the per-experiment job_list and history databases
+(each experiment has its own SQLite file or PostgreSQL schema).
+
+The version table lives in the target database and is created and recorded
+lazily: on a fresh install for the general database, or the first time a target
+database is opened. A pre-existing database that is never opened again therefore
+has no version row, which is fine: the version is schema metadata, not a registry
+of experiments, and nothing depends on it until the database is used. The legacy
+versioning (SQLite pragmas / the ``db_version`` table) is not read here, so a
+pre-existing database is stamped with the current version the first time it is
+opened.
+
+Each target has its own version constant and its own tracking table, even when
+several targets share a PostgreSQL schema::
+
+    Target      Version constant              Tracking table
+    general     GENERAL_SCHEMA_VERSION        general_schema_version
+    job_list    JOB_LIST_SCHEMA_VERSION       job_list_schema_version
+    history     HISTORY_SCHEMA_VERSION        history_schema_version
+
+TODO(#1286): a dedicated migration tool should eventually read the legacy version
+and apply the ordered migration steps, taking over this layer. The tool is TBD.
+Alternatives to evaluate:
+- Alembic: SQLAlchemy-native; autogenerates migration scripts by diffing the
+  models against the DB, orders them, and handles SQLite ALTER via batch mode.
+  Would need customization to fit the per-experiment files/schemas.
+- Minimal custom runner (Cylc-style): ordered migration steps plus a version
+  table. Zero dependencies and full control of the per-experiment targets, but
+  migrations are written by hand (no autogeneration).
+"""
+
+import datetime
+
+from sqlalchemy import Table, func, inspect, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.schema import CreateTable
+
+from autosubmit.database.models.tables import schema_version_table
+
+# Schema versions for every target. Each target has an independent migration
+# sequence, even when several targets share a PostgreSQL schema.
+GENERAL_SCHEMA_VERSION = 1
+JOB_LIST_SCHEMA_VERSION = 1
+HISTORY_SCHEMA_VERSION = 21
+
+__all__ = [
+    "GENERAL_SCHEMA_VERSION",
+    "HISTORY_SCHEMA_VERSION",
+    "JOB_LIST_SCHEMA_VERSION",
+    "ensure_schema_version_table",
+    "get_schema_version",
+    "record_schema_version",
+    "schema_version_table",
+]
+
+
+def _now() -> datetime.datetime:
+    """Return the current UTC timestamp used for ``applied_at``."""
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def ensure_schema_version_table(target: Engine | Connection, table: Table) -> None:
+    """Create the ``schema_version`` table if it does not exist.
+
+    :param target: The engine that owns the target database, or an open connection.
+    :param table: The ``schema_version`` table.
+    """
+    if isinstance(target, Engine):
+        with target.begin() as conn:
+            conn.execute(CreateTable(table, if_not_exists=True))
+    else:
+        target.execute(CreateTable(table, if_not_exists=True))
+
+
+def get_schema_version(engine: Engine, table: Table, schema: str | None = None) -> int:
+    """Return the schema version recorded for the target.
+
+    :param engine: The engine that owns the target database.
+    :param table: The ``schema_version`` table.
+    :param schema: Optional schema name (PostgreSQL).
+    :return: The current schema version, or 0 if none was recorded.
+    """
+    if not inspect(engine).has_table(table.name, schema=schema):
+        return 0
+    with engine.connect() as conn:
+        version = conn.execute(select(func.max(table.c.version))).scalar()
+    return int(version) if version is not None else 0
+
+
+def record_schema_version(conn: Connection, table: Table, version: int) -> None:
+    """Record the current schema version for a target. Idempotent for sqlite and postgres.
+
+    Uses a dialect upsert (``ON CONFLICT DO NOTHING``) so concurrent writers do
+    not race on the check-then-insert.
+
+    :param conn: An open connection.
+    :param table: The ``schema_version`` table.
+    :param version: The schema version to record.
+    """
+    values = {"version": version, "applied_at": _now()}
+    if conn.dialect.name == "postgresql":
+        stmt = pg_insert(table).values(**values).on_conflict_do_nothing(
+            index_elements=[table.c.version]
+        )
+    elif conn.dialect.name == "sqlite":
+        stmt = sqlite_insert(table).values(**values).on_conflict_do_nothing(
+            index_elements=[table.c.version]
+        )
+    else:
+        # Unknown dialect: fall back to a non-atomic check-then-insert.
+        exists = conn.execute(select(table.c.version).where(table.c.version == version)).first()
+        if exists:
+            return
+        stmt = table.insert().values(**values)
+    conn.execute(stmt)

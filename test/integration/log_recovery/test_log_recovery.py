@@ -25,7 +25,7 @@ from types import SimpleNamespace
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.database.db_manager_job_list import JobsDbManager
+from autosubmit.database.managers.job_list import JobsDbManager
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log

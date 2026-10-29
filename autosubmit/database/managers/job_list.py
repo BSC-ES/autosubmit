@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Contains code to manage a database via SQLAlchemy."""
+"""SQLAlchemy manager for the per-experiment ``job_list`` database."""
 import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -24,8 +24,8 @@ from sqlalchemy import and_, exists, func, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_manager import DbManager
-from autosubmit.database.tables import (
+from autosubmit.database.managers.base import DbManager
+from autosubmit.database.models.tables import (
     ExperimentStructureTable,
     JobsTable,
     PreviewWrapperInfoTable,
@@ -35,6 +35,7 @@ from autosubmit.database.tables import (
     WrapperInfoTable,
     WrapperJobsTable,
 )
+from autosubmit.database.schema_version import JOB_LIST_SCHEMA_VERSION
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
 
@@ -91,9 +92,14 @@ if TYPE_CHECKING:
 class JobsDbManager(DbManager):
     """A database manager for the job_list that extends DbManager using SQLAlchemy.
 
-    It can be used with any engine supported by SQLAlchemy, such
-    as Postgres, Mongo, MySQL, etc.
+    It supports the SQLite and PostgreSQL backends used by Autosubmit.
     """
+
+    # Schema version of the job_list database, recorded in ``schema_version``.
+    SCHEMA_VERSION = JOB_LIST_SCHEMA_VERSION
+
+    # The job_list schema is shared with the history tables on PostgreSQL.
+    SCHEMA_VERSION_TABLE_NAME = "job_list_schema_version"
 
     def __init__(self, schema: str | None = None) -> None:
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
@@ -103,7 +109,6 @@ class JobsDbManager(DbManager):
         super().__init__(persistence_full_path, schema)
         self._ACTIVE_STATUSES = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
-        self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
     def save_jobs(self, job_list: list["Job"], reset_log_counters: bool = False) -> None:
         """Save the job list to the database.
@@ -112,11 +117,7 @@ class JobsDbManager(DbManager):
         :meth:`save_job_log`.
 
         :param job_list: List of Job objects to save to the database.
-        :type job_list: List[Job]
         :param reset_log_counters: Whether to reset log counters.
-        :type reset_log_counters: bool
-
-        :return: None
         :raises: May raise database-related exceptions during upsert operations.
         """
         table: Table = self.table_registry.get(JobsTable.name)
@@ -136,11 +137,9 @@ class JobsDbManager(DbManager):
     def save_job_log(self, job: "Job") -> None:
         """Save only the log information of a single job to the database.
 
-        only update log-related fields (name, log, updated_log, local_logs_out, local_logs_err, remote_logs_out, remote_logs_err).
+        only update log-related fields (name, log, updated_log, updated_stats, local_logs_out, local_logs_err, remote_logs_out, remote_logs_err).
 
         :param job: Job object whose log information is to be saved.
-        :type job: Job
-        :return: None
         """
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)
@@ -157,7 +156,7 @@ class JobsDbManager(DbManager):
             load_failed_jobs: bool = False,
             members: list[Any] | None = None
     ) -> list[dict[str, Any]]:
-        """Return a  list of jobs loaded from the database.
+        """Return a list of jobs loaded from the database.
 
         Load jobs according to the requested mode.
 
@@ -177,12 +176,11 @@ class JobsDbManager(DbManager):
 
         return [dict(job) for job in job_list]
 
-    def load_job_by_name(self, job_name: str) -> dict[str, Any]:
+    def load_job_by_name(self, job_name: str) -> dict[str, Any] | None:
         """
         Load a job by its name from the database.
         :param job_name: Name of the job to load.
-        :type job_name: str
-        :return: Dictionary containing the job information.
+        :return: Dictionary containing the job information, or ``None`` if not found.
         """
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)
@@ -190,9 +188,7 @@ class JobsDbManager(DbManager):
         return dict(job) if job else None
 
     def get_job_list_size(self) -> tuple[int, int, int]:
-        """
-        Return the number of jobs in the database.
-        """
+        """Return the total, completed and failed job counts."""
         table: Table = self.table_registry.get(JobsTable.name)
 
         self.create_table(table.name)
@@ -229,24 +225,6 @@ class JobsDbManager(DbManager):
         with self._get_engine(table.name).connect() as conn:
             rows = conn.execute(select(table.c.name).select_from(table).where(condition))
             return {row[0] for row in rows.fetchall()}
-
-    def count_remaining_jobs_in_sections(self, sections: list[str], exclude_names: list[str]) -> int:
-        """Count non-completed jobs in sections, excluding given names.
-
-        :param sections: List of section names.
-        :param exclude_names: List of job names to exclude.
-        :return: Count of remaining non-completed jobs.
-        """
-        table: Table = self.table_registry.get(JobsTable.name)
-        self.create_table(table.name)
-        condition = and_(
-            table.c.section.in_(sections),
-            table.c.status != 'COMPLETED',
-            not_(table.c.name.in_(exclude_names))
-        )
-        with self._get_engine(table.name).connect() as conn:
-            row = conn.execute(select(func.count()).select_from(table).where(condition))
-            return row.scalar()
 
     def count_non_completed_parents_not_in_memory(
             self, remaining_names: set[str], loaded_names: set[str]) -> int:
@@ -337,7 +315,7 @@ class JobsDbManager(DbManager):
             self,
             sections: list[str],
             already_loaded_names: set[str],
-    ) -> list[tuple[tuple[str, Any]]]:
+    ) -> list[tuple[tuple[str, Any], ...]]:
         """Return non-completed jobs in sections whose cross-section parents are all COMPLETED.
 
         Uses a single SQL query with NOT EXISTS to find jobs whose
@@ -368,7 +346,8 @@ class JobsDbManager(DbManager):
                 .where(and_(
                     structure_table.c.e_to == jobs_table.c.name,
                     parent_alias.c.section.notin_(sections),
-                    structure_table.c.completion_status != 'COMPLETED'
+                    structure_table.c.completion_status != 'COMPLETED',
+                    parent_alias.c.status != 'COMPLETED'
                 ))
             )
         )
@@ -620,21 +599,18 @@ class JobsDbManager(DbManager):
         return [dict(edge) for edge in graph]
 
     def delete_unused_edges(self, graph: list[dict[str, Any]]) -> None:
-        """
-        Delete unused edges from the database.
-        """
+        """Replace all stored edges with the given graph."""
         table: Table = self.table_registry.get(ExperimentStructureTable.name)
 
         self.create_table(table.name)
         self.delete_all(table.name)
         self.save_edges(graph)
 
-    def select_job_by_name(self, job_name: str) -> dict[str, Any]:
-        """
-        Select a job by its name from the database.
+    def select_job_by_name(self, job_name: str) -> tuple[tuple[str, Any], ...] | None:
+        """Select a job by its name from the database.
+
         :param job_name: Name of the job to select.
-        :type job_name: str
-        :return: List of dictionaries containing the job information.
+        :return: The job row as a tuple of column-value pairs, or ``None`` if not found.
         """
         table: Table = self.table_registry.get(JobsTable.name)
 
@@ -642,6 +618,20 @@ class JobsDbManager(DbManager):
         job = self.select_where_with_columns(table, {'name': job_name})
         if job:
             return job[0]
+
+    def select_parent_names(self, job_name: str) -> set[str]:
+        """Return the names of the jobs that the given job depends on.
+
+        :param job_name: The job name.
+        :return: A set of parent job names.
+        """
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
+        self.create_table(structure_table.name)
+        with self._get_engine(structure_table.name).connect() as conn:
+            rows = conn.execute(
+                select(structure_table.c.e_from).where(structure_table.c.e_to == job_name)
+            )
+            return {row[0] for row in rows}
 
     # WRAPPERS
     # At this point, we already built the wrappers, so we can save them in the database.
@@ -739,13 +729,9 @@ class JobsDbManager(DbManager):
         self.drop_table(experiment_structure_table.name)
 
     def save_sections_data(self, sections_data: list[dict[str, Any]]) -> None:
-        """
-        Save the section data to the database.
+        """Save the section data to the database.
 
         :param sections_data: List of dictionaries containing section information.
-        :type sections_data: List[Dict[str, Any]]
-        :return: None
-        :rtype: None
         """
         section_structure_table: Table = self.table_registry.get(SectionsStructureTable.name)
         self.drop_table(section_structure_table.name)
@@ -753,7 +739,7 @@ class JobsDbManager(DbManager):
         self.upsert_many(section_structure_table.name, sections_data, ['name'])
 
     def load_sections_data(self) -> list[tuple[str, Any]]:
-        """Load the section data to the database."""
+        """Load the section data from the database."""
         section_structure_table: Table = self.table_registry.get(SectionsStructureTable.name)
 
         self.create_table(section_structure_table.name)
@@ -761,11 +747,9 @@ class JobsDbManager(DbManager):
         return section_data
 
     def clear_unused_nodes(self, differences: dict[str, dict[str, Any]]) -> None:
-        """
-        Remove jobs from the database that are no longer needed based on section differences.
+        """Remove jobs from the database that are no longer needed based on section differences.
 
         :param differences: Dictionary describing changes in sections.
-        :type differences: Dict[str, Dict[str, Any]]
         """
         jobs_table: Table = self.table_registry.get(JobsTable.name)
         jobs_to_delete: set[str] = set()
@@ -789,11 +773,8 @@ class JobsDbManager(DbManager):
         Determine if a job should be deleted based on section differences.
 
         :param job: Job dictionary.
-        :type job: Dict[str, Any]
         :param section_diff: Section difference dictionary.
-        :type section_diff: Dict[str, Any]
         :return: True if the job should be deleted, False otherwise.
-        :rtype: bool
         """
         if 'numchunks' in section_diff and job.get('chunk') is not None:
             if (job.get('chunk') is None and section_diff['numchunks'] is not None) or \
@@ -862,7 +843,6 @@ class JobsDbManager(DbManager):
         Clear all wrapper jobs and their associated information from the database.
 
         :param preview: If True, use preview tables; otherwise, use production tables.
-        :type preview: bool
         """
         if preview:
             innerjobs_table: Table = self.table_registry.get(PreviewWrapperJobsTable.name)
@@ -876,12 +856,11 @@ class JobsDbManager(DbManager):
         self.delete_all(innerjobs_table.name)
         self.delete_all(wrapper_info_table.name)
 
-    def update_wrapper_status(self, packages) -> None:
+    def update_wrapper_status(self, packages: list[dict[str, Any]]) -> None:
         """
         Update the status of wrapper jobs in the database.
 
-        :param packages: WrapperJob object containing package information.
-        :type packages: WrapperJob
+        :param packages: List of wrapper job dictionaries.
         """
         wrapper_info_table: Table = self.table_registry.get(WrapperInfoTable.name)
         self.create_table(wrapper_info_table.name)
@@ -896,7 +875,6 @@ class JobsDbManager(DbManager):
         Get the IDs of all wrapper jobs in the database.
 
         :return: List of wrapper job IDs.
-        :rtype: List[int]
         """
         wrapper_info_table: Table = self.table_registry.get(WrapperInfoTable.name)
         self.create_table(wrapper_info_table.name)
@@ -918,7 +896,6 @@ class JobsDbManager(DbManager):
         """Get the names of jobs that have failed.
 
         :return: List of job names that have failed.
-        :rtype: List[str]
         """
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)

@@ -18,11 +18,11 @@
 
 import datetime
 from functools import cached_property
-from typing import cast
 
 from sqlalchemy import (
     Boolean,
     Column,
+    DateTime,
     Float,
     ForeignKey,
     Integer,
@@ -44,14 +44,6 @@ ExperimentTable = Table(
     Column("autosubmit_version", String),
 )
 """The main table, populated by Autosubmit. Should be read-only by the API."""
-
-# NOTE: In the original SQLite DB, db_version.version was the only field,
-#       and not a PK.
-DBVersionTable = Table(
-    "db_version",
-    metadata_obj,
-    Column("version", Integer, nullable=False, primary_key=True),
-)
 
 ExperimentStatusTable = Table(
     "experiment_status",
@@ -100,7 +92,7 @@ DetailsTable = Table(
     Column("hpc", Text, nullable=False),
 )
 
-"""Table that holds the structure of the experiment jobs."""
+"""Table that holds the historical job data."""
 JobDataTable = Table(
     "job_data",
     metadata_obj,
@@ -153,7 +145,7 @@ JobDataTable = Table(
 
 """All these tables will go inside the $expid/db/job_list.db."""
 # Jobs table
-"""Table that holds the minium neccesary info about the experiment jobs."""
+"""Table that holds the minimum necessary information about the experiment jobs."""
 JobsTable = Table(
     "jobs",
     metadata_obj,
@@ -238,7 +230,7 @@ SectionsStructureTable = Table(
 )
 
 
-def create_wrapper_tables(name, metadata_obj_):
+def create_wrapper_tables(name: str, metadata_obj_: MetaData) -> tuple[Table, Table]:
     """Create a wrapper table for the given name."""
     table_package_info = Table(
         f"{name}_info",
@@ -294,7 +286,6 @@ GENERALTABLES = {
     ExperimentTable.name: ExperimentTable,
     ExperimentStatusTable.name: ExperimentStatusTable,
     ExperimentRunTable.name: ExperimentRunTable,
-    DBVersionTable.name: DBVersionTable,
     JobDataTable.name: JobDataTable,
     StructureDataTable.name: StructureDataTable,
     DetailsTable.name: DetailsTable,
@@ -314,49 +305,33 @@ JOBLISTTABLES = {
 JobListTable = JobsTable
 
 
-def get_table_with_schema(schema: str | None, table: Table | None) -> Table:
-    """Get the ``Table`` instance with the metadata modified.
+def schema_version_table(metadata: MetaData, name: str) -> Table:
+    """Build the schema-version table for a single target.
 
-    The metadata will use the given container. This means you can
-    have table ``A`` with no schema, then call this function with
-    ``schema=a000``, and then a new table ``A`` with ``schema=a000``
-    will be returned.
+    The table name and metadata vary per target (general, job_list, history) and
+    per PostgreSQL schema, so it is built on demand instead of registered in
+    ``get_all_tables_by_name``.
 
-    :param schema: The target schema for the table metadata.
-    :param table: The SQLAlchemy Table.
-    :return: The same table, but with the given schema set as metadata.
+    :param metadata: The metadata the table belongs to.
+    :param name: The table name.
+    :return: The ``schema_version`` table.
     """
-    if not isinstance(table, Table):
-        raise ValueError("Invalid source type on table schema change")
-
-    metadata = MetaData(schema=schema)
-    dest_table = Table(table.name, metadata)
-
-    for col in cast(list, table.columns):
-        dest_table.append_column(col.copy())
-
-    return dest_table
-
-
-def get_table_from_name(*, schema: str | None, table_name: str) -> Table:
-    """Get a new Table instance with the given schema and table name from the registry.
-
-    :param schema: Optional schema name.
-    :param table_name: Name of the table to retrieve (case-insensitive).
-    :return: A new SQLAlchemy Table instance.
-    """
-    all_tables = get_all_tables_by_name()
-    if table_name not in all_tables:
-        lower_map = {k.lower(): k for k in all_tables}
-        if table_name.lower() in lower_map:
-            table_name = lower_map[table_name.lower()]
-        else:
-            raise KeyError(f"No table definition found for '{table_name}'.")
-    return get_table_with_schema(schema, all_tables[table_name])
+    return Table(
+        name,
+        metadata,
+        Column("version", Integer, primary_key=True, nullable=False),
+        Column("applied_at", DateTime(timezone=True), nullable=False),
+    )
 
 
 def get_all_tables_by_name() -> dict[str, Table]:
-    """Return a dictionary of all tables, combining general and job-list tables."""
+    """Return the module-level tables with a fixed name, keyed by name.
+
+    These are created once at import time, even when a factory such as
+    :func:`create_wrapper_tables` builds them. Per-target tables such as the
+    schema-version table are built at runtime for each target and schema, so
+    they are not registered here.
+    """
     return {**GENERALTABLES, **JOBLISTTABLES}
 
 
