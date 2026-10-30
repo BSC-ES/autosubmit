@@ -21,6 +21,7 @@ import json
 import locale
 import numbers
 import os
+import pwd
 import re
 import shutil
 import subprocess
@@ -562,7 +563,7 @@ class AutosubmitConfig:
             self._normalize_notify_on(data_fixed, job)
 
     @staticmethod
-    def _normalize_wallclock(data_fixed: {}) -> None:
+    def _normalize_wallclock(data_fixed: dict) -> None:
         """
         Normalize the wallclock time format in the job configuration.
 
@@ -570,7 +571,6 @@ class AutosubmitConfig:
         If the wallclock time is in "HH:MM:SS" format, it truncates it to "HH:MM" and logs a warning.
 
         :param data_fixed: The dictionary containing job configurations.
-        :type data_fixed: dict
         """
         for job in data_fixed.get("JOBS", {}):
             wallclock = data_fixed["JOBS"][job].get("WALLCLOCK", "")
@@ -1742,22 +1742,54 @@ class AutosubmitConfig:
         # Think of it as a tree with two branches that needs to be unified at each level
         return self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post)
 
+    def _get_experiment_owner_uid(self) -> int | None:
+        """
+        Get the UID of the owner of the experiment folder.
+
+        :return: UID of the owner if available, None if ``ROOTDIR`` is not set or cannot be read.
+        """
+        rootdir = self.experiment_data.get("ROOTDIR", None)
+        if not rootdir:
+            return None
+
+        try:
+            owner_uid = Path(rootdir).stat().st_uid
+            return owner_uid
+        except OSError as e:
+            Log.debug(f"Could not determine the owner of {rootdir}: {str(e)}")
+            return None
+
     @property
     def is_current_real_user_owner(self) -> bool:
         """
-        Check if the real user(AS_ENV_CURRENT_USER) is the owner of the experiment folder
-        :return: bool
+        Check if the real user (``AS_ENV_CURRENT_USER``) is the owner of the experiment folder.
+
+        :return: True if the real user is the owner, False otherwise.
         """
-        return Path(self.experiment_data["ROOTDIR"]).owner() == self.experiment_data["AS_ENV_CURRENT_USER"]
+        owner_uid = self._get_experiment_owner_uid()
+        real_user = self.experiment_data.get("AS_ENV_CURRENT_USER", None)
+        if owner_uid is None or not real_user:
+            return False
+
+        try:
+            real_user_uid = pwd.getpwnam(str(real_user)).pw_uid
+        except KeyError as e:
+            Log.debug(f"Could not determine the UID of the real user {real_user}: {str(e)}")
+            return False
+        
+        return owner_uid == real_user_uid
 
     @property
     def is_current_logged_user_owner(self) -> bool:
-        """Check if the current user is the owner of the experiment folder."""
-        if self.experiment_data.get("ROOTDIR", None):
-            rootdir_path = Path(self.experiment_data["ROOTDIR"])
-            return rootdir_path.exists() and rootdir_path.owner() == os.environ.get("USER", None)
-        else:
-            return False
+        """
+        Check if the current user is the owner of the experiment folder.
+
+        :return: True if the current user is the owner, False otherwise.
+        """
+        owner_uid = self._get_experiment_owner_uid()
+        current_user_uid = os.getuid()
+        
+        return owner_uid == current_user_uid
 
     @staticmethod
     def load_as_env_variables(parameters: dict[str, Any]) -> dict[str, Any]:
@@ -2378,7 +2410,7 @@ class AutosubmitConfig:
             return self.experiment_data["DEFAULT"]["HPCARCH"].upper()
         except KeyError:
             raise AutosubmitCritical(
-                "Defaul HPCARCH not defined in the configuration file", 7014
+                "Default HPCARCH not defined in the configuration file", 7014
             )
         except Exception as exc:
             raise AutosubmitCritical(

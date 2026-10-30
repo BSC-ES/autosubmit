@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -255,4 +255,3 @@ def test_database_backup_dump_can_be_restored(job_data_paths: JobDataPaths, mock
         restored.executescript(job_data_paths.sql.read_text())
         rows = restored.execute("SELECT platform_output FROM job_data ORDER BY id").fetchall()
     assert rows == _JOB_DATA_ROWS
-

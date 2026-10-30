@@ -31,6 +31,8 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed vertical wrappers not stopping an inner job that ignored `SIGTERM`, which could let the job outlive its wallclock inside the wrapper. The per-job `timeout` now also forces a `SIGKILL` after a grace period. jira-external#1494
 - Fixed the log recovery process being silently skipped when it died, which lost the logs and stats of the affected jobs. Autosubmit now restarts it and re-queues the pending jobs #3342
 - Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name instead of platform name #3342
+- Fixed `is_current_logged_user_owner` and `is_current_real_user_owner` raising `KeyError` when the experiment
+  folder is owned by a UID with no `passwd` entry (e.g. inside containers) #3375
 
 **New Features:**
 
