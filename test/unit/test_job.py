@@ -2560,7 +2560,19 @@ def test_check_completion(completed_names, default_status, expected, mocker):
     platform.get_completed_job_names.assert_called_once_with([job.name])
 
 
-def test_update_platform_associated_parameters(mocker):
+@pytest.mark.parametrize(
+    ("exclusivity_parameters", "expected_exclusive"),
+    [
+        ({"CURRENT_EXCLUSIVE": True}, True),
+        ({"CURRENT_EXCLUSIVITY": True}, True),
+        ({"CURRENT_EXCLUSIVE": False, "CURRENT_EXCLUSIVITY": True}, False),
+    ],
+)
+def test_update_platform_associated_parameters(
+    mocker,
+    exclusivity_parameters,
+    expected_exclusive,
+):
     job = Job("A", 1, Status.WAITING, 0)
     as_conf = mocker.MagicMock(spec=AutosubmitConfig)
     as_conf.get_project_type.return_value = "none"
@@ -2574,7 +2586,7 @@ def test_update_platform_associated_parameters(mocker):
         "CURRENT_SHAPE": "rect",
         "CURRENT_PROCESSORS_PER_NODE": "2",
         "CURRENT_NODES": "1",
-        "CURRENT_EXCLUSIVE": True,
+        **exclusivity_parameters,
         "CURRENT_THREADS": "8",
         "CURRENT_TASKS": "16",
         "CURRENT_RESERVATION": "resv",
@@ -2606,7 +2618,7 @@ def test_update_platform_associated_parameters(mocker):
     assert job.shape == "rect"
     assert job.processors_per_node == "2"
     assert job.nodes == "1"
-    assert job.exclusive is True
+    assert job.exclusive is expected_exclusive
     assert job.threads == "8"
     assert job.tasks == "16"
     assert job.reservation == "resv"
