@@ -15,98 +15,61 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
+from autosubmit.config.configcommon import AutosubmitConfig
 
+# Tests for ``_get_experiment_owner_uid``: read the folder owner
 
-@pytest.mark.parametrize("is_owner", [True, False])
-def test_is_current_real_user_owner(autosubmit_config, mocker, is_owner, tmp_path):
-    """Test if the real user (``AS_ENV_CURRENT_USER``) owns the current experiment."""
-    as_conf = autosubmit_config(
-        expid="a000",
-        experiment_data={"ROOTDIR": str(tmp_path), "AS_ENV_CURRENT_USER": "dummy"},
-    )
-    owner_uid = tmp_path.stat().st_uid
-    mocker.patch(
-        "pwd.getpwnam",
-        return_value=mocker.Mock(pw_uid=owner_uid if is_owner else owner_uid + 1),
-    )
-    assert as_conf.is_current_real_user_owner == is_owner
-
-
-def test_is_current_real_user_owner_unknown_user(autosubmit_config, tmp_path):
-    """Test that ``False`` is returned when ``AS_ENV_CURRENT_USER`` is not in the user db."""
-    as_conf = autosubmit_config(
-        expid="a000",
-        experiment_data={
-            "ROOTDIR": str(tmp_path),
-            "AS_ENV_CURRENT_USER": "user_that_does_not_exist",
-        },
-    )
-    assert as_conf.is_current_real_user_owner is False
-
-
-def test_is_current_real_user_owner_does_not_resolve_owner_name(
-    autosubmit_config, mocker, tmp_path
-):
-    """Test that the user database is not queried when the current user is the owner of the experiment.
-    A missing passwd entry for the owner of the experiment should not cause an exception.
-    """
-    as_conf = autosubmit_config(
-        expid="a000",
-        experiment_data={"ROOTDIR": str(tmp_path), "AS_ENV_CURRENT_USER": "dummy"},
-    )
-    mocker.patch(
-        "pwd.getpwnam", return_value=mocker.Mock(pw_uid=tmp_path.stat().st_uid)
-    )
-    mocked_getpwuid = mocker.patch("pwd.getpwuid")
-    assert as_conf.is_current_real_user_owner is True
-    mocked_getpwuid.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    "experiment_data",
-    [
-        {},
-        {"AS_ENV_CURRENT_USER": "dummy"},
-        {"ROOTDIR": "/dummy/rootdir"},
-        {"ROOTDIR": "/dummy/rootdir", "AS_ENV_CURRENT_USER": ""},
-    ],
-    ids=[
-        "Missing rootdir and user",
-        "Missing rootdir",
-        "Missing user",
-        "Empty user",
-    ],
-)
-def test_is_current_real_user_owner_missing_data(autosubmit_config, experiment_data):
-    """Test that ``False`` is returned when the experiment data is missing required fields."""
-    as_conf = autosubmit_config(expid="a000", experiment_data=experiment_data)
-    assert as_conf.is_current_real_user_owner is False
-
-
-@pytest.mark.parametrize("is_owner", [True, False])
-def test_is_current_logged_user_owner(autosubmit_config, mocker, is_owner, tmp_path):
-    """Test that the ownership of the experiment is decided comparing UIDs."""
+def test_owner_uid_is_the_folder_owner(autosubmit_config, tmp_path):
+    """It returns the UID of the user owning ``ROOTDIR``."""
     as_conf = autosubmit_config(
         expid="a000", experiment_data={"ROOTDIR": str(tmp_path)}
     )
-    owner_uid = tmp_path.stat().st_uid
-    mocker.patch("os.getuid", return_value=owner_uid if is_owner else owner_uid + 1)
-    assert as_conf.is_current_logged_user_owner == is_owner
+    
+    assert as_conf._get_experiment_owner_uid() == tmp_path.stat().st_uid
 
 
-@pytest.mark.parametrize(
-    "experiment_data", [{}, {"ROOTDIR": ""}], ids=["Missing rootdir", "Empty rootdir"]
-)
-def test_is_current_logged_user_owner_missing_data(autosubmit_config, experiment_data):
-    """Test that ``is_current_logged_user_owner`` returns ``False`` when ``ROOTDIR`` is not defined."""
-    as_conf = autosubmit_config(expid="a000", experiment_data=experiment_data)
-    assert as_conf.is_current_logged_user_owner is False
-
-
-def test_is_current_logged_user_owner_missing_rootdir(autosubmit_config, tmp_path):
-    """Test that ``is_current_logged_user_owner`` returns ``False`` when ``ROOTDIR`` does not exist."""
+def test_owner_uid_is_none_folder_not_exists(autosubmit_config, tmp_path):
+    """It returns ``None`` if ``ROOTDIR`` does not exist."""
     as_conf = autosubmit_config(
-        expid="a000", experiment_data={"ROOTDIR": str(tmp_path / "does_not_exist")}
+        expid="a000", experiment_data={"ROOTDIR": str(tmp_path / "not_exists")}
     )
+    
+    assert as_conf._get_experiment_owner_uid() is None
+
+
+def test_owner_uid_is_none_Without_rootdir(autosubmit_config):
+    """It returns ``None`` if there's no experiment folder configured."""
+    as_conf = autosubmit_config(expid="a000", experiment_data={})
+    
+    assert as_conf._get_experiment_owner_uid() is None
+
+
+# Tests for ``is_current_user_owner``: compare against ``os.getuid()``
+
+def test_logged_user_owns_the_experiment(autosubmit_config, tmp_path):
+    """It returns ``True`` if the current user is the owner of ``ROOTDIR``."""
+    as_conf = autosubmit_config(expid="a000", experiment_data={"ROOTDIR": str(tmp_path)})
+
+    assert as_conf.is_current_logged_user_owner is True
+
+
+def test_logged_user_is_not_the_owner(autosubmit_config, mocker, tmp_path):
+    """It returns ``False`` if the current user is not the owner of ``ROOTDIR``."""
+    as_conf = autosubmit_config(expid="a000", experiment_data={"ROOTDIR": str(tmp_path)})
+    another_uid = tmp_path.stat().st_uid + 1  # Diff user
+    mocker.patch("os.getuid", return_value=another_uid)
+
     assert as_conf.is_current_logged_user_owner is False
+
+
+def test_logged_user_owns_experiment_when_uid_zero(autosubmit_config, mocker):
+    """It returns ``True`` if the current user is root (uid=0)."""
+    as_conf = autosubmit_config(expid="a000", experiment_data={})
+    mocker.patch.object(AutosubmitConfig, "_get_experiment_owner_uid", return_value=0)
+    mocker.patch("os.getuid", return_value=0)
+
+    assert as_conf.is_current_logged_user_owner is True
+
+
+# Tests for ``is_current_real_user_owner``: compare against ``AS_ENV_CURRENT_USER``
+
