@@ -1768,7 +1768,7 @@ class AutosubmitConfig:
         """
         owner_uid = self._get_experiment_owner_uid()
         real_user = self.experiment_data.get("AS_ENV_CURRENT_USER", None)
-        if not owner_uid or not real_user:
+        if owner_uid is None or not real_user:
             return False
 
         try:
