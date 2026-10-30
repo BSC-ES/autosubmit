@@ -88,7 +88,7 @@ def test_is_current_real_user_owner_missing_data(autosubmit_config, experiment_d
 def test_is_current_logged_user_owner(autosubmit_config, mocker, is_owner, tmp_path):
     """Test that the ownership of the experiment is decided comparing UIDs."""
     as_conf = autosubmit_config(
-        expid="a000", experiment_data={"ROOTDIR": f"{str(tmp_path)}"}
+        expid="a000", experiment_data={"ROOTDIR": str(tmp_path)}
     )
     owner_uid = tmp_path.stat().st_uid
     mocker.patch("os.getuid", return_value=owner_uid if is_owner else owner_uid + 1)
