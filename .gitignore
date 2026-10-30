@@ -29,6 +29,13 @@ test/htmlcov
 # Docker
 dockerfiles/id_rsa*
 dockerfiles/authorized_keys
+# Ignore Autosubmit experiment data, but retain the directory.
+docker/postgres/experiments/*
+!docker/postgres/experiments/.gitkeep
+docker/postgres/logs/*
+!docker/postgres/logs/.gitkeep
+docker/postgres/metadata/*
+!docker/postgres/metadata/.gitkeep
 
 # Manual pages
 man/

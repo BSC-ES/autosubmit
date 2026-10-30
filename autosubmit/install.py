@@ -70,13 +70,11 @@ def create_required_directories() -> None:
     directories = _get_required_directories()
     _create_directories(directories)
 
+    directory_list = "\n".join(f"  {directory}" for directory in directories)
+
     Log.result(
-        "\n".join(
-            [
-                "Directories have been created and configured successfully:",
-                *map(str, directories),
-            ]
-        )
+        "Autosubmit directory structure has been initialized successfully:\n"
+        f"{directory_list}\n"
     )
 
 
