@@ -957,8 +957,21 @@ def test_update_parameters_attributes(autosubmit_config, experiment_data, attrib
     ("test_str", "both", ["test_str"]),
     (['test_list', 'test_list2'], "current_directive", ['test_list', 'test_list2']),
     ("['test_str_list', 'test_str_list2']", "job", ['test_str_list', 'test_str_list2']),
+    (['test_list', 'test_list2'], "self_current_directive", ['test_list', 'test_list2']),
+    ("test_str", "self_current_directive", ["test_str"]),
+    (['test_list', 'test_list2'], "self_current_directive_lowercase", ['test_list', 'test_list2']),
+    (['test_list', 'test_list2'], "self_current_directive_whitespace", ['test_list', 'test_list2']),
+    (None, "self_current_directive_no_platform_value", []),
+    (['test_list', 'test_list2'], "wrapper_self_current_directive", ['test_list', 'test_list2']),
+    (['test_list', 'test_list2'], "wrapper_self_current_directive_over_job", ['test_list', 'test_list2']),
 ], ids=["Test str - platform", "test_list - platform", "test_list - job", "test_str - job", "test_list - both",
-        "test_str - both", "test_list - job - current_directive", "test_str_list - current_directive"])
+        "test_str - both", "test_list - job - current_directive", "test_str_list - current_directive",
+        "test_list - job - self_current_directive", "test_str - job - self_current_directive",
+        "test_list - job - self_current_directive_lowercase",
+        "test_list - job - self_current_directive_whitespace",
+        "no directives - job - self_current_directive_no_platform_value",
+        "test_list - wrapper - self_current_directive",
+        "test_list - wrapper - self_current_directive_over_job"])
 def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines, mocker, autosubmit_config):
     file_stat = os.stat(f"{tmpdir.strpath}")
     file_owner_id = file_stat.st_uid
@@ -1008,12 +1021,43 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
     elif test_type == "current_directive":
         experiment_data['PLATFORMS']['dummy_platform']['APP_CUSTOM_DIRECTIVES'] = custom_directives
         experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_APP_CUSTOM_DIRECTIVES%"
+    elif test_type == "self_current_directive":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_CUSTOM_DIRECTIVES%"
+    elif test_type == "self_current_directive_lowercase":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%current_custom_directives%"
+    elif test_type == "self_current_directive_whitespace":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "  %CURRENT_CUSTOM_DIRECTIVES%  "
+    elif test_type == "self_current_directive_no_platform_value":
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_CUSTOM_DIRECTIVES%"
+    elif test_type == "wrapper_self_current_directive":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['WRAPPERS'] = {
+            'WRAPPER_0': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'RANDOM-SECTION',
+                'CUSTOM_DIRECTIVES': "%CURRENT_CUSTOM_DIRECTIVES%",
+            },
+        }
+    elif test_type == "wrapper_self_current_directive_over_job":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = ['#SBATCH --platform-only']
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['WRAPPERS'] = {
+            'WRAPPER_0': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'RANDOM-SECTION',
+                'CUSTOM_DIRECTIVES': "%CURRENT_CUSTOM_DIRECTIVES%",
+            },
+        }
     job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data, "slurm")
     mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
     template_content, _ = job.update_content(as_conf, parameters)
     for directive in result_by_lines:
         pattern = r'^\s*' + re.escape(directive) + r'\s*$'  # Match Start line, match directive, match end line
         assert re.search(pattern, template_content, re.MULTILINE) is not None
+    assert "%current_custom_directives%" not in template_content.lower()
 
 
 @pytest.mark.parametrize('experiment_data', [(
