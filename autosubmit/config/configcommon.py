@@ -1742,6 +1742,23 @@ class AutosubmitConfig:
         # Think of it as a tree with two branches that needs to be unified at each level
         return self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post)
 
+    def _get_experiment_owner_uid(self) -> int | None:
+        """
+        Get the UID of the owner of the experiment folder.
+
+        :return: UID of the owner if available, None if ``ROOTDIR`` is not set or cannot be read.
+        """
+        rootdir = self.experiment_data.get("ROOTDIR", None)
+        if not rootdir:
+            return None
+
+        try:
+            owner_uid = Path(rootdir).stat().st_uid
+            return owner_uid
+        except OSError as e:
+            Log.debug(f"Could not determine the owner of {rootdir}: {str(e)}")
+            return None
+
     @property
     def is_current_real_user_owner(self) -> bool:
         """
@@ -1749,17 +1766,17 @@ class AutosubmitConfig:
 
         :return: True if the real user is the owner, False otherwise.
         """
-        rootdir = self.experiment_data.get("ROOTDIR", None)
+        owner_uid = self._get_experiment_owner_uid()
         real_user = self.experiment_data.get("AS_ENV_CURRENT_USER", None)
-        if not rootdir or not real_user:
+        if not owner_uid or not real_user:
             return False
 
         try:
-            owner_uid = Path(rootdir).stat().st_uid
             real_user_uid = pwd.getpwnam(str(real_user)).pw_uid
-        except (KeyError, OSError) as e:
-            Log.debug(f"Could not determine the owner of {rootdir} or the UID of {real_user}: {str(e)}")
+        except KeyError as e:
+            Log.debug(f"Could not determine the UID of the real user {real_user}: {str(e)}")
             return False
+        
         return owner_uid == real_user_uid
 
     @property
@@ -1769,15 +1786,10 @@ class AutosubmitConfig:
 
         :return: True if the current user is the owner, False otherwise.
         """
-        rootdir = self.experiment_data.get("ROOTDIR", None)
-        if not rootdir:
-            return False
-
-        try:
-            return Path(rootdir).stat().st_uid == os.getuid()
-        except OSError as e:
-            Log.debug(f"Could not determine the owner of {rootdir}: {str(e)}")
-            return False
+        owner_uid = self._get_experiment_owner_uid()
+        current_user_uid = os.getuid()
+        
+        return owner_uid == current_user_uid
 
     @staticmethod
     def load_as_env_variables(parameters: dict[str, Any]) -> dict[str, Any]:
