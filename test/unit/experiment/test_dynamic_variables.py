@@ -94,6 +94,43 @@ def test_dynamic_variable_deep_add_missing_starter_conf(
 
 
 @pytest.mark.parametrize(
+    "experiment_data",
+    [
+        {
+            "A": {
+                "SCRIPT": "echo %% %CURRENT_SCRIPT%",
+                "CHUNK": "%CHUNK%"
+            },
+        },
+        {
+            "A": {
+                "SCRIPT": "echo % %CURRENT_SCRIPT%",
+                "CHUNK": "%CHUNK%"
+            },
+        },
+    ],
+    ids=[
+        "Special Dynamic Variable with whitespace and double %",
+        "Special Dynamic Variable with whitespace and single %",
+    ],
+)
+def test_empty_dynamic_variable_deep_add_missing_starter_conf(
+    autosubmit_config, general_data, experiment_data
+):
+    as_conf = autosubmit_config(
+        "t000",
+        {
+            "PLATFORMS": experiment_data,
+        },
+    )
+    with pytest.raises(AutosubmitCritical) as ac:
+        as_conf.experiment_data = as_conf.deep_add_missing_starter_conf(
+            general_data, as_conf.experiment_data
+        )
+    assert "where empty dynamic variable was set" in ac.value.message
+
+
+@pytest.mark.parametrize(
     "new_data",
     [
         {
@@ -130,7 +167,10 @@ def test_dynamic_variable_deep_add_missing_starter_conf(
         },
         {
             "JOBS": {
-                "A": {"SCRIPT": "OK %TEST.CURRENT_TE_ME%", "CHUNK": "%CHUNK%"},
+                "A": {
+                    "SCRIPT": "OK %TEST.CURRENT_TE_ME%",
+                    "CHUNK": "%CHUNK%"
+                },
             },
             "TEST": {
                 "NAME": "AUTOSUBMIT",
@@ -330,6 +370,24 @@ def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, ne
                 },
             },
         ),
+        (
+            {
+                "JOBS": {
+                    "TEST": {
+                        "NAME": "BLA",
+                        "T_NAME": "Hi %TEST.TEST_NAME%",
+                    },
+                },
+            },
+            {
+                "JOBS": {
+                    "TEST": {
+                        "NAME": "BLA",
+                        "T_NAME": "Hi %TEST.TEST_NAME%",
+                    },
+                },
+            },
+        ),
     ],
     ids=[
         "Special Dynamic Variable",
@@ -340,6 +398,7 @@ def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, ne
         "Data Format",
         "No substitution",
         "Double %% to variables",
+        "Non Loop",
     ],
 )
 def test_finite_loop_dynamic_variable_unify_conf(autosubmit_config, new_data, result):

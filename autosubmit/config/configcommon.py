@@ -1963,12 +1963,17 @@ class AutosubmitConfig:
             # However, special variables start with `^` that can break this logic since
             # it becomes part of the generated reference name.
             key_experiment_data = experiment_data[key]
-            if isinstance(key_experiment_data, str) and REFERENCE_PATTERN.findall(key_experiment_data):
+            dynamic_variables = REFERENCE_PATTERN.findall(key_experiment_data)
+            if isinstance(key_experiment_data, str) and dynamic_variables is not None:
                 try:
-                    check_value = key_experiment_data.split("%")[1]
-                    special_var = check_value[0] == "^"
-                    if key.casefold() == check_value[8:].casefold() or (special_var and key.casefold() == check_value[9:].casefold()):
-                        raise AutosubmitCritical(f"Dynamic variable {key} causing infinite recursion during evaluation of the element {key_experiment_data}")
+                    for check_value in dynamic_variables:
+                        check_value = check_value.strip()
+                        if len(check_value) == 0:
+                            raise AutosubmitCritical(f"Invalid value for key '{key}', where empty dynamic variable was set")
+                        if ((check_value[0] == "^" and key.casefold() == check_value[9:].casefold()) or
+                            key.casefold() == check_value[8:].casefold()
+                        ):
+                                raise AutosubmitCritical(f"Dynamic variable {key} causing infinite recursion during evaluation of the element {key_experiment_data}")
                 except IndexError:
                     raise AutosubmitCritical(f"Invalid value for key '{key}': {key_experiment_data}")
         return experiment_data
