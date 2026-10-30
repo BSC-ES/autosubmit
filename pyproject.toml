@@ -72,7 +72,7 @@ Documentation = "https://autosubmit.readthedocs.io/"
 [project.optional-dependencies]
 postgres = ["psycopg", "psycopg2"]
 lint = [
-    "ruff==0.17.2",
+    "ruff==0.17.3",
 ]
 tests = [
     # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
