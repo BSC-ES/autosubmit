@@ -1789,6 +1789,8 @@ class Job:
         parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', self.platform.get_files_path())
 
         for key, value in as_conf.jobs_data[self.section].items():
+            if isinstance(value, str) and value.strip().upper() == f"%CURRENT_{key.upper()}%":
+                continue
             parameters[f"CURRENT_{key.upper()}"] = value
 
         for key, value in as_conf.get_current_wrapper(self.section).items():
@@ -1804,6 +1806,8 @@ class Job:
                 "min_wrapped_v",
                 "policy"
             ]:
+                if isinstance(value, str) and value.strip().upper() == f"%CURRENT_{key.upper()}%":
+                    continue
                 parameters[f"CURRENT_{key.upper()}"] = value
 
         parameters["CURRENT_METRIC_FOLDER"] = self.get_metric_folder(as_conf=as_conf)
