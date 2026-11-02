@@ -54,7 +54,7 @@ def generate_scripts_andor_wrappers(
     """
     # We don't want to store inspect/-cw related jobs and edges stuff
     job_list.disable_save = True
-    Log.warning("Generating the auxiliary job_list used for the -CW flag.")
+    Log.warning("Generating the auxiliary job list used by the -cw flag.")
     date_list = as_conf.get_date_list()
     if len(date_list) != len(set(date_list)):
         raise AutosubmitCritical("There are repeated start dates!", 7014)

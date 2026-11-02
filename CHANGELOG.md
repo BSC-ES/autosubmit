@@ -32,6 +32,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed the log recovery process being silently skipped when it died, which lost the logs and stats of the affected jobs. Autosubmit now restarts it and re-queues the pending jobs #3342
 - Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name instead of platform name #3342
 - Fix job and wrapper values like `%CURRENT_CUSTOM_DIRECTIVES%` overwriting the platform value they reference #3286
+- Fix the -cw flag name and wording in the scheduler warning #3393 (thanks @bfs2021)
 
 **New Features:**
 
