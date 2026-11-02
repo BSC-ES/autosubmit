@@ -54,7 +54,9 @@ def generate_scripts_andor_wrappers(
     """
     # We don't want to store inspect/-cw related jobs and edges stuff
     job_list.disable_save = True
-    Log.warning("Generating the auxiliary job_list used for the -CW flag.")
+    Log.warning(
+        "Generating the auxiliary job list because of the -cw/--check_wrapper flag."
+    )
     date_list = as_conf.get_date_list()
     if len(date_list) != len(set(date_list)):
         raise AutosubmitCritical("There are repeated start dates!", 7014)
@@ -65,7 +67,7 @@ def generate_scripts_andor_wrappers(
         if type(wrapper_data) is not dict:
             continue
         wrapper_jobs[wrapper_section] = as_conf.get_wrapper_jobs(wrapper_data)
-    Log.info("Aux Job_list was generated successfully")
+    Log.info("Auxiliary job list was generated successfully")
 
     # Load platforms.
     submitter = ParamikoSubmitter(as_conf=as_conf)

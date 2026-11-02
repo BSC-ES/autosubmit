@@ -3530,7 +3530,7 @@ class JobList:
     def assign_unique_fake_id(self, package: Any, max_retries: int = 2) -> None:
         """Assign a unique fake ID to all jobs in the package, ensuring no collision with existing IDs.
 
-        This is for the -CW flag, as the wrapper won't be really submitted.
+        This is for the -cw/--check_wrapper flag, as the wrapper won't be really submitted.
 
         the wrappers.id db field has a non-nullable flag
 
