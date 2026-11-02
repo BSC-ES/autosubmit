@@ -448,13 +448,14 @@ def slurm_server(
     """Function-scoped fixture that creates a Slurm server container per test."""
     # Patch multiprocessing start method to 'fork' in test environment so child worker processes
     # inherit active pytest fixtures, monkeypatches, and in-memory mock dispatchers (Platform defaults to 'spawn').
+    from time import perf_counter
+
     fork_context = multiprocessing.get_context("fork")
 
     mocker.patch(
         "autosubmit.platforms.platform.multiprocessing.get_context",
         return_value=fork_context,
     )
-    from time import perf_counter
 
     fork_context = multiprocessing.get_context("fork")
 

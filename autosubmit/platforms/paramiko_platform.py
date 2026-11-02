@@ -800,7 +800,7 @@ class ParamikoPlatform(Platform):
         :param filename: file name
         :return: True if successful or file does not exist
         """
-        remote_file = Path(self.files_path) / filename
+        remote_file = self.files_path / filename
         try:
             self._ftpChannel.remove(str(remote_file))
             return True

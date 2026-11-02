@@ -319,7 +319,7 @@ class LocalPlatform(ParamikoPlatform):
             if must_exist:
                 raise AutosubmitError(f"File {path_root / src} does not exist", 6004, str(e))
             else:
-                Log.debug(f"File {path_root} does not exist ")
+                Log.debug(f"File {str(path_root)} does not exist ")
                 return False
         except Exception as e:
             if str(e) in "Garbage":

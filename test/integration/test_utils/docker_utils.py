@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Utilities for Docker."""
-
 import multiprocessing
 from getpass import getuser
 from os import environ
@@ -375,12 +374,18 @@ def _write_authorized_keys(
 def prepare_and_test_ssh_container(
     container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: "MockerFixture"
 ) -> None:
+    fork_context = multiprocessing.get_context("fork")
+
+    mocker.patch(
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
+    )
+
     exec_result = container.exec("whoami")
     if exec_result.exit_code != 0:
         raise RuntimeError(
             f"Failed to run whoami on test container {container.get_wrapped_container().id}"
         )
-
     container.exec(
         [
             "bash",

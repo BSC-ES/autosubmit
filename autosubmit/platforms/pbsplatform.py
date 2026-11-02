@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
@@ -369,7 +368,6 @@ class PBSPlatform(ParamikoPlatform):
         wrapper_failed: bool = False,
         sleeptime: int = 5,
         max_retries: int = 3,
-        show_logs: bool = True,
     ):
         """Check if a file exists on the FTP server.
 
@@ -377,7 +375,6 @@ class PBSPlatform(ParamikoPlatform):
         :param wrapper_failed: Whether the wrapper has failed. Defaults to False.
         :param sleeptime: Time to sleep between retries in seconds. Defaults to 5.
         :param max_retries: Maximum number of retries. Defaults to 3.
-        :param show_logs:
         :return: True if the file exists, False otherwise
         """
 
@@ -386,8 +383,7 @@ class PBSPlatform(ParamikoPlatform):
         while not file_exist and retries < max_retries:
             try:
                 # This return IOError if a path does not exist
-                self._ftpChannel.stat(os.path.join(
-                    self.files_path, src))
+                self._ftpChannel.stat(str(self.files_path / src))
                 file_exist = True
             except OSError:  # File does not exist, retry in sleeptime
                 sleep(sleeptime)

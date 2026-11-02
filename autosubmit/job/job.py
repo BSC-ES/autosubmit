@@ -1444,7 +1444,7 @@ class Job:
             Log.printlog(f"Trace {e} \n Failed to retrieve log file for job {self.name}", 6000)
         return remote_logs
 
-    def check_remote_log_exists(self, show_logs: bool = False) -> bool:
+    def check_remote_log_exists(self) -> bool:
         """Checks if remote log file exists on remote host
 
         :param show_logs: Whether to show logs during the check
