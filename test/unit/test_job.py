@@ -2146,11 +2146,11 @@ def test_update_parameters(autosubmit_config, experiment_data, local, tmp_path):
                              'CURRENT_EC_QUEUE': '', 'CURRENT_EXCLUSIVITY': '', 'CURRENT_EXTENDED_HEADER_PATH': 'bla',
                              'CURRENT_EXTENDED_TAILER_PATH': 'bla2', 'CURRENT_FILE': 'test.sh', 'CURRENT_HOST': '',
                              'CURRENT_HYPERTHREADING': False, 'CURRENT_METRIC_FOLDER': f'{tmp_path.parent}/test_update_parameters0/scratch/t000/tmp/LOG_t000/test_job',
-                             'CURRENT_PLATFORM': 'DUMMY_PLATFORM', 'CURRENT_PROJ': '', 'CURRENT_PROJ_DIR': '',
+                             'CURRENT_PLATFORM': 'DUMMY_PLATFORM', 'CURRENT_PROJ': '', 'CURRENT_PROJ_DIR': Path(''),
                              'CURRENT_QUEUE': '', 'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3,
-                             'CURRENT_ROOTDIR': local.root_dir, 'CURRENT_RUNNING': 'chunk', 'CURRENT_SCRATCH_DIR': '',
+                             'CURRENT_ROOTDIR': local.root_dir, 'CURRENT_RUNNING': 'chunk', 'CURRENT_SCRATCH_DIR': Path(''),
                              'CURRENT_TYPE': 'ps', 'CURRENT_USER': '', 'CURRENT_WRAPPER_TYPE': 'vertical',
-                             'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT', 'CURRENT_LOGDIR': str(local.files_path)}
+                             'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT', 'CURRENT_LOGDIR': Path(local.files_path)}
     for key, value in parameters.items():
         if key.startswith("CURRENT_"):
             assert value == expected_current_only[key]
@@ -2255,19 +2255,18 @@ def test_update_status(create_jobs: list[Job], status: Status,
     assert job.status == status
 
 
-@pytest.mark.parametrize("show_logs,exists",
-                         [
-                             (True, True),
-                             (True, False),
-                             (False, True),
-                             (False, False)
-                         ], ids=[
-        "show_logs=True, exists=True",
-        "show_logs=True, exists=False",
-        "show_logs=False, exists=True",
-        "show_logs=False, exists=False"
-    ])
-def test_check_remote_log_exists(tmp_path, show_logs: bool, exists, autosubmit_config: 'AutosubmitConfigFactory', mocker):
+@pytest.mark.parametrize(
+    "exists",
+    [
+        True,
+        False,
+    ],
+    ids=[
+        "exists=True",
+        "exists=False",
+    ],
+)
+def test_check_remote_log_exists(tmp_path, exists, autosubmit_config: 'AutosubmitConfigFactory', mocker):
     platform = SlurmPlatform(expid='a000', name='slurm', config={'LOCAL_ROOT_DIR': str(tmp_path), 'LOCAL_ASLOG_DIR': 'logs'})
 
     job = Job('some', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
@@ -2286,7 +2285,7 @@ def test_check_remote_log_exists(tmp_path, show_logs: bool, exists, autosubmit_c
     job.platform = platform
     job.remote_logs = (str(platform.remote_log_dir / 'some.out'), str(platform.remote_log_dir / 'some.err'))
 
-    log = job.check_remote_log_exists(show_logs=show_logs)
+    log = job.check_remote_log_exists()
     if exists:
         assert log
     else:

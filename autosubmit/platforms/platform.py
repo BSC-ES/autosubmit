@@ -722,7 +722,8 @@ class Platform(ABC):
         return False
 
     @property
-    def files_path(self) -> str:
+    @autosubmit_parameter(name="current_logdir")
+    def files_path(self) -> Path:
         """The platform's LOG directory.
 
         :autosubmit-group: JOB
