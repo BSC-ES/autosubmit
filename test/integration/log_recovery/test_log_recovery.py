@@ -101,7 +101,7 @@ def test_log_recovery_no_keep_alive(prepare_test, local, as_conf: 'AutosubmitCon
     local.cleanup_event.set()
 
 
-def test_log_recovery_keep_alive(prepare_test, local, as_conf):
+def test_log_recovery_keep_alive(prepare_test, local, as_conf: 'AutosubmitConfig'):
     local.config["LOG_RECOVERY_TIMEOUT"] = 1
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
@@ -114,7 +114,7 @@ def test_log_recovery_keep_alive(prepare_test, local, as_conf):
     assert not local.log_recovery_process.is_alive()
 
 
-def test_log_recovery_keep_alive_cleanup(prepare_test, local, as_conf):
+def test_log_recovery_keep_alive_cleanup(prepare_test, local, as_conf: 'AutosubmitConfig'):
     local.config["LOG_RECOVERY_TIMEOUT"] = 0
     local.spawn_log_retrieval_process(as_conf)
     local.cleanup_event.set()
@@ -448,7 +448,7 @@ def test_add_job_returns_false_without_queueing(local, as_conf, job_id, disable_
     assert job.updated_log == 0
 
 
-def test_clean_log_recovery_process_with_dead_child(local, as_conf):
+def test_clean_log_recovery_process_with_dead_child(local, as_conf: 'AutosubmitConfig'):
     """Verify clean-up does not hang when child has crashed."""
     local.config["LOG_RECOVERY_TIMEOUT"] = 1
     local.spawn_log_retrieval_process(as_conf)
@@ -463,7 +463,7 @@ def test_clean_log_recovery_process_with_dead_child(local, as_conf):
     assert local.log_recovery_process is None
 
 
-def test_add_job_to_log_recover_respawns_dead_process(local, as_conf, mocker):
+def test_add_job_to_log_recover_respawns_dead_process(local, as_conf):
     """Issue #3342: a dead log recovery process must be respawned, not silently dropped."""
     local.config["LOG_RECOVERY_TIMEOUT"] = 10
     local.spawn_log_retrieval_process(as_conf)
