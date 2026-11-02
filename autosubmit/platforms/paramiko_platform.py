@@ -676,7 +676,7 @@ class ParamikoPlatform(Platform):
             )
             os.chmod(multiple_delete_previous_run, 0o770)
             self.send_file(multiple_delete_previous_run, False)
-            command = str(Path(self.files_path) / "multiple_delete_previous_run.sh")
+            command = str(self.files_path / "multiple_delete_previous_run.sh")
             if self.send_command(command, ignore_log=True):
                 return self._ssh_output
         return ""
@@ -686,7 +686,7 @@ class ParamikoPlatform(Platform):
             self.check_remote_log_dir()
             self.delete_file(str(filename))
         local_path = str(Path(self.tmp_path) / filename)
-        remote_path = str(Path(self.files_path) / Path(filename).name)
+        remote_path = str(self.files_path / Path(filename).name)
         try:
             self._ftpChannel.put(local_path, remote_path)
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
@@ -761,7 +761,7 @@ class ParamikoPlatform(Platform):
         file_path = local_path / filename
         if file_path.exists():
             file_path.unlink()
-        remote_path = str(Path(self.files_path) / filename)
+        remote_path = str(self.files_path / filename)
         try:
             self._ftpChannel.get(remote_path, str(file_path))
 
@@ -800,7 +800,7 @@ class ParamikoPlatform(Platform):
         :param filename: file name
         :return: True if successful or file does not exist
         """
-        remote_file = Path(self.files_path) / filename
+        remote_file = self.files_path / filename
         try:
             self._ftpChannel.remove(str(remote_file))
             return True
@@ -830,7 +830,7 @@ class ParamikoPlatform(Platform):
         """
         path_root = ""
         try:
-            path_root = Path(self.files_path)
+            path_root = self.files_path
             src = str(path_root / src)
             dest = str(path_root / dest)
             try:
@@ -856,15 +856,15 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(
-                    f"File {Path(self.files_path) / src} does not exist", 6004, str(e)
+                    f"File {self.files_path / src} does not exist", 6004, str(e)
                 )
             if must_exist:
                 raise AutosubmitError(
-                    f"File {Path(self.files_path) / src} does not exist", 6004, str(e)
+                    f"File {self.files_path / src} does not exist", 6004, str(e)
                 )
             else:
                 Log.printlog(
-                    f"Log file couldn't be moved: {Path(self.files_path) / src}", 5001
+                    f"Log file couldn't be moved: {self.files_path / src}", 5001
                 )
                 return False
 
@@ -2129,7 +2129,6 @@ class ParamikoPlatform(Platform):
         wrapper_failed: bool = False,
         sleeptime: int = 5,
         max_retries: int = 3,
-        show_logs: bool = True,
     ):
         """Checks if a file exists on the FTP server.
 
@@ -2137,7 +2136,6 @@ class ParamikoPlatform(Platform):
         :param wrapper_failed: Whether the wrapper has failed. Defaults to False.
         :param sleeptime: Time to sleep between retries in seconds. Defaults to 5.
         :param max_retries: Maximum number of retries. Defaults to 3.
-        :param show_logs: Whether to show logs if the file does not exist. Defaults to True.
         :return: True if the file exists, False otherwise
         """
 
@@ -2147,7 +2145,7 @@ class ParamikoPlatform(Platform):
         while not file_exist and retries < max_retries:
             try:
                 # This return IOError if path does not exist
-                self._ftpChannel.stat(str(Path(self.files_path, src)))
+                self._ftpChannel.stat(str(self.files_path / src))
                 file_exist = True
             except OSError:  # File does not exist, retry in sleeptime
                 if not wrapper_failed:
@@ -2163,7 +2161,7 @@ class ParamikoPlatform(Platform):
                     retries = retries + 1
                 else:
                     raise
-        if not file_exist and show_logs:
+        if not file_exist:
             Log.warning(f"File {src} couldn't be found")
         return file_exist
 

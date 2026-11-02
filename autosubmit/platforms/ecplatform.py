@@ -466,11 +466,11 @@ class EcPlatform(ParamikoPlatform):
     def send_file(self, filename, check=True) -> bool:
         self.check_remote_log_dir()
         self.delete_file(filename)
-        command = f'{self.put_cmd} {Path(self.tmp_path) / filename} {self.host}:{Path(self.files_path) / os.path.basename(filename)}'
+        command = f'{self.put_cmd} {Path(self.tmp_path) / filename} {self.host}:{self.files_path / os.path.basename(filename)}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError as e:
-            raise AutosubmitError(f"Could not send file {Path(self.tmp_path) / filename} to {Path(self.files_path) / filename}", 6005, str(e))
+            raise AutosubmitError(f"Could not send file {Path(self.tmp_path) / filename} to {self.files_path / filename}", 6005, str(e))
         return True
 
     def move_file(self, src, dest, must_exist=False):
@@ -507,7 +507,7 @@ class EcPlatform(ParamikoPlatform):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        command = f'{self.get_cmd} {self.host}:{os.path.join(self.files_path, filename)} {file_path}'
+        command = f'{self.get_cmd} {self.host}:{self.files_path / filename} {file_path}'
         try:
             retries = 0
             sleeptime = 5
@@ -560,12 +560,12 @@ class EcPlatform(ParamikoPlatform):
         return None
 
     def delete_file(self, filename: str) -> bool:
-        command = f'{self.del_cmd} {self.host}:{Path(self.files_path) / filename}'
+        command = f'{self.del_cmd} {self.host}:{self.files_path / filename}'
         try:
             FNULL = open(os.devnull, 'w')
             subprocess.check_call(command, stdout=FNULL, stderr=FNULL, shell=True)
         except subprocess.CalledProcessError:
-            Log.debug('Could not remove file {0}', os.path.join(self.files_path, filename))
+            Log.debug('Could not remove file {0}', self.files_path / filename)
             return False
         return True
 

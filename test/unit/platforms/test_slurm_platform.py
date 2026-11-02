@@ -182,5 +182,5 @@ def test_check_file_exists(mocker, slurm_platform, monkeypatch, tmp_path, exists
     assert result is exists
 
     # Check that show_logs doesn't affect to the result
-    result = slurm_platform.check_file_exists("file.txt", show_logs=False, max_retries=2, sleeptime=0)
+    result = slurm_platform.check_file_exists("file.txt", max_retries=2, sleeptime=0)
     assert result is exists

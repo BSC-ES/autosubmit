@@ -701,7 +701,7 @@ class Platform(ABC):
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
+    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3):
         return True
 
     def get_stat_file(self, job, attempt: int):
@@ -719,7 +719,8 @@ class Platform(ABC):
         return False
 
     @property
-    def files_path(self) -> str:
+    @autosubmit_parameter(name="current_logdir")
+    def files_path(self) -> Path:
         """The platform's LOG directory.
 
         :autosubmit-group: JOB
@@ -729,7 +730,7 @@ class Platform(ABC):
         else:
             path = self.remote_log_dir
 
-        return str(path)
+        return path
 
     def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):
         """Checks jobs running status

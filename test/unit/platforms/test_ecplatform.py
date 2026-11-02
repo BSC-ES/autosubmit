@@ -110,7 +110,6 @@ def test_ec_retry_count_fallback(
 
 def test_file_read_size_and_send(ec_platform: EcPlatform, mocker):
     path = ec_platform.config.get("LOCAL_ROOT_DIR")
-    # mocker.patch.object(ec_platform, "files_path", side_effect=path)
     assert isinstance(path, str)
     random_file = Path(path) / "random_file"
     assert isinstance(random_file, Path)

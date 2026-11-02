@@ -475,9 +475,7 @@ class JobPackageThread(JobPackageBase):
         self.platform.check_remote_log_dir()
         output_filepath = 'wrapper_scripts.tar'
         if callable(self.platform.remove_multiple_files):
-            filenames = ""
-            for job in self.jobs:
-                filenames += str(self.platform.remote_log_dir / f"{job.name}.cmd")
+            filenames = " ".join([str(self.platform.remote_log_dir / f"{job.name}.cmd") for job in self.jobs])
             self.platform.remove_multiple_files(filenames)
         tar_path = os.path.join(self._tmp_path, output_filepath)
         Log.debug("Compressing multiple_files")

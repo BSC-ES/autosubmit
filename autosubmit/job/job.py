@@ -1444,17 +1444,15 @@ class Job:
             Log.printlog(f"Trace {e} \n Failed to retrieve log file for job {self.name}", 6000)
         return remote_logs
 
-    def check_remote_log_exists(self, show_logs: bool = False) -> bool:
+    def check_remote_log_exists(self) -> bool:
         """Checks if remote log file exists on remote host
 
         :param show_logs: Whether to show logs during the check
         :return: True if remote log file exists, False otherwise
         """
         try:
-            out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1,
-                                                        show_logs=show_logs)
-            err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1,
-                                                        show_logs=show_logs)
+            out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1)
+            err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1)
         except OSError:
             return False
         return out_exist or err_exist
@@ -1783,10 +1781,10 @@ class Job:
         parameters['CURRENT_EXCLUSIVITY'] = parameters.get('CURRENT_EXCLUSIVITY', self.platform.exclusivity)
         parameters['CURRENT_HYPERTHREADING'] = parameters.get('CURRENT_HYPERTHREADING', self.platform.hyperthreading)
         parameters['CURRENT_TYPE'] = parameters.get('CURRENT_TYPE', self.platform.TYPE.value)
-        parameters['CURRENT_SCRATCH_DIR'] = parameters.get('CURRENT_SCRATCH_DIR', self.platform.scratch)
-        parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', str(self.platform.project_dir))
-        parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', self.platform.root_dir)
-        parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', self.platform.files_path)
+        parameters['CURRENT_SCRATCH_DIR'] = parameters.get('CURRENT_SCRATCH_DIR', Path(self.platform.scratch))
+        parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', Path(self.platform.project_dir))
+        parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', Path(self.platform.root_dir))
+        parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', Path(self.platform.files_path))
 
         for key, value in as_conf.jobs_data[self.section].items():
             if isinstance(value, str) and value.strip().upper() == f"%CURRENT_{key.upper()}%":

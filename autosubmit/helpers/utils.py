@@ -29,10 +29,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
-from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.paramiko_submitter import _get_host, get_platform_by_type
-from autosubmit.platforms.platform import Platform
-from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -334,52 +330,3 @@ def user_yes_no_query(question: str) -> bool:
             sys.stdout.write('Please respond with \'y\' or \'n\'.\n')
         except Exception as e:
             raise AutosubmitCritical("No input detected, the experiment will not be erased.", 7011, str(e))
-
-
-def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', expid: str) -> Platform:
-    """Build a minimal platform object and connect to it for STAT recovery.
-
-    :param platform_name: Name of the platform in the experiment configuration.
-    :param as_conf: Autosubmit config object.
-    :param expid: Experiment identifier.
-    :return: Connected platform instance.
-    """
-    if platform_name.lower() == PlatformType.LOCAL:
-        config = {
-            "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
-            "LOCAL_TMP_DIR": BasicConfig.LOCAL_TMP_DIR,
-        }
-        plat = LocalPlatform(expid, platform_name, config=config)
-    else:
-        platforms_data = as_conf.experiment_data.get('PLATFORMS', {})
-        platform_config = platforms_data.get(platform_name.upper(), {})
-        platform_type = platform_config.get('TYPE', '').lower()
-        platform_version = platform_config.get('VERSION', '')
-
-        plat = get_platform_by_type(
-            platform_type, expid, platform_name,
-            as_conf.experiment_data, platform_version, None
-        )
-
-        if plat is None:
-            raise AutosubmitCritical(
-                f"PLATFORMS.{platform_name.upper()}.TYPE: {platform_type} is not supported", 7012
-            )
-        plat._version = platform_version
-
-        add_project_to_host = str(platform_config.get('ADD_PROJECT_TO_HOST', False)).lower() != "false"
-        section_project = platform_config.get('PROJECT', "")
-        section_host = platform_config.get('HOST', "")
-        plat.host = _get_host(section_host, add_project_to_host, section_project)
-        plat.user = platform_config.get('USER', "")
-        plat.scratch = platform_config.get('SCRATCH_DIR', "")
-        plat.temp_dir = platform_config.get('TEMP_DIR', "")
-        plat.root_dir = (Path(plat.scratch) /
-                         (plat.project if hasattr(plat, 'project') and plat.project else section_project) /
-                         (plat.user if hasattr(plat, 'user') and plat.user else "") / expid)
-
-        with suppress(Exception):
-            plat.update_cmds()
-
-    plat.restore_connection(as_conf)
-    return plat
