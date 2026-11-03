@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -15,7 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Autosubmit database session."""
+
 import threading
+from enum import Enum
 from pathlib import Path
 
 from sqlalchemy import Engine, NullPool
@@ -23,7 +26,17 @@ from sqlalchemy import create_engine as sqlalchemy_create_engine
 
 from autosubmit.config.basicconfig import BasicConfig
 
-__all__ = ["_resolve_engine", "get_engine"]
+__all__ = ["DatabaseBackend", "_resolve_engine", "get_engine"]
+
+
+class DatabaseBackend(str, Enum):
+    """Enum for the database engine."""
+
+    SQLITE = "sqlite"
+    """SQLite database."""
+
+    POSTGRES = "postgres"
+    """Postgres database."""
 
 
 def _resolve_engine(connection_url: str) -> Engine:
@@ -75,7 +88,7 @@ def get_engine(db_path: str | Path) -> Engine:
 
         db_path = Path(db_path) if isinstance(db_path, str) else db_path
         db_path = db_path.resolve()
-        
+
         if not db_path.exists():
             if not db_path.parent.exists():
                 db_path.parent.mkdir(parents=True, exist_ok=True)

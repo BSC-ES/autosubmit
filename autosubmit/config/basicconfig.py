@@ -20,10 +20,16 @@ import os
 from configparser import ConfigParser
 from pathlib import Path
 
+__all__ = ["BasicConfig"]
+
 
 class BasicConfig:
-    """
-    Class to manage configuration for Autosubmit path, database and default values for new experiments
+    """Autosubmit site configuration.
+
+    This contains configuration used by Autosubmit, before any experiment is created.
+    For instance, the paths of Autosubmit folders and database.
+
+    It also contains the default values for new experiments.
     """
     def props(self) -> dict:
         pr = {}
