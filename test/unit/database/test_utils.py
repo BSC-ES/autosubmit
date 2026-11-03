@@ -15,11 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Unit tests for ``autosubmit.database.db_utils``."""
+"""Unit tests for ``autosubmit.database.utils``."""
 
 import pytest
 
-from autosubmit.database.db_utils import batch_size_for, chunked, max_params
+from autosubmit.database.utils import batch_size_for, chunked, max_params
 
 
 @pytest.mark.parametrize(

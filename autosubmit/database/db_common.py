@@ -31,13 +31,13 @@ from sqlalchemy.schema import CreateTable
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
-from autosubmit.database.db_utils import batch_size_for, chunked
 from autosubmit.database.models import tables
 from autosubmit.database.schema_version import (
     GENERAL_SCHEMA_VERSION,
     record_schema_version,
     schema_version_table,
 )
+from autosubmit.database.utils import batch_size_for, chunked
 from autosubmit.log.log import AutosubmitCritical, Log
 
 if TYPE_CHECKING:
@@ -47,10 +47,10 @@ if TYPE_CHECKING:
 
 TIMEOUT = 15
 
-# The general database records its schema version in ``general_schema_version``.
 _SCHEMA_VERSION_TABLE = schema_version_table(
     tables.metadata_obj, name="general_schema_version"
 )
+"""The table where the general database records its schema version."""
 
 
 def _get_engine(*, create: bool = False) -> "Engine":

@@ -36,7 +36,6 @@ from sqlalchemy.schema import CreateIndex, CreateSchema, CreateTable
 import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
-from autosubmit.database.db_utils import batch_size_for, chunked, max_params
 from autosubmit.database.managers.base import SchemaVersionedManager
 from autosubmit.database.models import records as Models
 from autosubmit.database.models.tables import (
@@ -45,6 +44,7 @@ from autosubmit.database.models.tables import (
     TableRegistry,
 )
 from autosubmit.database.schema_version import HISTORY_SCHEMA_VERSION
+from autosubmit.database.utils import batch_size_for, chunked, max_params
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.log.log import Log
@@ -54,6 +54,20 @@ DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
 
 _DEFAULT_MAX_COUNTER = 0
 """Fallback counter value used when no job_data row exists."""
+
+
+def _inserted_primary_key(result: Any) -> int:
+    """Return the primary key of an insert result.
+
+    :param result: A SQLAlchemy CursorResult.
+    :return: The inserted primary key.
+    :raises RuntimeError: If the backend did not report the inserted key.
+    """
+    primary_key = result.inserted_primary_key
+    if primary_key is None:
+        raise RuntimeError("The database did not return the inserted primary key.")
+    return int(primary_key[0])
+
 
 class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
     """A SQLAlchemy experiment history database manager.
@@ -194,8 +208,8 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
             )
         )
         with self.engine.connect() as conn, conn.begin():
-            conn.execute(query)
-        return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
+            inserted_id = _inserted_primary_key(conn.execute(query))
+        return ExperimentRun.from_model(self._get_experiment_run_by_id(inserted_id))
 
     def update_experiment_run_dc_by_id(self, experiment_run_dc: ExperimentRun) -> ExperimentRun:
         experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
@@ -218,7 +232,21 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
         )
         with self.engine.connect() as conn, conn.begin():
             conn.execute(query)
-        return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
+        return ExperimentRun.from_model(self._get_experiment_run_by_id(experiment_run_dc.run_id))
+
+    def _get_experiment_run_by_id(self, run_id: int) -> Models.ExperimentRunRow:
+        """Return the experiment run with ``run_id``.
+
+        :param run_id: The run identifier.
+        :raises Exception: If the run does not exist.
+        """
+        experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
+        query = select(experiment_run_table).where(experiment_run_table.c.run_id == run_id)
+        with self.engine.connect() as conn:
+            row = conn.execute(query).first()
+        if not row:
+            raise Exception(f"No experiment run found for run_id={run_id}.")
+        return Models.ExperimentRunRow(*row)
 
     def _get_experiment_run_with_max_id(self) -> Models.ExperimentRunRow:
         """ Get Models.ExperimentRunRow for the maximum id run. """
@@ -260,12 +288,15 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
         return self.get_job_data_dc_unique_latest_by_job_name(job_data_dc.job_name)
 
     def _set_current_job_data_rows_last_to_zero_by_job_name(self, job_name: str):
-        """ Sets the column last = 0 for all job_rows by job_name and last = 1. """
-        job_data_row_last = self._get_job_data_last_by_name(job_name)
-        job_data_dc_list = [JobData.from_model(row) for row in job_data_row_last]
-        for job_data_dc in job_data_dc_list:
-            job_data_dc.last = 0
-            self._update_job_data_by_id(job_data_dc)
+        """Set ``last=0`` for the current rows of the job in a single statement."""
+        job_data_table = self.table_registry.get(JobDataTable.name)
+        stmt = (
+            update(job_data_table)
+            .where(and_(job_data_table.c.job_name == job_name, job_data_table.c.last == 1))
+            .values(last=0, modified=HUtils.get_current_datetime())
+        )
+        with self.engine.begin() as conn:
+            conn.execute(stmt)
 
     def update_job_data_dc_by_job_id_name(self, job_data_dc: JobData) -> JobData:
         """
@@ -292,28 +323,37 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
         return None
 
     def _get_job_data_last_by_name(self, job_name: str | None) -> list[Models.JobDataRow]:
+        """Return the current rows of a job, falling back to its last=0 rows.
+
+        The highest ``last`` value is resolved in the same statement that reads
+        the rows, so a concurrent insert cannot make the fallback read stale data.
+        The fallback covers the case where a job did not finish but was created
+        again.
+        """
         job_data_table = self.table_registry.get(JobDataTable.name)
+        highest_last = (
+            select(func.max(job_data_table.c.last))
+            .where(
+                and_(
+                    job_data_table.c.job_name == job_name,
+                    job_data_table.c.last.in_((0, 1)),
+                )
+            )
+            .scalar_subquery()
+        )
         query = (
-            select(job_data_table).
-            where(
-                and_(job_data_table.c.last == 1, job_data_table.c.job_name == job_name)
-            ).
-            order_by(desc(job_data_table.c.counter))
+            select(job_data_table)
+            .where(
+                and_(
+                    job_data_table.c.job_name == job_name,
+                    job_data_table.c.last == highest_last,
+                )
+            )
+            .order_by(desc(job_data_table.c.counter))
         )
         with self.engine.connect() as conn:
-            job_data_rows_last = conn.execute(query).all()
-        # if previous job didn't finished but a new create has been made
-        if not job_data_rows_last:
-            new_query = (
-                select(job_data_table).
-                where(
-                    and_(job_data_table.c.last == 0, job_data_table.c.job_name == job_name)
-                ).
-                order_by(desc(job_data_table.c.counter))
-            )
-            with self.engine.connect() as conn:
-                job_data_rows_last = conn.execute(new_query).all()
-        return [Models.JobDataRow(*row) for row in job_data_rows_last]
+            rows = conn.execute(query).all()
+        return [Models.JobDataRow(*row) for row in rows]
 
     def get_job_data_dcs_last_by_wrapper_code(self, wrapper_code: int) -> list[JobData]:
         if wrapper_code and wrapper_code > 2:
@@ -399,7 +439,7 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
         )
         with self.engine.connect() as conn, conn.begin():
             result = conn.execute(insert_query)
-        return result.inserted_primary_key[0]
+        return _inserted_primary_key(result)
 
     def update_many_job_data_change_status(self, changes: list[tuple]) -> None:
         """Update many job_data rows in bulk.
@@ -609,14 +649,31 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
         return result.rowcount
 
 
+def create_history_manager(
+    expid: str, *, read_config: bool = True
+) -> SqlAlchemyExperimentHistoryDbManager:
+    """Build the history database manager for an experiment.
+
+    Centralises the path and filename logic so callers do not rebuild it.
+
+    :param expid: Experiment identifier.
+    :param read_config: When ``True``, reload ``BasicConfig`` before reading the paths.
+    :return: An uninitialized history database manager.
+    """
+    if read_config:
+        BasicConfig.read()
+    job_data_file = f"job_data_{expid}.db" if BasicConfig.DATABASE_BACKEND == "sqlite" else ""
+    return SqlAlchemyExperimentHistoryDbManager(expid, BasicConfig.JOBDATA_DIR, job_data_file)
+
+
 def get_last_run_id(expid: str) -> int | None:
     """Get the last experiment run ID, or None if not available.
-    Bypasses ExperimentHistory.__init__ to avoid silent failure on manager creation.
+
+    This is a read only helper. It does not create tables or run migrations,
+    so a missing database or table simply yields ``None``.
     """
     try:
-        BasicConfig.read()
-        manager = SqlAlchemyExperimentHistoryDbManager(expid, BasicConfig.JOBDATA_DIR)
-        manager.initialize()
+        manager = create_history_manager(expid)
         run = manager.get_experiment_run_dc_with_max_id_or_none()
         return run.run_id if run else None
     except Exception as exp:

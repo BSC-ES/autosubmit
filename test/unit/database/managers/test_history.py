@@ -18,7 +18,7 @@
 import sqlite3
 
 import pytest
-from sqlalchemy import and_, create_engine, delete, insert, inspect, select
+from sqlalchemy import and_, create_engine, delete, event, insert, inspect, select
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.managers.history import (
@@ -28,6 +28,7 @@ from autosubmit.database.managers.history import (
 )
 from autosubmit.database.models.tables import JobDataTable
 from autosubmit.database.schema_version import HISTORY_SCHEMA_VERSION
+from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.utils import get_current_datetime
 from test._oldschema import old_experiment_run_table, old_job_data_table, with_schema
 
@@ -390,3 +391,85 @@ def test_get_last_run_id_returns_none(mocker, monkeypatch, tmp_path, fail) -> No
         )
 
     assert get_last_run_id("t999") is None
+
+
+def test_get_last_run_id_does_not_create_the_schema(monkeypatch, tmp_path) -> None:
+    """The read helper must not run DDL on the history database."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+
+    assert get_last_run_id("t999") is None
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'job_data_t999.db'}")
+    try:
+        assert inspect(engine).get_table_names() == []
+    finally:
+        engine.dispose()
+
+
+def test_get_job_data_last_by_name_uses_a_single_query(sqlalchemy_db_manager) -> None:
+    """The fallback is resolved in one statement, so it cannot read stale rows."""
+    table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
+    with sqlalchemy_db_manager.engine.connect() as conn:
+        conn.execute(insert(table), {**_base_row("job", counter=0, job_id=1), "last": 0})
+        conn.commit()
+
+    statements: list[str] = []
+
+    def _record(conn, cursor, statement, parameters, context, executemany):
+        if "FROM job_data" in statement:
+            statements.append(statement)
+
+    event.listen(sqlalchemy_db_manager.engine, "before_cursor_execute", _record)
+    try:
+        rows = sqlalchemy_db_manager._get_job_data_last_by_name("job")
+    finally:
+        event.remove(sqlalchemy_db_manager.engine, "before_cursor_execute", _record)
+
+    assert len(rows) == 1
+    assert len(statements) == 1
+
+
+def test_get_job_data_last_by_name_prefers_current_rows(sqlalchemy_db_manager) -> None:
+    """When both last values exist, only the ``last=1`` rows are returned."""
+    table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
+    with sqlalchemy_db_manager.engine.connect() as conn:
+        conn.execute(insert(table), [
+            {**_base_row("job", counter=0, job_id=1), "last": 0},
+            {**_base_row("job", counter=1, job_id=2)},
+        ])
+        conn.commit()
+
+    rows = sqlalchemy_db_manager._get_job_data_last_by_name("job")
+
+    assert [row.counter for row in rows] == [1]
+
+
+def test_set_current_job_data_rows_last_to_zero_only_touches_last(sqlalchemy_db_manager) -> None:
+    """The reset does not rewrite unrelated columns from a stale in-memory row."""
+    table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
+    with sqlalchemy_db_manager.engine.connect() as conn:
+        conn.execute(insert(table), [
+            {**_base_row("job", counter=0, job_id=1), "last": 1, "status": "FAILED"},
+            {**_base_row("other", counter=0, job_id=2), "last": 1},
+        ])
+        conn.commit()
+
+    sqlalchemy_db_manager._set_current_job_data_rows_last_to_zero_by_job_name("job")
+
+    row = sqlalchemy_db_manager.get_job_data_by_job_id_name(1, "job")
+    assert row.last == 0
+    assert row.status == "FAILED"
+    assert sqlalchemy_db_manager.get_job_data_by_job_id_name(2, "other").last == 1
+
+
+def test_update_experiment_run_dc_by_id_returns_the_updated_run(sqlalchemy_db_manager) -> None:
+    """Updating an older run must not return the newest run."""
+    first = sqlalchemy_db_manager.register_experiment_run_dc(ExperimentRun(0, start=1))
+    sqlalchemy_db_manager.register_experiment_run_dc(ExperimentRun(0, start=2))
+
+    first.finish = 100
+    updated = sqlalchemy_db_manager.update_experiment_run_dc_by_id(first)
+
+    assert updated.run_id == first.run_id
+    assert updated.finish == 100

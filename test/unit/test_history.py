@@ -577,7 +577,7 @@ def test_history_disables_manager_on_error(mocker, tmp_path, monkeypatch) -> Non
     assert exp._manager is None
 
     mocker.patch(
-        "autosubmit.history.experiment_history.SqlAlchemyExperimentHistoryDbManager",
+        "autosubmit.history.experiment_history.create_history_manager",
         side_effect=Exception("boom"),
     )
     assert ExperimentHistory("t000")._manager is None

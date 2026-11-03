@@ -51,6 +51,18 @@ def _read_job_data(db_manager) -> list:
     return [Models.JobDataRow(*row) for row in rows]
 
 
+def _initialised_manager(as_db: str, autosubmit_exp):
+    """Create and initialise a history manager for a fresh experiment."""
+    exp = autosubmit_exp(experiment_data={})
+    db_manager = _create_db_manager(
+        as_db,
+        expid=exp.expid,
+        jobdata_dir_path=str(Path(BasicConfig.LOCAL_ROOT_DIR, 'metadata', 'data')),
+    )
+    db_manager.initialize()
+    return db_manager
+
+
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
@@ -526,3 +538,62 @@ def test_sqlalchemy_initialize_migration_preserves_data_postgres(as_db):
     with db_manager.engine.connect() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
         conn.commit()
+
+
+@pytest.mark.parametrize(
+    "lasts, expected_counters",
+    [
+        ([0], [0]),
+        ([1], [0]),
+        ([0, 1], [1]),
+    ],
+    ids=["fallback_last_zero", "only_last_one", "prefers_last_one"],
+)
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_get_job_data_last_by_name_cases(as_db, lasts, expected_counters, autosubmit_exp):
+    """The current rows are resolved by the highest ``last`` value."""
+    db_manager = _initialised_manager(as_db, autosubmit_exp)
+    for counter, last in enumerate(lasts):
+        db_manager._insert_job_data(
+            JobData(_id=0, counter=counter, job_name="job", rowtype=0, last=last)
+        )
+
+    rows = db_manager._get_job_data_last_by_name("job")
+
+    assert [row.counter for row in rows] == expected_counters
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_set_current_job_data_rows_last_to_zero_only_touches_last(as_db, autosubmit_exp):
+    """The reset only changes ``last`` and ``modified``, not the rest of the row."""
+    db_manager = _initialised_manager(as_db, autosubmit_exp)
+    db_manager._insert_job_data(
+        JobData(_id=0, counter=0, job_name="job", rowtype=0, status="FAILED", job_id=1)
+    )
+    db_manager._insert_job_data(
+        JobData(_id=0, counter=0, job_name="other", rowtype=0, job_id=2)
+    )
+
+    db_manager._set_current_job_data_rows_last_to_zero_by_job_name("job")
+
+    job_row = db_manager.get_job_data_by_job_id_name(1, "job")
+    assert job_row.last == 0
+    assert job_row.status == "FAILED"
+    assert db_manager.get_job_data_by_job_id_name(2, "other").last == 1
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_update_experiment_run_dc_by_id_returns_updated_run(as_db, autosubmit_exp):
+    """Updating an older run returns that run, not the newest one."""
+    db_manager = _initialised_manager(as_db, autosubmit_exp)
+    first = db_manager.register_experiment_run_dc(ExperimentRun(0, start=1))
+    db_manager.register_experiment_run_dc(ExperimentRun(0, start=2))
+
+    first.finish = 100
+    updated = db_manager.update_experiment_run_dc_by_id(first)
+
+    assert updated.run_id == first.run_id
+    assert updated.finish == 100

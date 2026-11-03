@@ -21,6 +21,7 @@ import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.managers.history import (
     SqlAlchemyExperimentHistoryDbManager,
+    create_history_manager,
 )
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
@@ -45,14 +46,10 @@ class ExperimentHistory:
         self.expid = expid
         BasicConfig.read()
         self._log = Logging(expid, BasicConfig.HISTORICAL_LOG_DIR)
-        self._job_data_dir_path = BasicConfig.JOBDATA_DIR
-        self._job_data_file = f"job_data_{expid}.db" if BasicConfig.DATABASE_BACKEND == "sqlite" else ""
         self._historiclog_dir_path = BasicConfig.HISTORICAL_LOG_DIR
         self._manager: SqlAlchemyExperimentHistoryDbManager | None = None
         try:
-            self._manager = SqlAlchemyExperimentHistoryDbManager(
-                self.expid, self._job_data_dir_path, self._job_data_file
-            )
+            self._manager = create_history_manager(self.expid, read_config=False)
             self.initialize_database()
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
