@@ -239,10 +239,8 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
     else:
         git_single_branch = True
     project_destination = as_conf.get_project_destination()
-    project_path = os.path.join(
-        BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
-    project_backup_path = os.path.join(
-        BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, f'proj_{int(time())}')
+    project_path = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid / BasicConfig.LOCAL_PROJ_DIR)
+    project_backup_path = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid / f'proj_{int(time())}')
     git_path = as_conf.get_project_dir()
 
     # Making proj backup

@@ -48,14 +48,14 @@ def _create_db_manager(db_path: Path):
 
 
 def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath") -> None:
-    db_manager = _create_db_manager(Path(tmp_path, f'{__name__}.db'))
+    db_manager = _create_db_manager(tmp_path / f'{__name__}.db')
     assert db_manager.engine.name.startswith('sqlite')
 
 
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_after_create_table_command_then_it_returns_1_row(tmp_path: "LocalPath", as_db: str):
-    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager = _create_db_manager(tmp_path / 'tests.db')
     db_manager.create_table(DBVersionTable.name)
     count = db_manager.count(DBVersionTable.name)
     assert 1 == count
@@ -64,7 +64,7 @@ def test_after_create_table_command_then_it_returns_1_row(tmp_path: "LocalPath",
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_after_3_inserts_into_a_table_then_it_has_4_rows(tmp_path: "LocalPath", as_db: str):
-    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager = _create_db_manager(tmp_path / 'tests.db')
     db_manager.create_table(DBVersionTable.name)
     # It already has the first version, so we are adding versions 2, 3, 4...
     for i in range(2, 5):
@@ -76,7 +76,7 @@ def test_after_3_inserts_into_a_table_then_it_has_4_rows(tmp_path: "LocalPath", 
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_select_first_where(tmp_path: "LocalPath", as_db: str):
-    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager = _create_db_manager(tmp_path / 'tests.db')
     db_manager.create_table(DBVersionTable.name)
     # It already has the first version, so we are adding versions 2, 3, 4...
     for i in range(2, 5):

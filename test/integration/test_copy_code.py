@@ -114,14 +114,14 @@ def test_copy_code_local_project_local_destination_does_not_exist(
     with project_path / "AGENTS.txt" as f:
         f.write_text("noop")
 
-    assert Path(local_destination, "ROBOTS.txt").exists()
-    assert not Path(local_destination, "AGENTS.txt").exists()
+    assert (local_destination / "ROBOTS.txt").exists()
+    assert not (local_destination / "AGENTS.txt").exists()
 
     rmtree(local_destination)
 
     create(exp.expid, noplot=True, hide=True)
 
-    assert Path(local_destination, "AGENTS.txt").exists()
+    assert (local_destination / "AGENTS.txt").exists()
 
 
 def test_copy_code_local_project_cp_error(autosubmit_exp, tmp_path, mocker):
@@ -153,9 +153,9 @@ def test_copy_code_local_project_cp_error(autosubmit_exp, tmp_path, mocker):
     assert "Cannot copy" in str(cm.value.message)
 
     # Failing to copy the contents results in the proj folder being deleted for a fresh try.
-    proj_dir = Path(tmp_path, exp.expid, "proj")
-    assert proj_dir.exists
-    assert not Path(proj_dir, "local_project").exists()
+    proj_dir = tmp_path / exp.expid / "proj"
+    assert not proj_dir.exists()
+    assert not (proj_dir / "local_project").exists()
 
 
 def test_copy_code_local_project_local_destination_exists_force(
@@ -188,13 +188,13 @@ def test_copy_code_local_project_local_destination_exists_force(
     with project_path / "AGENTS.txt" as f:
         f.write_text("noop")
 
-    assert Path(local_destination, "ROBOTS.txt").exists()
-    assert not Path(local_destination, "AGENTS.txt").exists()
+    assert (local_destination / "ROBOTS.txt").exists()
+    assert not (local_destination / "AGENTS.txt").exists()
 
     # Create does not force the sync.
     mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
     create(exp.expid, noplot=True, hide=True)
-    assert not Path(local_destination, "AGENTS.txt").exists()
+    assert not (local_destination / "AGENTS.txt").exists()
     # And since the folder already exists, we should have informed the user nothing was synced.
     # There will be a few calls to ``Log.info``, but here we confirm that at least one is right.
     assert any(
@@ -203,7 +203,7 @@ def test_copy_code_local_project_local_destination_exists_force(
 
     # Refresh does.
     refresh(exp.expid, None, None)
-    assert Path(local_destination, "AGENTS.txt").exists()
+    assert (local_destination / "AGENTS.txt").exists()
 
 
 def test_copy_code_local_project_rsync_error(autosubmit_exp, tmp_path, mocker):
@@ -238,11 +238,11 @@ def test_copy_code_local_project_rsync_error(autosubmit_exp, tmp_path, mocker):
     with pytest.raises(AutosubmitCritical) as cm:
         refresh(exp.expid, None, None)
 
-    assert not Path(local_destination, "AGENTS.txt").exists()
+    assert not (local_destination / "AGENTS.txt").exists()
     assert "Cannot rsync" in str(cm.value.message)
 
     # Failing to rsync the contents, the proj folder is left as-is.
     proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / exp.expid / "proj"
     assert proj_dir.exists
-    assert Path(proj_dir, "local_project").exists()
-    assert Path(proj_dir, "local_project", "ROBOTS.txt").exists()
+    assert (proj_dir / "local_project").exists()
+    assert (proj_dir / "local_project" / "ROBOTS.txt").exists()

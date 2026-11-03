@@ -86,10 +86,6 @@ def _create_recovery_files(tmp_path, platform: LocalPlatform, expid: str = "t000
 def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
     # Exercise the production start method. Spawn starts a fresh interpreter,
     # which is also the path that needs separate coverage collection.
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("spawn"),
-    )
     local.config["LOG_RECOVERY_TIMEOUT"] = 1
 
     local.spawn_log_retrieval_process(as_conf)
@@ -107,10 +103,6 @@ def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
 
 
 def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
     local.config["LOG_RECOVERY_TIMEOUT"] = 1
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
@@ -124,10 +116,6 @@ def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
 
 
 def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
     local.config["LOG_RECOVERY_TIMEOUT"] = 0
     local.spawn_log_retrieval_process(as_conf)
     local.cleanup_event.set()
@@ -290,10 +278,6 @@ def test_wait_for_work(
     recovery_queue_full,
     result,
 ):
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
     local.config["LOG_RECOVERY_TIMEOUT"] = 2
     # This is needed, because in this occasion we are testing the function from the main process
     local.keep_alive_timeout = 2
@@ -406,10 +390,6 @@ def test_create_a_new_copy(local, pjm, slurm, ps_platform, ecaccess):
 
 def test_worker_events_no_duplicates(local, mocker):
     """Verify that update_workers() does not add the same event twice."""
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
     Platform.worker_events.clear()
     local.prepare_process()
     # prepare_process adds one event; verify adding the same one again doesn't duplicate
@@ -422,10 +402,6 @@ def test_worker_events_no_duplicates(local, mocker):
 
 def test_clean_log_recovery_process_removes_worker_event(local, mocker):
     """Cleaning the process must not leave stale worker events behind on respawn."""
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
     Platform.worker_events.clear()
     local.prepare_process()
     assert local.work_event in Platform.worker_events
@@ -475,10 +451,6 @@ def test_add_job_returns_false_without_queueing(local, as_conf, job_id, disable_
 
 def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
     """Verify cleanup does not hang when child has crashed."""
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
     local.config["LOG_RECOVERY_TIMEOUT"] = 1
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
@@ -494,10 +466,6 @@ def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
 
 def test_add_job_to_log_recover_respawns_dead_process(local, as_conf, mocker):
     """Issue #3342: a dead log recovery process must be respawned, not silently dropped."""
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
     local.config["LOG_RECOVERY_TIMEOUT"] = 10
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()

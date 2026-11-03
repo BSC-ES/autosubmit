@@ -39,7 +39,7 @@ def test_reload_unittest(autosubmit_config, tmpdir, force_load, current_loaded_f
         expid='a000',
         experiment_data={})
     as_conf.conf_folder_yaml = tmpdir / 'conf'
-    Path(as_conf.conf_folder_yaml).mkdir(parents=True, exist_ok=True)
+    as_conf.conf_folder_yaml.mkdir()
 
     with open(as_conf.conf_folder_yaml / 'test.yml', 'w') as f:
         f.write('VAR: ["%NOTFOUND%", "%TEST%", "%TEST2%"]')

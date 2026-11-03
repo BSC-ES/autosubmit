@@ -291,7 +291,7 @@ def test_get_pscall(paramiko_platform):
 def test_remove_multiple_files_no_error_path_does_not_exist(paramiko_platform):
     """Test that calling a platform function to remove multiple files accepts non-existing directories. """
     from uuid import uuid4
-    paramiko_platform.tmp_path = 'non-existing-path-' + uuid4().hex
+    paramiko_platform.tmp_path = Path('non-existing-path-' + uuid4().hex)
     assert paramiko_platform.remove_multiple_files([]) == ""
 
 

@@ -1451,10 +1451,8 @@ class Job:
         :return: True if remote log file exists, False otherwise
         """
         try:
-            out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1,
-                                                        show_logs=show_logs)
-            err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1,
-                                                        show_logs=show_logs)
+            out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1)
+            err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1)
         except OSError:
             return False
         return out_exist or err_exist
@@ -1785,8 +1783,8 @@ class Job:
         parameters['CURRENT_TYPE'] = parameters.get('CURRENT_TYPE', self.platform.TYPE.value)
         parameters['CURRENT_SCRATCH_DIR'] = parameters.get('CURRENT_SCRATCH_DIR', self.platform.scratch)
         parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', self.platform.project_dir)
-        parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', self.platform.root_dir)
-        parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', self.platform.get_files_path())
+        parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', str(self.platform.root_dir))
+        parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', str(self.platform.get_files_path()))
 
         for key, value in as_conf.jobs_data[self.section].items():
             if isinstance(value, str) and value.strip().upper() == f"%CURRENT_{key.upper()}%":
@@ -2680,7 +2678,7 @@ class Job:
         script_path = Path(self._tmp_path) / script_name
         with open(script_path, 'wb') as f:
             f.write(template_content.encode(lang))
-        Path(script_path).chmod(0o755)
+        script_path.chmod(0o755)
 
         # Added here so the user can check the generated script
 

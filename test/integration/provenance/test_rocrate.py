@@ -40,7 +40,7 @@ _PROJECT_PATH = str(Path(__file__).parent.joinpath("../../../"))
 
 def test_custom_config_loaded_file(autosubmit_exp, tmp_path):
     """Test creating an RO-Crate archive for an AS configuration that contains CUSTOM_CONFIG (PRE)."""
-    project_path = Path(tmp_path, "project")
+    project_path = tmp_path / "project"
     project_path.mkdir()
 
     # This file must be included in the final RO-Crate archive because it's in the Project path
@@ -48,7 +48,7 @@ def test_custom_config_loaded_file(autosubmit_exp, tmp_path):
     project_file.touch()
 
     # Loading a custom config out of the experiment or project path
-    custom_config = Path(tmp_path, "include.yml")
+    custom_config = tmp_path / "include.yml"
     custom_config.touch()
     custom_config.write_text("CUSTOM_CONFIG_LOADED: True")
 
@@ -95,12 +95,10 @@ def test_custom_config_loaded_file(autosubmit_exp, tmp_path):
 
     # Create the strings for the RO-Crate File object. We will use it later in assert statements.
     experiment_path = exp.exp_path
-    experiment_project = Path(experiment_path, "proj")
+    experiment_project = experiment_path / "proj"
 
     # Here, we must have the file that was copied from the external folder into the exp/proj folder
-    project_file_str = Path(
-        experiment_project, project_destination, project_file.name
-    ).relative_to(experiment_path)
+    project_file_str = (experiment_project / project_destination / project_file.name).relative_to(experiment_path)
     assert str(File(crate, project_file_str).source) in data_entities_ids, (
         "Missing project file"
     )
@@ -113,13 +111,13 @@ def test_custom_config_loaded_file(autosubmit_exp, tmp_path):
 
 
 def test_rocrate(tmp_path, autosubmit_exp):
-    project_path = Path(tmp_path, "project")
+    project_path = tmp_path / "project"
     project_path.mkdir()
-    include = Path(project_path, "conf/bootstrap/include.yml")
+    include = project_path / "conf/bootstrap/include.yml"
     include.parent.mkdir(exist_ok=True, parents=True)
     include.touch()
     for output_file in ["graph_1.png", "graph_2.gif", "graph_3.gif", "graph.jpg"]:
-        Path(project_path, output_file).touch()
+        (project_path / output_file).touch()
 
     exp = autosubmit_exp(
         experiment_data={
@@ -162,11 +160,11 @@ def test_rocrate(tmp_path, autosubmit_exp):
 
 
 def test_rocrate_invalid_project(autosubmit_exp, tmp_path, mocker):
-    project_path = Path(tmp_path, "project")
+    project_path = tmp_path / "project"
     project_path.mkdir()
     # some outputs
     for output_file in ["graph_1.png", "graph_2.gif", "graph_3.gif", "graph.jpg"]:
-        Path(project_path, output_file).touch()
+        (project_path / output_file).touch()
 
     exp = autosubmit_exp(
         experiment_data={
@@ -218,10 +216,10 @@ def test_rocrate_invalid_parameter_type(autosubmit_exp, tmp_path):
     """NOTE: This is not possible at the moment, as we are using ruamel.yaml
     to parse the YAML, and we are not supporting objects. But you never know
     what the code will do in the future, so we just make sure we fail nicely."""
-    project_path = Path(tmp_path, "project")
+    project_path = tmp_path / "project"
     project_path.mkdir()
     for output_file in ["graph_1.png", "graph_2.gif", "graph_3.gif", "graph.jpg"]:
-        Path(project_path, output_file).touch()
+        (project_path / output_file).touch()
     with pytest.raises(RepresenterError) as cm:
         autosubmit_exp(
             experiment_data={
@@ -241,13 +239,13 @@ def test_no_duplicate_ids(autosubmit_exp, tmp_path):
     """Test that there are no duplicated ID's.
 
     We must not have duplicate IDs as they are unique for JSON-LD terms."""
-    project_path = Path(tmp_path, "project")
+    project_path = tmp_path / "project"
     project_path.mkdir()
 
     # custom config file
-    project_conf = Path(project_path, "conf")
+    project_conf = project_path / "conf"
     project_conf.mkdir()
-    custom_config = Path(project_conf, "include.yml")
+    custom_config = project_path / "include.yml"
     custom_config.touch()
     custom_config.write_text("CUSTOM_CONFIG_LOADED: True")
 
@@ -290,11 +288,11 @@ def test_no_duplicate_ids(autosubmit_exp, tmp_path):
 
 def test_rocrate_main(autosubmit_exp, tmp_path):
     """Test calling rocrate main function, used for the command line."""
-    project_path = Path(tmp_path, "project")
+    project_path = tmp_path / "project"
     project_path.mkdir()
     # some outputs
     for output_file in ["graph_1.png", "graph_2.gif", "graph_3.gif", "graph.jpg"]:
-        Path(project_path, output_file).touch()
+        (project_path / output_file).touch()
 
     exp = autosubmit_exp(
         experiment_data={
@@ -321,11 +319,11 @@ def test_do_not_include_other_crates(autosubmit_exp, tmp_path):
 
     This creates large crate files unnecessarily.
     """
-    project_path = Path(tmp_path, "project")
+    project_path = tmp_path / "project"
     project_path.mkdir()
 
     for output_file in ["graph_1.png", "graph_2.gif", "graph_3.gif", "graph.jpg"]:
-        Path(project_path, output_file).touch()
+        (project_path / output_file).touch()
 
     exp = autosubmit_exp(
         experiment_data={
@@ -386,11 +384,11 @@ def test_do_not_include_other_crates(autosubmit_exp, tmp_path):
 
 
 def test_rocrate_validator(autosubmit_exp, tmp_path):
-    project_path = Path(tmp_path, "project")
+    project_path = tmp_path / "project"
     project_path.mkdir()
     # some outputs
     for output_file in ["graph_1.png", "graph_2.gif"]:
-        Path(project_path, output_file).touch()
+        (project_path / output_file).touch()
 
     exp = autosubmit_exp(
         experiment_data={

@@ -50,13 +50,13 @@ def test_save(autosubmit_config, mocker, data: dict, owner: bool):
     mocker.patch("os.getuid", return_value=owner_uid if owner else owner_uid + 1)
     as_conf.save()
     if not owner:
-        assert not Path(as_conf.metadata_folder).exists()
+        assert not as_conf.metadata_folder.exists()
     else:
-        assert Path(as_conf.metadata_folder).exists()
-        assert (Path(as_conf.metadata_folder) / 'experiment_data.yml').exists()
+        assert as_conf.metadata_folder.exists()
+        assert (as_conf.metadata_folder / 'experiment_data.yml').exists()
 
         # check contents
-        with open(Path(as_conf.metadata_folder) / 'experiment_data.yml', 'r') as f:
+        with open(as_conf.metadata_folder / 'experiment_data.yml', 'r') as f:
             yaml = YAML(typ="safe")
             loaded = yaml.load(f)
             assert data['DEFAULT']['HPCARCH'] == loaded['DEFAULT']['HPCARCH']
@@ -64,11 +64,11 @@ def test_save(autosubmit_config, mocker, data: dict, owner: bool):
 
         # Test .bak generated.
         as_conf.save()
-        assert (Path(as_conf.metadata_folder) / 'experiment_data.yml.bak').exists()
+        assert (as_conf.metadata_folder / 'experiment_data.yml.bak').exists()
         # force fail save
         mocker.patch("builtins.open", side_effect=Exception("Forced exception"))
         mocker.patch("shutil.copyfile", return_value=True)
         as_conf.save()
-        assert Path(as_conf.metadata_folder) / 'experiment_data.yml' not in Path(as_conf.metadata_folder).iterdir()
+        assert as_conf.metadata_folder / 'experiment_data.yml' not in as_conf.metadata_folder.iterdir()
         assert as_conf.data_changed is True
         assert as_conf.last_experiment_data == {}

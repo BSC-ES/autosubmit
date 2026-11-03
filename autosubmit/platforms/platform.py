@@ -125,7 +125,7 @@ class CopyQueue(Queue):
         super().__init__(maxsize, ctx=ctx)
 
     @staticmethod
-    def job_data(job: Any) -> LogRecoveryJobData:
+    def job_data(job: 'Job') -> LogRecoveryJobData:
         """Build the lightweight payload stored in the recovery queue for a job.
 
         :param job: The job to serialize.
@@ -169,13 +169,12 @@ class Platform(ABC):
         """
         self._atexit_registered = False
         self.processed_wrapper_logs = None
-        self.ctx = self.get_mp_context()
+        self.ctx = multiprocessing.get_context("spawn")
         self.connected = False
         self.expid: str = expid
         self._name: str = name
         self.config = config
-        self.tmp_path = os.path.join(
-            self.config.get("LOCAL_ROOT_DIR", ""), self.expid, self.config.get("LOCAL_TMP_DIR", ""))
+        self.tmp_path: Path = Path(self.config.get("LOCAL_ROOT_DIR", "")) / self.expid / self.config.get("LOCAL_TMP_DIR", "")
         self._serial_platform = None
         self._serial_queue = None
         self._serial_partition = None
@@ -194,7 +193,7 @@ class Platform(ABC):
         self._scratch = ''
         self._project_dir = ''
         self.temp_dir = ''
-        self._root_dir = ''
+        self._root_dir: Path = Path("")
         self.service = None
         self.scheduler = None
         self.directory = None
@@ -214,10 +213,15 @@ class Platform(ABC):
         self._submit_cmd_x11 = None
         self._checkhost_cmd = None
         self.cancel_cmd = None
-        self.otp_timeout = None
-        self.otp_timeout = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_TIMEOUT", 60 * 5)
-        self.two_factor_auth = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA", False)
-        self.two_factor_method = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
+        self.otp_timeout = (
+            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_TIMEOUT", 60 * 5)
+        )
+        self.two_factor_auth = (
+            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA", False)
+        )
+        self.two_factor_method = (
+            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
+        )
         if auth_password is not None and self.two_factor_auth:
             if isinstance(auth_password, list):
                 self.pw: str | None = auth_password[0]
@@ -237,7 +241,7 @@ class Platform(ABC):
         self._log_recovery_in_backoff: bool = False
         self._log_recovery_retry_at: float = 0.0
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
-        self.compress_remote_logs = False
+        self.compress_remote_logs: bool = False
         self.remote_logs_compress_type = "gzip"
         self.compression_level = 9
         log_queue_size = 200
@@ -249,7 +253,7 @@ class Platform(ABC):
             self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
 
         self.log_queue_size = log_queue_size
-        self.remote_log_dir: str = ""
+        self.remote_log_dir: Path = Path("")
         self.has_scheduler: bool = True
         self.IO_SAFE_WAIT = int(
             self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("IO_SAFE_WAIT", self.IO_SAFE_WAIT))
@@ -393,9 +397,9 @@ class Platform(ABC):
         self._root_dir = value
 
     def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
-                           packages_to_submit: list['JobPackageBase'],
-                           inspect=False, only_wrappers=False) -> tuple[
-        dict[str, dict[str, 'JobPackageBase']], dict[str, dict[str, 'JobPackageBase']]]:
+                           packages_to_submit: list['JobPackageBase'], inspect: bool = False,
+                           only_wrappers: bool = False) \
+            -> tuple[dict[str, dict[str, 'JobPackageBase']], dict[str, dict[str, 'JobPackageBase']]]:
         """Prepare job packages for submission on the current platform.
 
         Log the number of ready jobs, optionally initialize the platform submit
@@ -405,24 +409,17 @@ class Platform(ABC):
         collects the jobs prepared for later submission handling.
 
         :param as_conf: Autosubmit configuration for the current experiment.
-        :type as_conf: AutosubmitConfig
         :param job_list: Job container used to inspect ready jobs and register
             wrapper information.
-        :type job_list: JobList
         :param packages_to_submit: Packages built for this platform and ready to
             be prepared.
-        :type packages_to_submit: list[JobPackageBase]
         :param inspect: If ``True``, prepare packages for inspect mode without
             generating the platform submit script or sending files.
-        :type inspect: bool
         :param only_wrappers: If ``True``, prepare only wrapper-related metadata
             and skip the regular package submission flow.
-        :type only_wrappers: bool
         :raises Exception: Propagate any exception raised while preparing packages, generating scripts, or transferring files.
         :return: A list containing the jobs gathered while preparing the given
             packages for submission.
-        :rtype: list
-
         """
         Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self))}")
         # Submitting by sections allows to detect Scheduler misconfiguration derived from a bad configuration without submitting any job.
@@ -448,12 +445,9 @@ class Platform(ABC):
         """Dry-run preparation of a package to emulate that the package was submitted, without following the normal submission flow.
 
         :param package: Package being prepared for inspect or wrapper-only mode.
-        :type package: JobPackageBase
         :param only_wrappers: If ``True``, prepare wrapper metadata without
             following the normal submission flow.
-        :type only_wrappers: bool
         :param inspect: If ``True``, prepare package metadata for inspect mode.
-        :type inspect: bool
         :raises Exception: Propagate any exception raised while creating wrapper
             job metadata or saving the package.
         """
@@ -481,11 +475,10 @@ class Platform(ABC):
 
     @property
     @autosubmit_parameter(name='current_partition')
-    def partition(self):
+    def partition(self) -> str:
         """Partition to use for jobs.
 
         :return: queue's name
-        :rtype: str
         """
         if self._partition is None:
             return ''
@@ -496,11 +489,10 @@ class Platform(ABC):
         self._partition = value
 
     @property
-    def queue(self):
+    def queue(self) -> str:
         """Queue to use for jobs.
 
         :return: queue's name
-        :rtype: str
         """
         if self._default_queue is None or self._default_queue == "":
             return ''
@@ -511,11 +503,10 @@ class Platform(ABC):
         self._default_queue = value
 
     @property
-    def serial_partition(self):
+    def serial_partition(self) -> str:
         """Partition to use for serial jobs.
 
         :return: partition's name
-        :rtype: str
         """
         if self._serial_partition is None or self._serial_partition == "":
             return self.partition
@@ -526,11 +517,10 @@ class Platform(ABC):
         self._serial_partition = value
 
     @property
-    def serial_queue(self):
+    def serial_queue(self) -> str:
         """Queue to use for serial jobs.
 
         :return: queue's name
-        :rtype: str
         """
         if self._serial_queue is None or self._serial_queue == "":
             return self.queue
@@ -541,22 +531,40 @@ class Platform(ABC):
         self._serial_queue = value
 
     @property
-    def allow_arrays(self):
-        if type(self._allow_arrays) is bool and self._allow_arrays:
-            return True
-        return self._allow_arrays == "true"
+    def allow_arrays(self) -> bool:
+        """Whether array jobs are allowed.
+
+        :autosubmit-group: JOB
+        """
+        return (
+            self._allow_arrays
+            if isinstance(self._allow_arrays, bool)
+            else str(self._allow_arrays).lower() == "true"
+        )
 
     @property
-    def allow_wrappers(self):
-        if type(self._allow_wrappers) is bool and self._allow_wrappers:
-            return True
-        return self._allow_wrappers == "true"
+    def allow_wrappers(self) -> bool:
+        """Whether wrappers are allowed.
+
+        :autosubmit-group: JOB
+        """
+        return (
+            self._allow_wrappers
+            if isinstance(self._allow_wrappers, bool)
+            else str(self._allow_wrappers).lower() == "true"
+        )
 
     @property
-    def allow_python_jobs(self):
-        if type(self._allow_python_jobs) is bool and self._allow_python_jobs:
-            return True
-        return self._allow_python_jobs == "true"
+    def allow_python_jobs(self) -> bool:
+        """Whether python jobs are allowed.
+
+        :autosubmit-group: JOB
+        """
+        return (
+            self._allow_python_jobs
+            if isinstance(self._allow_python_jobs, bool)
+            else str(self._allow_python_jobs).lower() == "true"
+        )
 
     def add_parameters(self, as_conf: 'AutosubmitConfig'):
         """Add parameters for the current platform to the given parameters list.
@@ -590,54 +598,44 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def move_file(self, src, dest):
+    def move_file(self, src: str, dest: str) -> bool:
         """Moves a file on the platform.
 
         :param src: source name
-        :type src: str
         :param dest: destination name
-        :type dest: str
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
+    def get_file(self,
+        filename: str, must_exist: bool=True, relative_path: str='', ignore_log: bool=False, wrapper_failed: bool=False
+    ) -> bool:
         """Copies a file from the current platform to experiment's tmp folder
 
         :param wrapper_failed:
         :param ignore_log:
         :param filename: file name
-        :type filename: str
         :param must_exist: If True, raises an exception if file can not be copied
-        :type must_exist: bool
         :param relative_path: relative path inside tmp folder
-        :type relative_path: str
         :return: True if file is copied successfully, false otherwise
-        :rtype: bool
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_files(self, files, must_exist=True, relative_path=''):
+    def get_files(self, files: list[str], must_exist: bool=True, relative_path: str='') -> None:
         """Copies some files from the current platform to experiment's tmp folder.
 
         :param files: file names
-        :type files: [str]
         :param must_exist: If True, raises an exception if file can not be copied
-        :type must_exist: bool
         :param relative_path: relative path inside tmp folder
-        :type relative_path: str
         :return: True if file is copied successfully, false otherwise
-        :rtype: bool
         """
         for filename in files:
             self.get_file(filename, must_exist, relative_path)
 
-    def delete_file(self, filename: str):
+    def delete_file(self, filename: str) -> bool:
         """Deletes a file from this platform.
 
         :param filename: file name
-        :type filename: str
         :return: True if successful or file does not exist
-        :rtype: bool
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -646,17 +644,14 @@ class Platform(ABC):
         """Get the given LOGS files.
 
         :param exp_id: experiment id
-        :type exp_id: str
         :param remote_logs: names of the log files
-        :type remote_logs: (str, str)
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_checkpoint_files(self, job):
+    def get_checkpoint_files(self, job: 'Job'):
         """Get all the checkpoint files of a job.
 
         :param job: Get the checkpoint files
-        :type job: Job
         """
         if not job.current_checkpoint_step:
             job.current_checkpoint_step = 0
@@ -671,13 +666,11 @@ class Platform(ABC):
                 job.current_checkpoint_step += 1
                 self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
 
-    def remove_stat_file(self, job: Any) -> bool:
+    def remove_stat_file(self, job: 'Job') -> bool:
         """Removes STAT files from remote.
 
         :param job: Job to check.
-        :type job: Job
         :return: True if the file was removed, False otherwise.
-        :rtype: bool
         """
         # TODO: After rebasing everything I noticed that sometimes the stat file ends with '_'
         if job.stat_file.endswith('_'):
@@ -689,13 +682,11 @@ class Platform(ABC):
             return True
         return False
 
-    def remove_completed_file(self, job_name):
+    def remove_completed_file(self, job_name: str) -> bool:
         """Removes *COMPLETED* files from remote.
 
         :param job_name: name of job to check
-        :type job_name: str
         :return: True if successful, False otherwise
-        :rtype: bool
         """
         filename = job_name + '_COMPLETED'
         if self.delete_file(filename):
@@ -712,7 +703,7 @@ class Platform(ABC):
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
+    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3):
         return True
 
     def get_stat_file(self, job, attempt: int):
@@ -729,8 +720,8 @@ class Platform(ABC):
         Log.warning(f'{job.name}_STAT_{str(attempt)} file not found')
         return False
 
-    @autosubmit_parameter(name='current_logdir')
-    def get_files_path(self) -> str:
+    @autosubmit_parameter(name="current_logdir")
+    def get_files_path(self) -> Path:
         """The platform's LOG directory.
 
         :return: platform's LOG directory
@@ -738,20 +729,19 @@ class Platform(ABC):
         """
         # Circular import -- bad class design, probably can be re-designed.
         if self.TYPE is PlatformType.LOCAL:
-            path = Path(self.root_dir, self.config.get("LOCAL_TMP_DIR", ""), f'LOG_{self.expid}')
+            path = Path(
+                self.root_dir, self.config.get("LOCAL_TMP_DIR", ""), f"LOG_{self.expid}"
+            )
         else:
             path = Path(self.remote_log_dir)
-        return str(path)
+        return path
 
     def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):
         """Checks jobs running status
 
         :param job_list: list of jobs
-        :type job_list: list
         :param as_conf: config
-        :type as_conf: as_conf
         :param retries: retries
-        :type retries: int
         """
 
     def close_connection(self):
@@ -761,9 +751,7 @@ class Platform(ABC):
         """Writes Job id in an out/err file.
 
         :param jobid: job id
-        :type jobid: str
         :param complete_path: complete path to the file, includes filename
-        :type complete_path: str
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -905,7 +893,7 @@ class Platform(ABC):
                 Log.warning(f"[{self.name}] Inline log recovery failed for job {job_data.get('name')}: {e}")
                 Log.debug(traceback.format_exc())
 
-    def _recover_inline(self, job, as_conf: 'AutosubmitConfig') -> bool:
+    def _recover_inline(self, job, as_conf: "AutosubmitConfig") -> bool:
         """Recover the given job and any accumulated pending jobs inline.
 
         The given job is recovered from memory; the accumulated pending jobs are loaded from
@@ -977,9 +965,7 @@ class Platform(ABC):
         """Restores the SSH connection to the platform.
 
         :param as_conf: The Autosubmit configuration object used to establish the connection.
-        :type as_conf: AutosubmitConfig
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
-        :type log_recovery_process: bool
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -993,9 +979,6 @@ class Platform(ABC):
             process can take them over (used while respawning). When ``False`` (default) all
             the log recovery state, including pending jobs, is reset.
         """
-        if self.ctx is None:
-            self.ctx = self.get_mp_context()
-
         if self.cleanup_event is not None:
             self.cleanup_event.set()
 
@@ -1079,9 +1062,6 @@ class Platform(ABC):
 
     def prepare_process(self) -> 'Platform':
         new_platform = self.create_a_new_copy()
-        if self.ctx is None:
-            self.ctx = self.get_mp_context()
-
         # Allocate Events only on the first call.
         # On subsequent respawn cycles the events are reused (cleared by clean_log_recovery_process)
         if self.work_event is None:
@@ -1115,10 +1095,6 @@ class Platform(ABC):
             Log.error(f"Failed to start log recovery process: {e}")
             self.log_recovery_process = None
 
-    def get_mp_context(self):
-        if not hasattr(self, 'ctx') or self.ctx is None:
-            self.ctx = multiprocessing.get_context('spawn')
-        return self.ctx
 
     def join_new_process(self):
         # Check if the process is finished; prevent zombies
@@ -1145,7 +1121,7 @@ class Platform(ABC):
             return False
 
         self.log_retrieval_process_active = True
-        self.ctx = self.get_mp_context()
+        self.ctx = multiprocessing.get_context("spawn")
         new_platform = self.prepare_process()
         self.create_new_process(new_platform, as_conf)
         self.join_new_process()
@@ -1351,7 +1327,7 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_remote_log_dir(self) -> str:
+    def get_remote_log_dir(self) -> Path:
         """Get the variable remote_log_dir that stores the directory of the experiment's log.
 
         :return: The remote_log_dir variable.
@@ -1370,7 +1346,6 @@ class Platform(ABC):
         """Delete the COMPLETED and FAILED files for the given job names from the remote log directory.
 
         :param job_names: List of job names whose COMPLETED and FAILED files should be deleted.
-        :type job_names: list[str]
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -1378,7 +1353,6 @@ class Platform(ABC):
         """Delete all previous STAT files for the given job names from the remote log directory.
 
         :param job_names: List of job names whose STAT files should be deleted.
-        :type job_names: list[str]
         """
         raise NotImplementedError  # pragma: no cover
 
