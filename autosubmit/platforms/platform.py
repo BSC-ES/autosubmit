@@ -731,7 +731,7 @@ class Platform(ABC):
         if self.TYPE is PlatformType.LOCAL:
             path = self.root_dir / self.config.get("LOCAL_TMP_DIR", "") / f"LOG_{self.expid}"
         else:
-            path = self.remote_log_dir
+            path = Path(self.remote_log_dir)
 
         return path
 
