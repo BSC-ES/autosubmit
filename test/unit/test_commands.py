@@ -15,9 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import subprocess
+import sys
+
 import pytest
 
 # noinspection PyProtectedMember
+from autosubmit.helpers.version import get_version
 from autosubmit.scripts.autosubmit import _autosubmit, _get_arg_parser
 
 
@@ -262,3 +266,14 @@ def test_invalid_subcommand_argument_is_handled_by_subcommand(mocker):
         entry_point,
         "--fail-this-command-please-sir",
     )
+
+
+def test_python_m_autosubmit_version():
+    """Test that python -m autosubmit --version executes successfully."""
+    result = subprocess.run(
+        [sys.executable, "-m", "autosubmit", "--version"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert get_version() in (result.stdout + result.stderr)
