@@ -1378,6 +1378,7 @@ def statistics(
 
         os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
         job_list = load_job_list(expid, as_conf, new=False)
+        as_conf.reload()
         for job in job_list.get_job_list():
             job.update_parameters(as_conf, set_attributes=True)
         Log.debug("Job list restored from db")

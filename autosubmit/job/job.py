@@ -2507,8 +2507,8 @@ class Job:
                           reset_logs: bool = False) -> dict:
         """Refresh the job's parameters value.
 
-        This method reloads the Autosubmit configuration and updates the job's parameters
-        based on the configuration and the current state of the job.
+        This method updates the job's parameters based on the configuration and
+        the current state of the job.
 
         :param as_conf: The Autosubmit configuration object.
         :param set_attributes: Flag indicating whether to set attributes, defaults to False.
@@ -2519,7 +2519,6 @@ class Job:
             as_conf.save()
 
         if set_attributes:
-            as_conf.reload()
             if reset_logs:
                 self.reset_logs()
             self._init_runtime_parameters()
