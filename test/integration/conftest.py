@@ -202,7 +202,7 @@ def autosubmit_exp(
             advanced=False,
             database_path=BasicConfig.DB_DIR if not is_postgres else "",  # type: ignore
             database_filename=BasicConfig.DB_FILE if not is_postgres else "",  # type: ignore
-            local_root_path=str(tmp_path),
+            local_root_path=tmp_path,
             platforms_conf_path=None,  # type: ignore
             jobs_conf_path=None,  # type: ignore
             smtp_hostname=None,  # type: ignore
@@ -448,11 +448,14 @@ def slurm_server(
     """Function-scoped fixture that creates a Slurm server container per test."""
     # Patch multiprocessing start method to 'fork' in test environment so child worker processes
     # inherit active pytest fixtures, monkeypatches, and in-memory mock dispatchers (Platform defaults to 'spawn').
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=multiprocessing.get_context("fork"),
-    )
     from time import perf_counter
+
+    fork_context = multiprocessing.get_context("fork")
+
+    mocker.patch(
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
+    )
 
     start = perf_counter()
     container, ssh_port = get_slurm_container()

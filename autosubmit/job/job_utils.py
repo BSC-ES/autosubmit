@@ -434,8 +434,6 @@ class SubJobManager:
             self.subjobindex[subjob.name] = subjob
 
     def process_times(self) -> None:
-        """
-        """
         if self.packages_map and self.packages_dict:
             if self.current_structure and len(self.current_structure) > 0:
                 # Structure exists

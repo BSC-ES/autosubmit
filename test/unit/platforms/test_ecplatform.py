@@ -46,6 +46,30 @@ def ec_platform(tmp_path: 'LocalPath'):
     yield EcPlatform(expid=_EXPID, name='pytest-slurm', config=config, scheduler='slurm')
 
 
+@pytest.mark.parametrize(
+    "certificate_output,connected",
+    [(b"yes", True), (b"no", False)],
+    ids=["connected", "not-connected"],
+)
+def test_connect_spawns_log_recovery_only_when_connected(
+    ec_platform: EcPlatform, mocker, certificate_output: bytes, connected: bool
+) -> None:
+    """The recovery process is only spawned when the main connection succeeded."""
+    mocker.patch(
+        "autosubmit.platforms.ecplatform.subprocess.check_output",
+        return_value=certificate_output,
+    )
+    spawn = mocker.patch.object(ec_platform, "spawn_log_retrieval_process")
+
+    ec_platform.connect(None)
+
+    assert ec_platform.connected is connected
+    if connected:
+        spawn.assert_called_once()
+    else:
+        spawn.assert_not_called()
+
+
 @pytest.mark.parametrize("config_retry,expected", [
     (None, 100),
     (50, 50),
@@ -479,7 +503,7 @@ def test_check_remote_log_dir_creates_all_path_levels(
     ec_platform.project = "proj"
     ec_platform.user = "user1"
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/proj/user1/t000/LOG_t000")
 
     import subprocess as sp
     called: list[str] = []
@@ -519,7 +543,7 @@ def test_check_remote_log_dir_does_not_raise_when_dir_already_exists(
     ec_platform.project = "proj"
     ec_platform.user = "user1"
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/proj/user1/t000/LOG_t000")
 
     import subprocess as sp
 
@@ -580,7 +604,7 @@ def test_delete_previous_run_files_by_job_names_calls_del_cmd(
     :param monkeypatch: Pytest monkeypatch fixture.
     """
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
     ec_platform.host = "hpc"
     ec_platform.del_cmd = "ecaccess-file-delete"
 
@@ -612,7 +636,7 @@ def test_delete_previous_run_files_by_job_names_skips_when_expid_not_in_log_dir(
     :param monkeypatch: Pytest monkeypatch fixture.
     """
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/other/LOG_other"
+    ec_platform.remote_log_dir = Path("/scratch/other/LOG_other")
 
     called: list[str] = []
     import subprocess as sp
@@ -633,7 +657,7 @@ def test_delete_previous_stat_files_by_job_names_removes_matching_stat_files(
     :param monkeypatch: Pytest monkeypatch fixture.
     """
     ec_platform.expid = _EXPID
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
     ec_platform.host = "hpc"
     ec_platform.del_cmd = "ecaccess-file-delete"
 
@@ -811,8 +835,8 @@ def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
 ) -> None:
     """Verify confirm_done_jobs_via_stat uses ecaccess-file-dir and ecaccess-file-get."""
     ec_platform.host = "hpc"
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
-    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
+    ec_platform.tmp_path = tmp_path
     ec_platform.get_cmd = "ecaccess-file-get"
 
     # Mock send_command for ecaccess-file-dir
@@ -868,8 +892,8 @@ def test_confirm_done_jobs_via_stat_handles_download_outcomes(
 ) -> None:
     """Verify confirm_done_jobs_via_stat handles both download failure and success correctly."""
     ec_platform.host = "hpc"
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
-    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
+    ec_platform.tmp_path = tmp_path
     ec_platform.get_cmd = "ecaccess-file-get"
 
     def _send_command(cmd: str, **_) -> bool:
@@ -909,8 +933,8 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
 ) -> None:
     """Verify set_start_time_from_remote_stat_file uses ecaccess-file-dir and ecaccess-file-get."""
     ec_platform.host = "hpc"
-    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
-    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
+    ec_platform.tmp_path = tmp_path
     ec_platform.get_cmd = "ecaccess-file-get"
 
     # Mock send_command for ecaccess-file-dir
@@ -990,7 +1014,7 @@ def test_ecplatform_header_selected(
 
 def test_get_remote_log_dir(ec_platform):
     """The remote log dir will have the value specified in the constructor."""
-    assert ec_platform.get_remote_log_dir() == f'{_EXPID}/LOG_{_EXPID}'
+    assert ec_platform.get_remote_log_dir() == Path(f'{_EXPID}/LOG_{_EXPID}')
 
 
 def test_check_remote_log_dir_failed_mkdir(ec_platform, mocker):

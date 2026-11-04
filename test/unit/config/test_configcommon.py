@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.upgrade_scripts import ini_to_yaml
+from autosubmit.config.utils import ini_to_yaml
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.platform_type import PlatformType
 

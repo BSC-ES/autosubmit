@@ -528,7 +528,7 @@ CONFIG:
         child = Job("child", 1, Status.WAITING, 0)
         self.job.add_children([child])
         assert 1 == len(self.job.children)
-        assert child == list(self.job.children)[0]
+        assert child == next(iter(self.job.children))
 
 
 # TODO: remove this and use pytest fixtures.
@@ -957,8 +957,21 @@ def test_update_parameters_attributes(autosubmit_config, experiment_data, attrib
     ("test_str", "both", ["test_str"]),
     (['test_list', 'test_list2'], "current_directive", ['test_list', 'test_list2']),
     ("['test_str_list', 'test_str_list2']", "job", ['test_str_list', 'test_str_list2']),
+    (['test_list', 'test_list2'], "self_current_directive", ['test_list', 'test_list2']),
+    ("test_str", "self_current_directive", ["test_str"]),
+    (['test_list', 'test_list2'], "self_current_directive_lowercase", ['test_list', 'test_list2']),
+    (['test_list', 'test_list2'], "self_current_directive_whitespace", ['test_list', 'test_list2']),
+    (None, "self_current_directive_no_platform_value", []),
+    (['test_list', 'test_list2'], "wrapper_self_current_directive", ['test_list', 'test_list2']),
+    (['test_list', 'test_list2'], "wrapper_self_current_directive_over_job", ['test_list', 'test_list2']),
 ], ids=["Test str - platform", "test_list - platform", "test_list - job", "test_str - job", "test_list - both",
-        "test_str - both", "test_list - job - current_directive", "test_str_list - current_directive"])
+        "test_str - both", "test_list - job - current_directive", "test_str_list - current_directive",
+        "test_list - job - self_current_directive", "test_str - job - self_current_directive",
+        "test_list - job - self_current_directive_lowercase",
+        "test_list - job - self_current_directive_whitespace",
+        "no directives - job - self_current_directive_no_platform_value",
+        "test_list - wrapper - self_current_directive",
+        "test_list - wrapper - self_current_directive_over_job"])
 def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines, mocker, autosubmit_config):
     file_stat = os.stat(f"{tmpdir.strpath}")
     file_owner_id = file_stat.st_uid
@@ -1008,12 +1021,43 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
     elif test_type == "current_directive":
         experiment_data['PLATFORMS']['dummy_platform']['APP_CUSTOM_DIRECTIVES'] = custom_directives
         experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_APP_CUSTOM_DIRECTIVES%"
+    elif test_type == "self_current_directive":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_CUSTOM_DIRECTIVES%"
+    elif test_type == "self_current_directive_lowercase":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%current_custom_directives%"
+    elif test_type == "self_current_directive_whitespace":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "  %CURRENT_CUSTOM_DIRECTIVES%  "
+    elif test_type == "self_current_directive_no_platform_value":
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_CUSTOM_DIRECTIVES%"
+    elif test_type == "wrapper_self_current_directive":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['WRAPPERS'] = {
+            'WRAPPER_0': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'RANDOM-SECTION',
+                'CUSTOM_DIRECTIVES': "%CURRENT_CUSTOM_DIRECTIVES%",
+            },
+        }
+    elif test_type == "wrapper_self_current_directive_over_job":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = ['#SBATCH --platform-only']
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['WRAPPERS'] = {
+            'WRAPPER_0': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'RANDOM-SECTION',
+                'CUSTOM_DIRECTIVES': "%CURRENT_CUSTOM_DIRECTIVES%",
+            },
+        }
     job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data, "slurm")
     mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
     template_content, _ = job.update_content(as_conf, parameters)
     for directive in result_by_lines:
         pattern = r'^\s*' + re.escape(directive) + r'\s*$'  # Match Start line, match directive, match end line
         assert re.search(pattern, template_content, re.MULTILINE) is not None
+    assert "%current_custom_directives%" not in template_content.lower()
 
 
 @pytest.mark.parametrize('experiment_data', [(
@@ -1314,7 +1358,7 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
     job.submit_time_timestamp = date2str(datetime.now(), 'S')
     job.platform = local
 
-    total_stats = Path(tmp_path, f'{job.name}_TOTAL_STATS')
+    total_stats = tmp_path / f'{job.name}_TOTAL_STATS'
     if total_stats_exists:
         total_stats.touch()
         total_stats.write_text('First line')
@@ -1361,7 +1405,7 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     job = Job(f'{_EXPID}_dummy', 1, status, 0)
     job.platform = local
 
-    total_stats = Path(tmp_path, f'{job.name}_TOTAL_STATS')
+    total_stats = tmp_path / f'{job.name}_TOTAL_STATS'
     if existing_lines:
         total_stats.touch()
         total_stats.write_text(existing_lines)
@@ -1536,12 +1580,7 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
     mocked_log = mocker.patch('autosubmit.job.job.Log')
 
     if has_completed_files:
-        job_completed_file = Path(
-            local.root_dir,
-            local.config.get('LOCAL_TMP_DIR'),
-            f'LOG_{as_conf.expid}',
-            f'{job.name}_COMPLETED'
-        )
+        job_completed_file = local.root_dir / local.config.get('LOCAL_TMP_DIR') / f'LOG_{as_conf.expid}' / f'{job.name}_COMPLETED'
         job_completed_file.parent.mkdir(parents=True, exist_ok=True)
         job_completed_file.touch()
         job.update_status(as_conf=as_conf)
@@ -1964,6 +2003,19 @@ def test_init(loaded_data):
         assert job.date is None
         assert job.local_logs == ('', '')
         assert job.remote_logs == ('', '')
+
+
+def test_init_preserves_log_recovery_call_count_from_loaded_data():
+    state = {
+        "_name": "test_job",
+        "status": "COMPLETED",
+        "updated_log": 1,
+        "log_recovery_call_count": 3,
+    }
+
+    job = Job(loaded_data=state)
+
+    assert job.log_recovery_call_count == 3
 
 
 @pytest.fixture()
@@ -3121,14 +3173,41 @@ def test_calendar_chunk_last_chunk_consistency(chunk_unit, chunk_size):
     assert result['CHUNK_END_DATE'] == result['CHUNK_END_DATE_LAST']
     assert result['CHUNK_SECOND_TO_LAST_DATE'] == result['LDATE']
 
-def test_recover_log_queues_recovery(mocker):
+
+@pytest.mark.parametrize(
+    "threads_disabled,recovered,increment_expected",
+    [
+        (False, True, True),
+        (False, False, False),
+        (True, True, True),
+        (True, False, False),
+    ],
+    ids=["queued", "queue-failed", "recovered-inline", "inline-failed"],
+)
+def test_recover_log_updates_call_count(
+    autosubmit_config, mocker, threads_disabled, recovered, increment_expected
+):
     job = Job("test", 1, Status.COMPLETED, 0)
-    as_conf = mocker.MagicMock()
-    as_conf.platforms_data.get.return_value = {}
-    job.platform = mocker.MagicMock()
+    platform = LocalPlatform("t000", "pytest-ps", {})
+    platform.serial_platform = platform
+    job.platform = platform
+    job.platform_name = "PYTEST-PS"
+    inline = mocker.patch.object(platform, "recover_log_inline", return_value=recovered)
+    queue = mocker.patch.object(platform, "add_job_to_log_recover", return_value=recovered)
+    as_conf = autosubmit_config(
+        "t000",
+        {"PLATFORMS": {"PYTEST-PS": {"DISABLE_RECOVERY_THREADS": threads_disabled}}},
+    )
+
     job.recover_log(as_conf)
-    job.platform.add_job_to_log_recover.assert_called_once_with(job)
-    assert job.log_recovery_call_count == 1
+
+    if threads_disabled:
+        inline.assert_called_once_with(job, as_conf)
+        queue.assert_not_called()
+    else:
+        queue.assert_called_once_with(job, as_conf)
+        inline.assert_not_called()
+    assert job.log_recovery_call_count == (1 if increment_expected else 0)
 
 
 def test_compute_inner_job_status_returns_stat_when_done(mocker):
@@ -3140,16 +3219,3 @@ def test_compute_inner_job_status_returns_stat_when_done(mocker):
     result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
 
     assert result == Status.FAILED
-
-
-def test_recover_log_disabled_threads(mocker):
-    job = Job("test", 1, Status.COMPLETED, 0)
-    as_conf = mocker.MagicMock()
-    as_conf.platforms_data.get.return_value = {"DISABLE_RECOVERY_THREADS": "true"}
-    mock_retrieve = mocker.patch("autosubmit.job.job.Job.retrieve_logfiles")
-    mock_notify = mocker.patch("autosubmit.job.job.Job.send_cpmip_notification")
-    job.recover_log(as_conf)
-    mock_retrieve.assert_called_once()
-    mock_notify.assert_called_once_with(as_conf)
-    assert job.log_recovery_call_count == 1
-

@@ -17,7 +17,7 @@
 
 
 import datetime
-from functools import cache, cached_property
+from functools import cached_property
 from typing import cast
 
 from sqlalchemy import (
@@ -371,13 +371,13 @@ class TableRegistry:
     def __init__(self, schema: str | None) -> None:
         """Initialize the registry with the target schema."""
         self._schema = schema
+        self._tables_cache: dict[str, Table] = {}
 
     @cached_property
     def metadata(self) -> MetaData:
         """Return the MetaData instance for the given schema, creating it once."""
         return MetaData(schema=self._schema)
 
-    @cache
     def get(self, table_name: str) -> Table:
         """Return the Table for the given name and schema, creating it if needed.
 
@@ -385,7 +385,13 @@ class TableRegistry:
         :return: The SQLAlchemy Table instance.
         :raises KeyError: If no table definition exists for ``table_name``.
         """
+        if table_name in self._tables_cache:
+            return self._tables_cache[table_name]
+
         all_tables_def = get_all_tables_by_name()
         if table_name not in all_tables_def:
             raise KeyError(f"No table definition found for '{table_name}'.")
-        return all_tables_def[table_name].to_metadata(self.metadata)
+
+        table = all_tables_def[table_name].to_metadata(self.metadata)
+        self._tables_cache[table_name] = table
+        return table

@@ -62,7 +62,7 @@ def test_seq():
     """Function to test the Class JobData inside autosubmit/monitor/diagram.py"""
     seq = [x for x in _seq(100, 2, 10)]
     assert len(seq) == 9
-    assert all([x for x in seq if isinstance(x, int)])
+    assert all(isinstance(x, int) for x in seq)
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)

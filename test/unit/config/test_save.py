@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -39,26 +39,24 @@ from autosubmit.config.basicconfig import BasicConfig
     ],
     ids=["local_true", "local_false"]
 )
-def test_save(autosubmit_config, tmpdir, mocker, data: dict, owner: str, monkeypatch):
-    if owner:
-        monkeypatch.setenv("USER", Path(tmpdir).owner())
-    else:
-        monkeypatch.setenv("USER", 'whatever')
+def test_save(autosubmit_config, mocker, data: dict, owner: bool):
     as_conf = autosubmit_config(expid='t000', experiment_data=data, include_basic_config=True)
     data['ROOTDIR'] = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid)
     # TODO: figure why some autosubmit_config conf_test( I hope ) is adding functions to experiment_data
     as_conf.experiment_data = {k: v for k, v in data.items() if not callable(v)}
     as_conf.load_common_parameters(as_conf.experiment_data)
     as_conf.load_as_env_variables(as_conf.experiment_data)
+    owner_uid = Path(data['ROOTDIR']).stat().st_uid
+    mocker.patch("os.getuid", return_value=owner_uid if owner else owner_uid + 1)
     as_conf.save()
     if not owner:
-        assert not Path(as_conf.metadata_folder).exists()
+        assert not as_conf.metadata_folder.exists()
     else:
-        assert Path(as_conf.metadata_folder).exists()
-        assert (Path(as_conf.metadata_folder) / 'experiment_data.yml').exists()
+        assert as_conf.metadata_folder.exists()
+        assert (as_conf.metadata_folder / 'experiment_data.yml').exists()
 
         # check contents
-        with open(Path(as_conf.metadata_folder) / 'experiment_data.yml', 'r') as f:
+        with open(as_conf.metadata_folder / 'experiment_data.yml', 'r') as f:
             yaml = YAML(typ="safe")
             loaded = yaml.load(f)
             assert data['DEFAULT']['HPCARCH'] == loaded['DEFAULT']['HPCARCH']
@@ -66,11 +64,11 @@ def test_save(autosubmit_config, tmpdir, mocker, data: dict, owner: str, monkeyp
 
         # Test .bak generated.
         as_conf.save()
-        assert (Path(as_conf.metadata_folder) / 'experiment_data.yml.bak').exists()
+        assert (as_conf.metadata_folder / 'experiment_data.yml.bak').exists()
         # force fail save
         mocker.patch("builtins.open", side_effect=Exception("Forced exception"))
         mocker.patch("shutil.copyfile", return_value=True)
         as_conf.save()
-        assert Path(as_conf.metadata_folder) / 'experiment_data.yml' not in Path(as_conf.metadata_folder).iterdir()
+        assert as_conf.metadata_folder / 'experiment_data.yml' not in as_conf.metadata_folder.iterdir()
         assert as_conf.data_changed is True
         assert as_conf.last_experiment_data == {}

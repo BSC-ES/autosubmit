@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from pathlib import Path
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
@@ -47,7 +48,7 @@ class PsPlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = []
         self.job_status['FAILED'] = []
         self.update_cmds()
-        self.has_scheduler = False
+        self.has_scheduler: bool = False
 
     def get_check_all_jobs_cmd(self, jobs_id: str) -> str:
         """Return a shell command that checks the status of all given process IDs.
@@ -86,13 +87,13 @@ class PsPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Updates commands for platforms."""
-        self.root_dir = os.path.join(self.scratch, self.project_dir, self.user, self.expid)
-        self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
+        self.root_dir = Path(self.scratch) / self.project_dir / self.user / self.expid
+        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
         self.cancel_cmd = "kill -2"
         self._checkhost_cmd = "echo 1"
         self.put_cmd = "scp"
         self.get_cmd = "scp"
-        self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
+        self.mkdir_cmd = f"mkdir -p {self.remote_log_dir}"
         self.remove_checker = "rm -rf " + os.path.join(self.scratch, self.project_dir, self.user,
                                                        "ps_permission_checker_azxbyc")
         self.mkdir_checker = "mkdir -p " + os.path.join(self.scratch, self.project_dir, self.user,

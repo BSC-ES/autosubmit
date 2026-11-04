@@ -21,6 +21,7 @@ import json
 import locale
 import numbers
 import os
+import pwd
 import re
 import shutil
 import subprocess
@@ -37,6 +38,8 @@ from pyparsing import nested_expr
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.runtime import RuntimeConfig
+from autosubmit.config.utils import as_bool, as_mapping
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_utils import calendar_chunk_section
@@ -121,6 +124,33 @@ class AutosubmitConfig:
             raise AutosubmitCritical(
                 f"Error while reading PLATFORMS section: {exc}", 7014
             )
+
+    @property
+    def runtime(self) -> RuntimeConfig:
+        """Parsed ``RUNTIME`` section of the experiment configuration.
+
+        :return: The runtime configuration with normalized values and defaults.
+        """
+        return RuntimeConfig.from_experiment_data(self.experiment_data)
+
+    def is_recovery_threads_disabled(self, platform_name: str | None) -> bool:
+        """Whether the recovery threads are disabled for the given platform.
+
+        :param platform_name: Name of the platform (case-insensitive).
+        :return: ``True`` when ``DISABLE_RECOVERY_THREADS`` is enabled for the platform.
+        """
+        if not platform_name:
+            return False
+        platforms = as_mapping(self.experiment_data.get("PLATFORMS"), "PLATFORMS")
+        platforms_by_name = {name.upper(): data for name, data in platforms.items()}
+        platform_data = as_mapping(
+            platforms_by_name.get(platform_name.upper()), f"PLATFORMS.{platform_name}"
+        )
+        return as_bool(
+            platform_data.get("DISABLE_RECOVERY_THREADS"),
+            False,
+            f"PLATFORMS.{platform_name}.DISABLE_RECOVERY_THREADS",
+        )
 
     def get_wrapper_export(self, wrapper=None) -> str:
         """Returns modules variable from the wrapper
@@ -533,7 +563,7 @@ class AutosubmitConfig:
             self._normalize_notify_on(data_fixed, job)
 
     @staticmethod
-    def _normalize_wallclock(data_fixed: {}) -> None:
+    def _normalize_wallclock(data_fixed: dict) -> None:
         """
         Normalize the wallclock time format in the job configuration.
 
@@ -541,7 +571,6 @@ class AutosubmitConfig:
         If the wallclock time is in "HH:MM:SS" format, it truncates it to "HH:MM" and logs a warning.
 
         :param data_fixed: The dictionary containing job configurations.
-        :type data_fixed: dict
         """
         for job in data_fixed.get("JOBS", {}):
             wallclock = data_fixed["JOBS"][job].get("WALLCLOCK", "")
@@ -978,23 +1007,14 @@ class AutosubmitConfig:
         Substitute dynamic variables in the given keys.
 
         :param keys: List of keys to be processed.
-        :type keys: list[str]
         :param dynamic_var: Tuple containing the dynamic variable and its value.
-        :type dynamic_var: tuple[str, Any]
         :param parameters: Dictionary containing the parameters to be substituted.
-        :type parameters: dict[str, Any]
         :param pattern: Regex pattern to identify dynamic variables.
-        :type pattern: str
         :param start_long: Start index for long key format.
-        :type start_long: int
         :param dict_keys_type: Type of keys in the parameters dictionary, either "long" or "short".
-        :type dict_keys_type: str
         :param processed_dynamic_variables: Dictionary of already processed dynamic variables.
-        :type processed_dynamic_variables: dict[str, Any]
         :param in_the_end: Flag indicating whether to include special dynamic variables for substitution.
-        :type in_the_end: bool
         :return: A tuple containing the updated processed dynamic variables and parameters.
-        :rtype: tuple[dict[str, Any], dict[str, Any]]
         """
         for i, key in enumerate(filter(None, keys)):
             matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
@@ -1400,7 +1420,7 @@ class AutosubmitConfig:
                 with suppress(Exception):
                     if self.ignore_file_path:
                         if "SCRIPT" not in section_data:
-                            if not os.path.exists(os.path.join(self.get_project_dir(), section_file_path)):
+                            if not (Path(self.get_project_dir()) / section_file_path).exists():
                                 check_value = str(section_data.get('CHECK', True)).lower()
                                 if check_value != "false":
                                     if check_value not in "on_submission":
@@ -1408,7 +1428,7 @@ class AutosubmitConfig:
                                             [section,
                                              f"FILE {section_file_path} does not exist and check parameter is not set on_submission value"]]
                                 else:
-                                    self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} does not exist"]]
+                                    self.wrong_config["Jobs"] += [[section, f"FILE {Path(self.get_project_dir()) / section_file_path} does not exist"]]
 
             dependencies = section_data.get('DEPENDENCIES', '')
             if dependencies != "":
@@ -1584,11 +1604,11 @@ class AutosubmitConfig:
         :return:
         """
         # parameters.update( dict((name, getattr(BasicConfig, name)) for name in dir(BasicConfig) if not name.startswith('_') and not name=="read"))
-        parameters['ROOTDIR'] = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
+        parameters['ROOTDIR'] = str(Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid)
         # get_project_dir expects self.experiment_data to be loaded
         # parameters['PROJDIR'] = self.get_project_dir()
-        parameters['PROJDIR'] = os.path.join(
-            parameters['ROOTDIR'], "proj",
+        parameters['PROJDIR'] = str(Path(
+            parameters['ROOTDIR']) / "proj" /
             parameters.get('PROJECT', {}).get('PROJECT_DESTINATION', "project_files")
         )
         return parameters
@@ -1713,22 +1733,54 @@ class AutosubmitConfig:
         # Think of it as a tree with two branches that needs to be unified at each level
         return self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post)
 
+    def _get_experiment_owner_uid(self) -> int | None:
+        """
+        Get the UID of the owner of the experiment folder.
+
+        :return: UID of the owner if available, None if ``ROOTDIR`` is not set or cannot be read.
+        """
+        rootdir = self.experiment_data.get("ROOTDIR", None)
+        if not rootdir:
+            return None
+
+        try:
+            owner_uid = Path(rootdir).stat().st_uid
+            return owner_uid
+        except OSError as e:
+            Log.debug(f"Could not determine the owner of {rootdir}: {str(e)}")
+            return None
+
     @property
     def is_current_real_user_owner(self) -> bool:
         """
-        Check if the real user(AS_ENV_CURRENT_USER) is the owner of the experiment folder
-        :return: bool
+        Check if the real user (``AS_ENV_CURRENT_USER``) is the owner of the experiment folder.
+
+        :return: True if the real user is the owner, False otherwise.
         """
-        return Path(self.experiment_data["ROOTDIR"]).owner() == self.experiment_data["AS_ENV_CURRENT_USER"]
+        owner_uid = self._get_experiment_owner_uid()
+        real_user = self.experiment_data.get("AS_ENV_CURRENT_USER", None)
+        if owner_uid is None or not real_user:
+            return False
+
+        try:
+            real_user_uid = pwd.getpwnam(str(real_user)).pw_uid
+        except KeyError as e:
+            Log.debug(f"Could not determine the UID of the real user {real_user}: {str(e)}")
+            return False
+        
+        return owner_uid == real_user_uid
 
     @property
     def is_current_logged_user_owner(self) -> bool:
-        """Check if the current user is the owner of the experiment folder."""
-        if self.experiment_data.get("ROOTDIR", None):
-            rootdir_path = Path(self.experiment_data["ROOTDIR"])
-            return rootdir_path.exists() and rootdir_path.owner() == os.environ.get("USER", None)
-        else:
-            return False
+        """
+        Check if the current user is the owner of the experiment folder.
+
+        :return: True if the current user is the owner, False otherwise.
+        """
+        owner_uid = self._get_experiment_owner_uid()
+        current_user_uid = os.getuid()
+        
+        return owner_uid == current_user_uid
 
     @staticmethod
     def load_as_env_variables(parameters: dict[str, Any]) -> dict[str, Any]:
@@ -1754,8 +1806,8 @@ class AutosubmitConfig:
             return True
         if self.experiment_data.get("CONFIG", {}).get("RELOAD_WHILE_RUNNING", True):
             for file in self.current_loaded_files.keys():
-                if os.path.exists(file):
-                    mod_time = os.path.getmtime(file)
+                if Path(file).exists():
+                    mod_time = Path(file).stat().st_mtime
                     if mod_time > self.current_loaded_files[file]:
                         return True
         return False
@@ -1812,8 +1864,7 @@ class AutosubmitConfig:
                 del self.experiment_data["AS_TEMP"]
             # IF expid and hpcarch are not defined, use the ones from the minimal.yml file
             self.deep_add_missing_starter_conf(self.experiment_data, starter_conf)
-            self.experiment_data['ROOTDIR'] = os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, self.expid)
+            self.experiment_data['ROOTDIR'] = str(Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid)
             self.experiment_data['PROJDIR'] = self.get_project_dir()
             self.experiment_data.update(BasicConfig().props())
             self.experiment_data = self.normalize_variables(self.experiment_data, must_exists=True, raise_exception=True)
@@ -2189,7 +2240,7 @@ class AutosubmitConfig:
             value = self.experiment_data.get("PROJECT", {}).get("PROJECT_DESTINATION", "project_files")
             if not value:
                 if self.experiment_data.get("PROJECT", {}).get("PROJECT_TYPE", "").lower() == "local":
-                    value = os.path.split(self.experiment_data.get("LOCAL", {}).get("PROJECT_PATH", ""))[-1]
+                    value = Path(self.experiment_data.get("LOCAL", {}).get("PROJECT_PATH", "")).name
                 elif self.experiment_data.get("PROJECT", {}).get("PROJECT_TYPE", "").lower() == "svn":
                     value = self.experiment_data.get("SVN", {}).get("PROJECT_URL", "").split('/')[-1]
                 elif self.experiment_data.get("PROJECT", {}).get("PROJECT_TYPE", "").lower() == "git":
@@ -2363,7 +2414,7 @@ class AutosubmitConfig:
             return self.experiment_data["DEFAULT"]["HPCARCH"].upper()
         except KeyError:
             raise AutosubmitCritical(
-                "Defaul HPCARCH not defined in the configuration file", 7014
+                "Default HPCARCH not defined in the configuration file", 7014
             )
         except Exception as exc:
             raise AutosubmitCritical(
@@ -2375,7 +2426,7 @@ class AutosubmitConfig:
         :param command: current autosubmit command
         :return:
         """
-        misc = os.path.join(self.conf_folder_yaml, "as_misc.yml")
+        misc = self.conf_folder_yaml / "as_misc.yml"
         try:
             content = open(misc, 'r').read()
             if re.search('AS_MISC:.*', content):
@@ -2399,7 +2450,7 @@ class AutosubmitConfig:
         :param autosubmit_version: autosubmit's version
         :type autosubmit_version: str
         """
-        version_file = os.path.join(self.conf_folder_yaml, "version.yml")
+        version_file = self.conf_folder_yaml / "version.yml"
         try:
             content = open(version_file, 'r').read()
             if re.search('AUTOSUBMIT_VERSION:.*', content):
@@ -2667,19 +2718,18 @@ class AutosubmitConfig:
 
     def parse_githooks(self) -> None:
         """Parse githooks section in the configuration file."""
-        proj_dir = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_PROJ_DIR)
+        proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid / BasicConfig.LOCAL_PROJ_DIR
         # get project_name
         project_name = str(self.get_project_destination())
 
         # get githook files from proj_dir
-        githook_files = [os.path.join(os.path.join(os.path.join(proj_dir, project_name), ".githooks"), f) for f in
-                         os.listdir(os.path.join(os.path.join(proj_dir, project_name), ".githooks"))]
+        githook_files = [proj_dir / project_name / ".githooks" / f for f in
+                         (proj_dir / project_name / ".githooks").iterdir()]
         parameters = self.load_parameters()
 
         # find all '%(?<!%%)\w+%(?!%%)' in githook files
         for githook_file in githook_files:
-            f_name, ext = os.path.splitext(githook_file)
+            f_name, ext = githook_file.stem, githook_file.suffix
             if ext == ".tmpl":
                 with open(githook_file, 'r') as f:
                     content = f.read()
@@ -2742,7 +2792,7 @@ class AutosubmitConfig:
         if not datelist or not chunks:
             return
 
-        if isinstance(datelist, str) or isinstance(datelist, int):
+        if isinstance(datelist, (str, int)):
             datelist = str(datelist).split()
 
         for section_name, section_data in self.jobs_data.items():

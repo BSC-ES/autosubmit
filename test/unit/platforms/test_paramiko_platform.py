@@ -291,7 +291,7 @@ def test_get_pscall(paramiko_platform):
 def test_remove_multiple_files_no_error_path_does_not_exist(paramiko_platform):
     """Test that calling a platform function to remove multiple files accepts non-existing directories. """
     from uuid import uuid4
-    paramiko_platform.tmp_path = 'non-existing-path-' + uuid4().hex
+    paramiko_platform.tmp_path = Path('non-existing-path-' + uuid4().hex)
     assert paramiko_platform.remove_multiple_files([]) == ""
 
 
@@ -1207,7 +1207,7 @@ def test_exec_command_reconnects_on_transport_error(paramiko_platform, mocker, e
 
     assert result == (False, False, False)
     assert mocked_restore.call_count == (1 if expect_reconnect else 0)
-    assert platform.connected is (False if expect_reconnect else True)
+    assert platform.connected is (not expect_reconnect)
 
 
 @pytest.mark.parametrize(

@@ -25,7 +25,7 @@ __all__ = ["restore_platforms"]
 
 
 def restore_platforms(
-    platforms_to_test, mail_notify=False, as_conf=None, expid=None
+    platforms_to_test, mail_notify=False, as_conf=None, expid=None, fail_on_init_error=False
 ) -> None:
     """Try to restore each platform used in an experiment.
 
@@ -33,6 +33,8 @@ def restore_platforms(
     :param mail_notify: Whether to notify users by email or not.
     :param as_conf: Autosubmit configuration.
     :param expid: Experiment identifier.
+    :param fail_on_init_error: Whether a failure to initialise the log recovery process must
+        abort the run. Used for the initial connection at the start of a run.
     :raises AutosubmitCritical: If an error occurs trying to restore a platform.
     """
     Log.info("Checking the connection to all platforms in use")
@@ -81,6 +83,19 @@ def restore_platforms(
             platform_issues += f"\n[{platform_to_test.name}] Connection Unsuccessful to host {platform_to_test.host} "
             issues += platform_issues
             continue
+        log_recovery_expected = (
+            as_conf is not None
+            and platform_to_test.connected
+            and platform_to_test.should_run_log_recovery(as_conf)
+        )
+        if (fail_on_init_error
+                and log_recovery_expected
+                and not platform_to_test.try_respawn_log_recovery_process(as_conf)):
+            raise AutosubmitCritical(
+                f"[{platform_to_test.name}] Log recovery is enabled for this run, but its process "
+                f"could not be started. Aborting to avoid losing logs and stats.",
+                6008,
+            )
         if platform_to_test.check_remote_permissions():
             Log.result(
                 f"[{platform_to_test.name}] Correct user privileges for host {platform_to_test.host}"

@@ -130,7 +130,7 @@ def _match_autosubmit_cmdline(cmdline: list[str], command='run', expid: str | No
     if len(filtered_list) != 3:
         return None
 
-    if not Path(filtered_list[0]).name == 'autosubmit':
+    if Path(filtered_list[0]).name != 'autosubmit':
         return None
 
     if filtered_list[1] != command:

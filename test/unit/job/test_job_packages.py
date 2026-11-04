@@ -255,7 +255,7 @@ def test_job_package_generate_scripts(mocker, local, tmp_path, error, target_fun
     configuration = mocker.MagicMock()
 
     if error is not None and target_function is not None:
-        method_mocks[target_function].side_effect = error("boom", 7000) if error is AutosubmitError else error("boom", 7000)
+        method_mocks[target_function].side_effect = error("boom", 7000)
 
         with pytest.raises(error):  # type: ignore
             job_package.generate_scripts(configuration)

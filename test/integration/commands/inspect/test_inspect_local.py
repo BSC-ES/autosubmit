@@ -355,7 +355,7 @@ def test_inspect_calendar(tmp_path, autosubmit_exp, general_data: dict[str, Any]
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
-    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
 
     # Execute inspect
     as_conf.set_last_as_command('inspect')
@@ -387,10 +387,10 @@ def test_inspect_calendar(tmp_path, autosubmit_exp, general_data: dict[str, Any]
             "SPLIT_END_DATE": int(split_end_date) if split_end_date.isdigit() else None,
             "CHUNK_START_DATE": int(chunk_start_date),
             "CHUNK_END_DATE": int(chunk_end_date),
-            "SPLIT_FIRST": True if split_first.lower() == 'true' else False,
-            "SPLIT_LAST": True if split_last.lower() == 'true' else False,
-            "CHUNK_FIRST": True if chunk_first.lower() == 'true' else False,
-            "CHUNK_LAST": True if chunk_last.lower() == 'true' else False,
+            "SPLIT_FIRST": split_first.lower() == 'true',
+            "SPLIT_LAST": split_last.lower() == 'true',
+            "CHUNK_FIRST": chunk_first.lower() == 'true',
+            "CHUNK_LAST": chunk_last.lower() == 'true',
             "CURRENT_SPLIT": int(split),
             "MAX_SPLITS": int(max_splits),
             "CURRENT_CHUNK": int(chunk),

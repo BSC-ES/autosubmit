@@ -65,7 +65,7 @@ def test_get_table_from_name(schema):
     table = table_registry.get(table_name=ExperimentTable.name)
     assert table.name == ExperimentTable.name
     assert len(table.columns) == len(ExperimentTable.columns)  # type: ignore
-    assert all([left.name == right.name for left, right in zip(table.columns, ExperimentTable.columns)])  # type: ignore
+    assert all(left.name == right.name for left, right in zip(table.columns, ExperimentTable.columns))  # type: ignore
     assert table.schema == schema
 
 

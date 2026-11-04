@@ -76,9 +76,7 @@ class MetricSpecSelector:
             key = data.get("KEY", None)
             if isinstance(key, str):
                 key = key.split(".")
-            elif isinstance(key, list):
-                key = key
-            else:
+            elif not isinstance(key, list):
                 raise ValueError("Invalid key for JSON selector")
             return MetricSpecSelector(type=selector_type, key=key)
 
@@ -121,7 +119,7 @@ class UserMetricRepository:
         self.expid = expid
 
         exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
-        tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
+        tmp_path = exp_path.joinpath(BasicConfig.LOCAL_TMP_DIR)
         db_path = tmp_path.joinpath(f"metrics_{expid}.db")
 
         if BasicConfig.DATABASE_BACKEND == "postgres":

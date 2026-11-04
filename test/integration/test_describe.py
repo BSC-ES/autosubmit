@@ -186,6 +186,13 @@ def test_describe_uid_without_user(autosubmit_exp, mocker, tmp_path):
         return_value=mock_conf,
     )
     mock_conf.conf_folder_yaml = str(tmp_path)
+    # load_config is mocked with a MagicMock, so ParamikoSubmitter would read a
+    # MagicMock as experiment_data and the new strict config parsing would reject it (as_mapping).
+    # This test only checks the UID fallback, so the submitter is mocked out.
+    mocker.patch(
+        "autosubmit.experiment.describe.ParamikoSubmitter",
+        return_value=mocker.Mock(platforms=["LOCAL"]),
+    )
     owner_uid = exp.exp_path.stat().st_uid
 
     mocker.patch(

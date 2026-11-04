@@ -16,8 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Fixtures for unit tests."""
-
-from collections.abc import Callable
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -250,24 +248,6 @@ job_id = -1
 """The global sequence of test Job IDs. Starts at 0 (increments+returns)."""
 
 
-@pytest.fixture(scope="session")
-def next_job_id() -> Callable[[], int]:
-    """A fixture that returns a sequence of Job IDs.
-
-    We had a test failing intermittently due to ``randrange`` used to generate job ids:
-    https://github.com/BSC-ES/autosubmit/issues/2744
-
-    This quick-and-dirty solution uses a global sequence to return the next Job ID.
-    """
-
-    def _next_job_id() -> int:
-        global job_id
-        job_id += 1
-        return job_id
-
-    return _next_job_id
-
-
 @pytest.fixture
 def slurm_platform(autosubmit_config, tmp_path):
     """Minimal SlurmPlatform with the directory structure it expects."""
@@ -393,9 +373,9 @@ class FakePlatform:
 @pytest.fixture
 def fake_platform(mocker) -> FakePlatform:
     """Return a :class:`FakePlatform` with mocker-backed method stubs.
+
     :param mocker: pytest-mock mocker fixture.
     :return: Configured :class:`FakePlatform` instance.
-    :rtype: FakePlatform
     """
     fp = FakePlatform()
     fp.check_all_jobs = mocker.MagicMock()
@@ -406,9 +386,9 @@ def fake_platform(mocker) -> FakePlatform:
 @pytest.fixture
 def fake_job_list(mocker) -> JobList:
     """Return a minimal :class:`JobList` for wrapper/job-check unit tests.
+
     :param mocker: pytest-mock mocker fixture.
     :return: Configured :class:`JobList` instance.
-    :rtype: JobList
     """
     as_conf = mocker.MagicMock()
     as_conf.experiment_data = {}

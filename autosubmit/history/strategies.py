@@ -106,7 +106,6 @@ class StraightWrapperAssociationStrategy(Strategy):
         super().__init__(historiclog_dir_path=historiclog_dir_path)
 
     def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
-        """ """
         try:
             if len(job_data_dcs_in_wrapper) != slurm_monitor.step_count:
                 return []

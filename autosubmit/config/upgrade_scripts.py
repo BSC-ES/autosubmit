@@ -19,144 +19,18 @@
 
 import locale
 import re
-import shutil
-from io import StringIO
 from pathlib import Path
-from typing import Any
-
-from configobj import ConfigObj
-from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.registry import load_config
+from autosubmit.config.utils import ini_to_yaml
 from autosubmit.database.db_common import update_experiment_description_version
 from autosubmit.experiment.utils import check_ownership, create_required_folders
 from autosubmit.helpers.version import get_version
 from autosubmit.log.log import Log
 
-__all__ = ["ini_to_yaml", "upgrade_scripts"]
-
-
-_LISTS_REGEX = re.compile(
-    r"""
-    =\s*                 # equals sign + optional spaces
-    \[                   # opening bracket
-    (?P<content>         # capture group "content"
-        [^]]*            # anything except closing bracket
-    )
-    ]                    # closing bracket
-""",
-    re.VERBOSE | re.IGNORECASE,
-)
-"""Regex to match patterns like '= [bla]', '= [a, b, c]'."""
-
-
-def _replace_list(match):
-    """Convert '= [a, b]' by ='= "a, b"'."""
-    content = match.group("content").strip()
-    return f'= "{content}"'
-
-
-def _update_dict(config_obj: ConfigObj) -> dict[str, Any]:
-    """Convert a ConfigObj dictionary to a nested dictionary.
-
-    It is iterative, not recursive, so no risk of YAML-bomb files causing stack issues.
-
-    :param config_obj: The original ConfigObj instance (dictionary-compatible).
-    :return: The resulting dictionary.
-    """
-    yaml_dict: dict[str, Any] = {}
-
-    stack: list[tuple[str | None, dict[str, Any]]] = [(None, config_obj)]
-
-    while stack:
-        current_key, source_dict = stack.pop()
-
-        for k, v in source_dict.items():
-            keys = k.split(".")
-            current = yaml_dict if not current_key else yaml_dict[current_key]
-
-            # Traverse down the nested keys
-            for nested_key in keys[:-1]:
-                current = current.setdefault(nested_key, {})
-
-            last_key = keys[-1]
-
-            if isinstance(v, dict):
-                # Does the YAML data already contain this, and as a dictionary?
-                # If so, we use that.
-                existing = current.get(k)
-                if not isinstance(existing, dict):
-                    current[last_key] = {}
-
-                stack.append((last_key, v))
-            else:
-                current[last_key] = v
-                current.setdefault(last_key, v)
-
-    return yaml_dict
-
-
-def ini_to_yaml(ini_file: Path) -> Path:
-    """Convert an Autosubmit conf file to YAML.
-
-    Creates a backup of the conf file before conversion.
-
-    INI lists such as "a = [b, c]" are converted to YAML lists ["b", "c"].
-    An intermediary step is required to convert from "a = [b, c]" to "a = b, c".
-
-    Configuration keys such as "a.b.c" are converted to nested dictionaries
-    {"a": {"b": {"c": ...}}}.
-
-    After the conversion, for each INI file we should have the backup INI file
-    and the new YAML file.
-
-    If the file name contains "jobs" or "platform" in ANY part of its name,
-    then the generated YAML data will become ``{"JOBS": yaml_data}`` or
-    ``{"PLATFORMS": yaml_data}``.
-
-    :param ini_file: Path to the AS3 conf file to convert.
-    :return: The YAML file.
-    """
-    yaml_file_path = ini_file.with_suffix(".yml")
-    if yaml_file_path.exists():
-        Log.debug(
-            f"AS3 conf file {ini_file} not upgraded. YAML file already exists: {yaml_file_path}"
-        )
-        return yaml_file_path
-
-    # Read the file name from the command line argument
-    backup_path = ini_file.parent / f"{ini_file.name}_as_v3_backup"
-    if not backup_path.exists():
-        Log.info(f"Backup created at {backup_path}")
-        shutil.copyfile(ini_file, backup_path)
-    else:
-        Log.info(f"Backup already exists at {backup_path}")
-
-    encoding = locale.getlocale()[1]
-    content = ini_file.read_text(encoding=encoding)
-    content = _LISTS_REGEX.sub(_replace_list, content)
-
-    config_dict = ConfigObj(
-        StringIO(content),
-        stringify=True,
-        list_values=False,
-        interpolation=False,
-        unrepr=False,
-    )
-
-    yaml_dict = _update_dict(config_dict)
-
-    if "platform" in ini_file.name.lower():
-        yaml_dict = {"PLATFORMS": yaml_dict}
-    elif "jobs" in ini_file.name.lower():
-        yaml_dict = {"JOBS": yaml_dict}
-
-    yaml_file_path = ini_file.with_suffix(".yml")
-    with open(yaml_file_path, "w", encoding=encoding) as yaml_file:
-        YAML().dump(yaml_dict, yaml_file)
-    return yaml_file_path
+__all__ = ["upgrade_scripts"]
 
 
 def upgrade_scripts(expid: str, files: list[str] | None) -> bool:

@@ -48,13 +48,13 @@ def _build_script(tmp_path: 'Path', body: str, executable: str | None = None) ->
 
 def test_header_default_executable_used_when_empty():
     """Use the default executable when an empty string is given."""
-    header = as_header(platform_header='', executable='')
+    header = as_header(platform_header="", executable="")
     assert _DEFAULT_EXECUTABLE.strip() in header.splitlines()[0]
 
 
 def test_header_default_executable_used_when_none():
     """Use the default executable when ``None`` is given."""
-    header = as_header(platform_header='', executable=None)
+    header = as_header(platform_header="", executable=None)
     assert _DEFAULT_EXECUTABLE.strip() in header.splitlines()[0]
 
 

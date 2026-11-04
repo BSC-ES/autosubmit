@@ -67,8 +67,8 @@ def test_submodules_empty_string(mocker, autosubmit_config):
     # A good improvement would have to break the function called into smaller
     # parts, like ``get_git_version``, ``clone_submodules(recursive=True)``, etc.
     # as that would be a lot easier to test.
-    recursive_in_any_call = any([call for call in platform.method_calls if
-                                 'git submodule update --init --recursive' in str(call)])
+    recursive_in_any_call = any(call for call in platform.method_calls if
+                                 'git submodule update --init --recursive' in str(call))
 
     assert recursive_in_any_call
 
@@ -103,8 +103,8 @@ def test_submodules_list_not_empty(mocker, autosubmit_config):
     clone_repository(as_conf=as_conf, force=force)
 
     # Here the call happens in the hpcarch, not in subprocess
-    clone_me_a_in_any_call = any([call for call in platform.method_calls if
-                                  'clone_me_a' in str(call)])
+    clone_me_a_in_any_call = any(call for call in platform.method_calls if
+                                  'clone_me_a' in str(call))
 
     assert clone_me_a_in_any_call
 
@@ -140,8 +140,8 @@ def test_submodules_false_disables_submodules(mocker, autosubmit_config):
 
     # Because we have ``PROJECT_SUBMODULES: False``, there must be no calls
     # to git submodules.
-    any_one_used_submodules = any([call for call in platform.method_calls if
-                                   'submodules' in str(call)])
+    any_one_used_submodules = any(call for call in platform.method_calls if
+                                   'submodules' in str(call))
 
     assert not any_one_used_submodules
 
