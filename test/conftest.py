@@ -161,6 +161,7 @@ def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest',
 
     monkeypatch.setenv('AUTOSUBMIT_CONFIGURATION', str(autosubmitrc))
 
+    BasicConfig.reset()
     BasicConfig.read()
     create_required_directories()
 

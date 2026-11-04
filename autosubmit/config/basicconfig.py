@@ -29,7 +29,7 @@ class BasicConfig:
         pr = {}
         for name in dir(self):
             value = getattr(self, name)
-            if not name.startswith('__') and not inspect.ismethod(value) and not inspect.isfunction(value):
+            if not name.startswith('_') and not inspect.ismethod(value) and not inspect.isfunction(value):
                 pr[name] = value
         return pr
 
@@ -62,6 +62,12 @@ class BasicConfig:
     DATABASE_CONN_URL = ""
     DATABASE_BACKUP = True
     LOG_RECOVERY_TIMEOUT: int = 60 * 5
+
+    _initial_defaults = {
+        k: v for k, v in vars().items()
+        if not k.startswith("_") and not inspect.isroutine(v)
+    }
+    _is_read: bool = False
 
     # TODO: BasicConfig contains site configuration, but this function returns the experiment directory.
     #       BasicConfig.read() loads the object, and this static function is completely unrelated; it is
@@ -207,12 +213,22 @@ class BasicConfig:
         if parser.has_option('config', 'log_recovery_timeout'):
             BasicConfig.LOG_RECOVERY_TIMEOUT = int(parser.get('config', 'log_recovery_timeout'))
 
+    @classmethod
+    def reset(cls) -> None:
+        cls._is_read = False
+        cls.CONFIG_FILE_FOUND = False
+        for key, value in cls._initial_defaults.items():
+            setattr(cls, key, value)
+
     @staticmethod
-    def read():
+    def read(force: bool = False) -> None:
         """
         Reads configuration from .autosubmitrc files, first from /etc., then for user
         directory and last for current path.
         """
+        if BasicConfig._is_read and not force:
+            return
+
         filename = "autosubmitrc"
         dot_filename = f".{filename}"
         # Check if the environment variable is defined
@@ -241,3 +257,4 @@ class BasicConfig:
                     BasicConfig.__read_file_config(etc_rc_path)
 
         BasicConfig._update_config()
+        BasicConfig._is_read = True

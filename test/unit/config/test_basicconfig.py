@@ -59,7 +59,7 @@ def test_read_file_config(tmp_path, monkeypatch):
     config_file = tmp_path / "autosubmitrc"
     config_file.write_text(config_content)
     monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
-    BasicConfig.read()
+    BasicConfig.read(force=True)
     assert BasicConfig.ALLOWED_HOSTS == {"": ["3]]", ""], "1": ["3]]", ""]}
     assert BasicConfig.AS_TIMES_DB == "as_times.db"
     assert BasicConfig.AUTOSUBMIT_API_URL.startswith("http://192.168.11.91:8081")
@@ -153,7 +153,71 @@ def test_read_database_backup_option(
     monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
     monkeypatch.setattr(BasicConfig, "DATABASE_BACKUP", not expected)
 
-    BasicConfig.read()
+    BasicConfig.read(force=True)
 
     assert BasicConfig.DATABASE_BACKUP is expected
+
+
+def test_basic_config_read_idempotent_caching(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Repeated calls to BasicConfig.read() do not re-read from disk when _is_read is True."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text("[database]\nfilename = initial.db\n")
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    BasicConfig.reset()
+    BasicConfig.read()
+    assert BasicConfig._is_read is True
+    assert BasicConfig.DB_FILE == "initial.db"
+
+    # Modify file on disk; subsequent unforced read must NOT reload the file
+    config_file.write_text("[database]\nfilename = modified.db\n")
+    BasicConfig.read()
+    assert BasicConfig.DB_FILE == "initial.db"
+
+
+def test_basic_config_read_force_reload(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Calling BasicConfig.read(force=True) bypasses _is_read and parses the file."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text("[database]\nfilename = initial.db\n")
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    BasicConfig.reset()
+    BasicConfig.read()
+    assert BasicConfig.DB_FILE == "initial.db"
+
+    # Modify file on disk; forced read must reload the new configuration
+    config_file.write_text("[database]\nfilename = forced.db\n")
+    BasicConfig.read(force=True)
+    assert BasicConfig.DB_FILE == "forced.db"
+    assert BasicConfig._is_read is True
+
+
+def test_basic_config_reset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Calling BasicConfig.reset() clears _is_read, sets CONFIG_FILE_FOUND = False, and restores defaults."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text("[database]\nfilename = custom.db\n")
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    BasicConfig.reset()
+    BasicConfig.read()
+    assert BasicConfig._is_read is True
+    assert BasicConfig.CONFIG_FILE_FOUND is True
+    assert BasicConfig.DB_FILE == "custom.db"
+
+    BasicConfig.reset()
+    assert BasicConfig._is_read is False
+    assert BasicConfig.CONFIG_FILE_FOUND is False
+    assert BasicConfig.DB_FILE == BasicConfig._initial_defaults["DB_FILE"]
+    for key, value in BasicConfig._initial_defaults.items():
+        assert getattr(BasicConfig, key) == value
+
+
+def test_basic_config_props_excludes_private_attributes() -> None:
+    """BasicConfig.props() excludes attributes starting with an underscore."""
+    props = BasicConfig().props()
+    for key in props:
+        assert not key.startswith("_")
+    assert "_initial_defaults" not in props
+    assert "_is_read" not in props
+
 
