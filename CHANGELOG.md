@@ -35,6 +35,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix the -cw flag name and wording in the scheduler warning #3393 (thanks @bfs2021)
 - Fixed `is_current_logged_user_owner` and `is_current_real_user_owner` raising `KeyError` when the experiment
   folder is owned by a UID with no `passwd` entry (e.g. inside containers) #3375
+- Fixed mail notifications crashing the experiment when `MAIL.TO` is a string #2974
 
 **New Features:**
 
