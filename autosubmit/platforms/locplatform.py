@@ -108,14 +108,14 @@ class LocalPlatform(ParamikoPlatform):
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
 
-    def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
 
-        :param raw_output: output of the submit command.
+        :param output: output of the submit command.
         :param x11: whether the job is an x11 job, which has a different output format.
         :return: job ID of the submitted job.
         """
-        return [output.strip() for output in raw_output.splitlines() if output.strip()]
+        return [line.strip() for line in output.splitlines() if line.strip()]
 
     def write_jobid(self, jobid: str, complete_path: str) -> None:
         try:

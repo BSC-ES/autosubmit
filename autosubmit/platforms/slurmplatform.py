@@ -25,6 +25,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
@@ -92,11 +93,11 @@ class SlurmPlatform(ParamikoPlatform):
         self._allow_wrappers = True
         self.update_cmds()
         self.config = config
-        tmp_path = Path(self.config.get("LOCAL_ROOT_DIR")) / self.expid / "tmp"
+        tmp_path = Path(self.config.get("LOCAL_ROOT_DIR", BasicConfig.LOCAL_ROOT_DIR)) / self.expid / "tmp"
         self._submit_script_path = tmp_path / self.config.get("LOCAL_ASLOG_DIR", "") / f"submit_{self.name}.sh"
         self._submit_script_base_name = tmp_path / self.config.get("LOCAL_ASLOG_DIR", "") / "submit_"
 
-def create_a_new_copy(self):
+    def create_a_new_copy(self):
         """Return a copy of a SlurmPlatform object with the same expid, name and config as the original.
 
         :return: A new platform type slurm
@@ -172,7 +173,7 @@ def create_a_new_copy(self):
             return status
         return status[0]
 
-    def get_submitted_job_id(self, output: str, x11: bool = False) -> int | list[Any]:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[int] | int:
         """Parses the output of the submit command to get the job ID.
 
         :param output: output of the submit command.

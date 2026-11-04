@@ -57,7 +57,7 @@ def paramiko_platform() -> Generator[ParamikoPlatform, None, None]:
         "LOCAL_TMP_DIR": "tmp",
     }
     platform = ParamikoPlatform(expid='a000', name='local', config=config)
-    platform.TYPE = "local"
+    platform.TYPE = PlatformType.LOCAL
     platform.job_status = {
         'COMPLETED': [],
         'RUNNING': [],
@@ -431,13 +431,12 @@ def test_move_file_errors(must_exist, expected_error_or_return_value, paramiko_p
 
     The main execution path of that function is tested with an integration test.
     """
-
-    if type(expected_error_or_return_value) is bool:
-        r = paramiko_platform.move_file('a.txt', 'b.txt', must_exist=must_exist)
-        assert r == expected_error_or_return_value
-    else:
+    if expected_error_or_return_value is AutosubmitError:
         with pytest.raises(expected_error_or_return_value):  # type: ignore
             paramiko_platform.move_file('a.txt', 'b.txt', must_exist=must_exist)
+    else:
+        r = paramiko_platform.move_file('a.txt', 'b.txt', must_exist=must_exist)
+        assert r == expected_error_or_return_value
 
 
 @pytest.mark.parametrize(

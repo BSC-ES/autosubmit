@@ -1829,7 +1829,7 @@ class ParamikoPlatform(Platform):
             f"ps -o stat= -p {job_id} 2>/dev/null | grep -qv '^Z' && echo 0 || echo 1"
         )
 
-    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str] | list[int] | int:
         """Parses the output of the submit command to get the job ID.
 
         :param output: output of the submit command.

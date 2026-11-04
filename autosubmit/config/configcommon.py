@@ -670,7 +670,7 @@ class AutosubmitConfig:
         #       ``misc_files``. It might be simpler to have a separate function for this, or append directly.
         new_file.data = self._pin_immutable_variables(new_file.data)
         if new_file.data.get("AS_MISC", False) and not load_misc:
-            self.misc_files.append(yaml_file)
+            self.misc_files.append(str(yaml_file))
             new_file.data = {}
         self._delete_autosubmit_calculated_variables(new_file.data)
         return self.unify_conf(current_folder_data, new_file.data)

@@ -292,21 +292,21 @@ class PBSPlatform(ParamikoPlatform):
                     return status.upper()
         return ''
 
-    def get_submitted_job_id(self, output_lines: str, x11: bool = False) -> list[str]:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[int]:
         """Iterate through jobs that didn't fail the submission and retrieve their ID.
 
-        :param output_lines: Output of the ssh command.
+        :param output: Output of the ssh command.
         :param x11: Enable x11 forwarding, to enable graphical jobs.
         :return: List of job ids that got submitted and had an output.
         """
         try:
-            output_lines = output_lines.lower()
-            if output_lines.find("failed") != -1:
+            output = output.lower()
+            if output.find("failed") != -1:
                 raise AutosubmitCritical(
                     "Submission failed. Command Failed", 7014)
             jobs_id = []
-            for output in output_lines.splitlines():
-                jobs_id.append(int(output.split('.')[0]))
+            for output_line in output.splitlines():
+                jobs_id.append(int(output_line.split('.')[0]))
             return jobs_id
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
@@ -368,7 +368,7 @@ class PBSPlatform(ParamikoPlatform):
         wrapper_failed: bool = False,
         sleeptime: int = 5,
         max_retries: int = 3,
-    ):
+    ) -> bool:
         """Check if a file exists on the FTP server.
 
         :param src: The name of the file to check.

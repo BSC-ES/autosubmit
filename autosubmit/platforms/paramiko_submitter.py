@@ -208,9 +208,9 @@ class ParamikoSubmitter:
         local_platform.max_processors = as_conf.get_max_processors()
         local_platform.max_waiting_jobs = as_conf.get_max_waiting_jobs()
         local_platform.total_jobs = as_conf.get_total_jobs()
-        local_platform.scratch = Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid / BasicConfig.LOCAL_TMP_DIR
-        local_platform.temp_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / 'ASlogs'
-        local_platform.root_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / local_platform.expid
+        local_platform.scratch = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid / BasicConfig.LOCAL_TMP_DIR)
+        local_platform.temp_dir = str(Path(BasicConfig.LOCAL_ROOT_DIR) / 'ASlogs')
+        local_platform.root_dir = str(Path(BasicConfig.LOCAL_ROOT_DIR) / local_platform.expid)
         local_platform.host = 'localhost'
         # Add an object to entry in dictionary
         self.platforms = {

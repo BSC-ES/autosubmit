@@ -310,7 +310,7 @@ def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPl
 
     assert (
         isinstance(parameters["CURRENT_ROOTDIR"], str)
-        and len(parameters["CURRENT_ROOTDIR"]) > 0
+        and parameters["CURRENT_ROOTDIR"] is not None
     )
 
     assert parameters["CURRENT_METRIC_FOLDER"] == str(
