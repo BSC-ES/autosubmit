@@ -34,7 +34,7 @@ def _create_db_manager(db_path: Path) -> DbManager:
 
 
 def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath") -> None:
-    db_manager = _create_db_manager(Path(tmp_path, f'{__name__}.db'))
+    db_manager = _create_db_manager(tmp_path / f'{__name__}.db')
     assert db_manager.engine is not None
     assert db_manager.engine.name.startswith('sqlite')
 
@@ -42,7 +42,7 @@ def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath") -> No
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_after_create_table_then_it_is_empty(tmp_path: "LocalPath", as_db: str) -> None:
-    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager = _create_db_manager(tmp_path / 'tests.db')
     db_manager.create_table(ExperimentTable.name)
     assert 0 == db_manager.count(ExperimentTable.name)
 
@@ -50,7 +50,7 @@ def test_after_create_table_then_it_is_empty(tmp_path: "LocalPath", as_db: str) 
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_after_3_inserts_into_a_table_then_it_has_3_rows(tmp_path: "LocalPath", as_db: str) -> None:
-    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager = _create_db_manager(tmp_path / 'tests.db')
     db_manager.create_table(ExperimentTable.name)
     for i in range(1, 4):
         db_manager.insert(
@@ -79,7 +79,7 @@ def test_delete_experiment_db(monkeypatch, tmp_path) -> None:
 @pytest.mark.postgres
 def test_invalid_dialect(monkeypatch, tmp_path) -> None:
     """``upsert_many`` rejects unknown dialects."""
-    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager = _create_db_manager(tmp_path / 'tests.db')
     db_manager.create_table(ExperimentTable.name)
 
     assert db_manager.engine is not None
