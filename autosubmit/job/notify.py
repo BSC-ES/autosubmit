@@ -34,7 +34,7 @@ def job_notify(as_conf, expid: str, job: Job):
             job.name,
             Status.VALUE_TO_KEY[job.prev_status],
             Status.VALUE_TO_KEY[job.status],
-            as_conf.experiment_data["MAIL"]["TO"],
+            as_conf.experiment_data.get("MAIL", {}).get("TO", ""),
         )
 
 
