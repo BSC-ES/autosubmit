@@ -3219,3 +3219,25 @@ def test_compute_inner_job_status_returns_stat_when_done(mocker):
     result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
 
     assert result == Status.FAILED
+
+
+def test_update_parameters_does_not_call_reload(autosubmit_config, mocker):
+    """Verify that update_parameters does not reload AutosubmitConfig even when set_attributes is True."""
+    experiment_data = {
+        "JOBS": {
+            "RANDOM-SECTION": {
+                "FILE": "test.sh",
+                "PLATFORM": "LOCAL",
+            }
+        }
+    }
+    as_conf = autosubmit_config("t000", experiment_data)
+    reload_spy = mocker.spy(as_conf, "reload")
+    job = Job("A", "1", Status.WAITING, 1)
+    job.section = "RANDOM-SECTION"
+    job.platform_name = "LOCAL"
+
+    job.update_parameters(as_conf, set_attributes=True)
+
+    reload_spy.assert_not_called()
+

@@ -171,8 +171,8 @@ class Log:
     STATUS_FAILED = 500
     STATUS = 1000
     DEBUG = 2000
-    WARNING = 3000
-    INFO = 4000
+    INFO = 3000
+    WARNING = 4000
     RESULT = 5000
     ERROR = 6000
     CRITICAL = 7000
@@ -251,11 +251,11 @@ class Log:
             "STATUS_FAILED": 500,
             "STATUS": 1000,
             "DEBUG": 2000,
-            "WARNING": 3000,
-            "INFO": 4000,
+            "INFO": 3000,
+            "WARNING": 4000,
             "RESULT": 5000,
             "ERROR": 6000,
-            "CRITICAL": 7000
+            "CRITICAL": 7000,
         }
         levels["NO_LOG"] = levels["CRITICAL"] + 1000
 
@@ -454,19 +454,19 @@ class Log:
         Log.log.log(Log.STATUS_FAILED, msg)
 
     @staticmethod
-    def printlog(message="Generic message", code=4000) -> None:
+    def printlog(message="Generic message", code=3000) -> None:
         """Log management for Autosubmit messages.
 
         Attributes:
             code -- Classified code
             message -- explanation
         """
-        if 4000 <= code < 5000:
+        if 3000 <= code < 4000:
             Log.info("{0}", message)
+        elif 4000 <= code < 5000:
+            Log.warning("{1}[eCode={0}]", code, message)
         elif 5000 <= code < 6000:
             Log.result("{0}", message)
-        elif 3000 <= code < 4000:
-            Log.warning("{1}[eCode={0}]", code, message)
         elif 6000 <= code < 7000:
             Log.error("{1}[eCode={0}]", code, message)
         elif code <= 7000:

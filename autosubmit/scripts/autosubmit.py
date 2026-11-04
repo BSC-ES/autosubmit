@@ -90,7 +90,7 @@ def _get_arg_parser() -> ArgumentParser:
         "-lf",
         "--logfile",
         choices=log_levels,
-        default="DEBUG",
+        default="INFO",
         type=str,
         help="Set the log level for the log file.",
     )
@@ -98,7 +98,7 @@ def _get_arg_parser() -> ArgumentParser:
         "-lc",
         "--logconsole",
         choices=log_levels,
-        default="WARNING",
+        default="INFO",
         type=str,
         help="Set the log level for the console.",
     )
