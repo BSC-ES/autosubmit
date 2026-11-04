@@ -22,6 +22,7 @@ import os
 import re
 import time
 import traceback
+from collections import deque
 from contextlib import suppress
 from pathlib import Path
 from time import localtime, mktime, strftime
@@ -3869,7 +3870,7 @@ class JobList:
         return "\n".join(results)
 
     def _recursion_print(self, job, level, visited=[], status_change=None, nocolor=False) -> str:
-        """Returns the list of children in a recursive way
+        """Returns the list of children in an iterative way using a worklist
         Traverses the dependency tree
 
         :param job: Job object
@@ -3879,44 +3880,56 @@ class JobList:
 
         :return: parent + list of children
         """
-        result = ""
-        if job.name not in visited:
-            visited.append(job.name)
-            prefix = ""
-            for i in range(level):
-                prefix += "|  "
+        if job is None:
+            return ""
+
+        visited_set = set(visited) if visited else set()
+        stack = deque([(job, level)])
+        results = []
+
+        while stack:
+            curr_job, curr_level = stack.pop()
+            if curr_job.name in visited_set:
+                continue
+
+            visited_set.add(curr_job.name)
+            if isinstance(visited, list):
+                visited.append(curr_job.name)
+            elif isinstance(visited, set):
+                visited.add(curr_job.name)
+
+            prefix = "|  " * curr_level
             # Prefix + Job Name
-            result = "\n" + prefix + \
-                     (bcolors.BOLD + bcolors.CODE_TO_COLOR[job.status]
-                      if nocolor is False else '') + job.name + \
-                     (bcolors.ENDC + bcolors.ENDC if nocolor is False else '')
-            if len(job._children) > 0:
-                level += 1
-                children = job._children
-                total_children = len(job._children)
+            line = "\n" + prefix + \
+                   (bcolors.BOLD + bcolors.CODE_TO_COLOR[curr_job.status]
+                    if nocolor is False else '') + curr_job.name + \
+                   (bcolors.ENDC + bcolors.ENDC if nocolor is False else '')
+            if len(curr_job._children) > 0:
+                children = curr_job._children
+                total_children = len(curr_job._children)
                 # Writes children number and status if color are not being showed
-                result += (" ~ [" + str(total_children) +
-                           (" children] " if total_children > 1 else " child] ") +
-                           ("[" + Status.VALUE_TO_KEY[job.status] + "] " if nocolor is True else "")
-                           )
+                line += (" ~ [" + str(total_children) +
+                         (" children] " if total_children > 1 else " child] ") +
+                         ("[" + Status.VALUE_TO_KEY[curr_job.status] + "] " if nocolor is True else "")
+                         )
                 if status_change is not None and len(str(status_change)) > 0:
                     # Writes change if performed
-                    result += (bcolors.BOLD +
-                               bcolors.OKGREEN if nocolor is False else '')
-                    result += (status_change[job.name]
-                               if job.name in status_change else "")
-                    result += (bcolors.ENDC +
-                               bcolors.ENDC if nocolor is False else "")
+                    line += (bcolors.BOLD +
+                             bcolors.OKGREEN if nocolor is False else '')
+                    line += (status_change[curr_job.name]
+                             if curr_job.name in status_change else "")
+                    line += (bcolors.ENDC +
+                             bcolors.ENDC if nocolor is False else "")
                 # order by name, this is for compare 4.0 with 4.1 as the children order is different
-                for child in sorted(children, key=lambda x: x.name):
-                    # Continues recursion
-                    result += self._recursion_print(
-                        child, level, visited, status_change=status_change, nocolor=nocolor)
+                for child in sorted(children, key=lambda x: x.name, reverse=True):
+                    stack.append((child, curr_level + 1))
             else:
-                result += (" [" + Status.VALUE_TO_KEY[job.status] +
-                           "] " if nocolor is True else "")
+                line += (" [" + Status.VALUE_TO_KEY[curr_job.status] +
+                         "] " if nocolor is True else "")
 
-        return result
+            results.append(line)
+
+        return "".join(results)
 
     def retrieve_symbols(self) -> dict:
         """Retrieves dictionaries that map the collection of packages in the experiment
