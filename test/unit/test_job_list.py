@@ -231,6 +231,24 @@ def test_get_job_by_name_returns_the_expected_job(setup_job_list):
         assert retrieved_job.status == job.status
 
 
+def test_get_job_by_name_o1_lookup(setup_job_list):
+    jobs, _edges, job_list = setup_job_list
+
+    # Verify that get_job_by_name returns the job instance when present in self.graph
+    target_job = jobs[0]
+    retrieved_job = job_list.get_job_by_name(target_job.name)
+    assert retrieved_job is target_job
+    assert retrieved_job.name == target_job.name
+
+    # Verify that get_job_by_name returns None when the job does not exist in self.graph
+    assert job_list.get_job_by_name("non_existent_job_xyz") is None
+
+    # Verify that lookups remain consistent when jobs are added to the graph
+    new_job = Job("job_dynamic_o1", 999, Status.WAITING, 0)
+    job_list.add_job(new_job)
+    assert job_list.get_job_by_name("job_dynamic_o1") is new_job
+
+
 def test_sort_by_name_returns_the_list_of_jobs_well_sorted(setup_job_list):
     _jobs, _edges, job_list = setup_job_list
     sorted_by_name = job_list.sort_by_name()

@@ -2703,15 +2703,13 @@ class JobList:
         return active
 
     def get_job_by_name(self, name: str) -> Job | None:
-        """Returns the job that its name matches parameter name.
+        """Get job by name in O(1) using the graph node data.
 
-        :parameter name: name to look for
-        :return: found job
+        :param name: Name of the job
+        :return: Job object if found, None otherwise
         """
-        for job in self.job_list:
-            if job.name == name:
-                return job
-        return None
+        node_data = self.graph.nodes.get(name)
+        return node_data.get("job") if node_data else None
 
     def get_jobs_by_section(self, section_list: list, banned_jobs: list | None = None,
                             get_only_non_completed: bool = False) -> list:
