@@ -237,16 +237,16 @@ class Platform(ABC):
         self._log_recovery_in_backoff: bool = False
         self._log_recovery_retry_at: float = 0.0
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
-        self.compress_remote_logs = False
+        self.compress_remote_logs = True
         self.remote_logs_compress_type = "gzip"
-        self.compression_level = 9
+        self.compression_level = 6
         log_queue_size = 200
         if self.config:
             platform_config: dict = self.config.get("PLATFORMS", {}).get(self.name.upper(), {})
             log_queue_size = resolve_log_recovery_queue_size(self.config, self.name)
-            self.compress_remote_logs = platform_config.get("COMPRESS_REMOTE_LOGS", False)
+            self.compress_remote_logs = platform_config.get("COMPRESS_REMOTE_LOGS", True)
             self.remote_logs_compress_type = platform_config.get("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
-            self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
+            self.compression_level = platform_config.get("COMPRESSION_LEVEL", 6)
 
         self.log_queue_size = log_queue_size
         self.remote_log_dir: str = ""

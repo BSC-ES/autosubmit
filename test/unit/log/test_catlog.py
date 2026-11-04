@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import gzip
 from pathlib import Path
 from subprocess import DEVNULL
 
@@ -23,8 +24,9 @@ import pytest
 from autosubmit.config.basicconfig import BasicConfig
 
 # noinspection PyProtectedMember
-from autosubmit.log.catlog import _view_file, cat_log
+from autosubmit.log.catlog import ViewMode, _view_file, cat_log
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.platforms.platform import Platform
 
 _EXPID = "a000"
 
@@ -333,3 +335,99 @@ def test_is_job_command_file_missing(mocker, exp_logs_dir):
         ["cat", str(log_file)],
         stdin=DEVNULL,
     )
+
+
+@pytest.mark.parametrize("file_type,extension", [("o", "out"), ("e", "err")])
+def test_job_uncompressed_cat(mocker, exp_logs_dir, file_type, extension):
+    """Test cat_log displaying uncompressed .out / .err file with mode=ViewMode.CAT."""
+    run = mocker.patch("autosubmit.log.catlog.subprocess.run")
+    log_file = exp_logs_dir / f"{_EXPID}_SIM.20261104.{extension}"
+    log_file.write_text("uncompressed log line 1\nuncompressed log line 2\n")
+    run.return_value.returncode = 0
+
+    assert cat_log(f"{_EXPID}_SIM", file=file_type, mode=ViewMode.CAT) is True
+
+    run.assert_called_once_with(
+        ["cat", str(log_file)],
+        stdin=DEVNULL,
+    )
+
+
+@pytest.mark.parametrize("file_type,extension", [("o", "out"), ("e", "err")])
+def test_job_uncompressed_tail(mocker, exp_logs_dir, file_type, extension):
+    """Test cat_log displaying uncompressed .out / .err file with mode=ViewMode.TAIL."""
+    popen = mocker.patch("autosubmit.log.catlog.subprocess.Popen")
+    log_file = exp_logs_dir / f"{_EXPID}_SIM.20261104.{extension}"
+    log_file.write_text("uncompressed log line 1\nuncompressed log line 2\n")
+    popen.return_value.wait.return_value = 0
+
+    assert cat_log(f"{_EXPID}_SIM", file=file_type, mode=ViewMode.TAIL) is True
+
+    popen.assert_called_once_with(
+        [
+            "tail",
+            "--lines=+1",
+            "--retry",
+            "--follow=name",
+            str(log_file),
+        ],
+        stdin=DEVNULL,
+    )
+
+
+@pytest.mark.parametrize("file_type,extension", [("o", "out"), ("e", "err")])
+def test_job_compressed_cat(capsys, mocker, exp_logs_dir, file_type, extension):
+    """Test cat_log displaying .out.gz / .err.gz file with mode=ViewMode.CAT (transparent decompression)."""
+    run = mocker.patch("autosubmit.log.catlog.subprocess.run")
+    log_file = exp_logs_dir / f"{_EXPID}_SIM.20261104.{extension}.gz"
+    content = "line 1: compressed archive\nline 2: decompressed output\n"
+    with gzip.open(log_file, "wt", encoding="utf-8") as gz:
+        gz.write(content)
+
+    assert cat_log(f"{_EXPID}_SIM", file=file_type, mode=ViewMode.CAT) is True
+
+    run.assert_not_called()
+    captured = capsys.readouterr()
+    assert captured.out == content
+
+
+@pytest.mark.parametrize("file_type,extension", [("o", "out"), ("e", "err")])
+def test_job_compressed_tail(capsys, mocker, exp_logs_dir, file_type, extension):
+    """Test cat_log displaying .out.gz / .err.gz file with mode=ViewMode.TAIL (last 20 lines and notice)."""
+    popen = mocker.patch("autosubmit.log.catlog.subprocess.Popen")
+    mock_log = mocker.patch("autosubmit.log.catlog.Log")
+    log_file = exp_logs_dir / f"{_EXPID}_SIM.20261104.{extension}.gz"
+    lines = [f"archive log line {i:02d}\n" for i in range(1, 31)]
+    with gzip.open(log_file, "wt", encoding="utf-8") as gz:
+        gz.writelines(lines)
+
+    assert cat_log(f"{_EXPID}_SIM", file=file_type, mode=ViewMode.TAIL) is True
+
+    popen.assert_not_called()
+    captured = capsys.readouterr()
+    expected_output = "".join(lines[-20:])
+    assert captured.out == expected_output
+    mock_log.info.assert_called_once_with(
+        "Note: Live follow (-m t / tail -f) is not supported on compressed archives."
+    )
+
+
+def test_platform_remote_log_compression_defaults():
+    """Test remote gzip compression default settings and config overrides on Platform."""
+    # Default without PLATFORMS config
+    platform_default = Platform(expid=_EXPID, name="marenostrum5", config={})
+    assert platform_default.compress_remote_logs is True
+    assert platform_default.compression_level == 6
+
+    # Override via platform configuration
+    custom_config = {
+        "PLATFORMS": {
+            "MARENOSTRUM5": {
+                "COMPRESS_REMOTE_LOGS": False,
+                "COMPRESSION_LEVEL": 9,
+            }
+        }
+    }
+    platform_custom = Platform(expid=_EXPID, name="marenostrum5", config=custom_config)
+    assert platform_custom.compress_remote_logs is False
+    assert platform_custom.compression_level == 9

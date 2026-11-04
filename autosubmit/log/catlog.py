@@ -20,7 +20,11 @@
 Used to write logs to streams.
 """
 
+import gzip
+import shutil
 import subprocess
+import sys
+from collections import deque
 from enum import Enum
 from pathlib import Path
 
@@ -155,7 +159,7 @@ def _find_job_log(
         return job_logs_path / f"{exp_or_job_id}_TOTAL_STATS"
 
     extension = "err" if log_file is LogFile.ERROR else "out"
-    search_pattern = f"{exp_or_job_id}.*.{extension}"
+    search_pattern = f"{exp_or_job_id}.*.{extension}*"
     workflow_log_files = sorted(job_logs_path.glob(search_pattern))
 
     if not workflow_log_files:
@@ -208,9 +212,28 @@ def _view_file(log_file: Path, mode: ViewMode) -> int:
     :return: The exit code of the underlying command.
     :raises ValueError: If the selected visualisation mode is invalid.
     """
+    path = Path(log_file)
+    if path.name.endswith(".gz"):
+        if mode is ViewMode.CAT:
+            with gzip.open(path, "rt", encoding="utf-8", errors="replace") as gz_file:
+                shutil.copyfileobj(gz_file, sys.stdout)
+                sys.stdout.flush()
+            return 0
+
+        if mode is ViewMode.TAIL:
+            with gzip.open(path, "rt", encoding="utf-8", errors="replace") as gz_file:
+                last_lines = deque(gz_file, maxlen=20)
+                for line in last_lines:
+                    sys.stdout.write(line)
+                sys.stdout.flush()
+            Log.info("Note: Live follow (-m t / tail -f) is not supported on compressed archives.")
+            return 0
+
+        raise ValueError(f"Invalid cat-log visualisation mode: {mode}")
+
     if mode is ViewMode.CAT:
         return subprocess.run(
-            ["cat", str(log_file)],
+            ["cat", str(path)],
             stdin=subprocess.DEVNULL,
         ).returncode
 
@@ -221,7 +244,7 @@ def _view_file(log_file: Path, mode: ViewMode) -> int:
                 "--lines=+1",
                 "--retry",
                 "--follow=name",
-                str(log_file),
+                str(path),
             ],
             stdin=subprocess.DEVNULL,
         )
