@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import io
 import logging
 from contextlib import nullcontext as does_not_raise
 from pathlib import Path
@@ -33,6 +34,7 @@ from autosubmit.log.log import (
     StatusFilter,
 )
 from autosubmit.log.utils import compress_xz
+from autosubmit.scripts.autosubmit import _get_arg_parser
 from test.unit.test_utils import find_uncompressed_files, is_xz_file
 
 if TYPE_CHECKING:
@@ -228,8 +230,8 @@ def test_log_at_certain_level(level, msg, args, expected, mocker):
 @pytest.mark.parametrize(
     'code,fn',
     [
-        (3000, 'warning'),
-        (4000, 'info'),
+        (3000, 'info'),
+        (4000, 'warning'),
         (5000, 'result'),
         (6000, 'error'),
         (7000, 'critical'),
@@ -248,6 +250,72 @@ def test_printlog(code, fn, mocker):
 
     fn_obj = getattr(mocked_log, fn)
     assert fn_obj.called
+
+
+def test_printlog_default_argument(mocker):
+    """Verify that calling Log.printlog() without code routes to Log.info."""
+    mocked_log = mocker.patch('autosubmit.log.log.Log')
+
+    Log.printlog("Test default message")
+
+    assert mocked_log.info.called
+
+
+def test_log_severity_ordering():
+    """Verify that WARNING has higher severity than INFO."""
+    assert Log.WARNING > Log.INFO
+    assert Log.DEBUG < Log.INFO < Log.WARNING < Log.RESULT < Log.ERROR < Log.CRITICAL
+
+
+def test_warning_emitted_when_console_level_is_info():
+    """Verify that Log.warning messages emit when console level is set to INFO."""
+    Log.set_console_level("INFO")
+    assert Log.console_handler.level == Log.INFO
+    assert Log.WARNING >= Log.console_handler.level
+
+    stream = io.StringIO()
+    original_stream = Log.console_handler.stream
+    try:
+        Log.console_handler.stream = stream
+        Log.warning("console warning test message")
+        Log.console_handler.flush()
+        output = stream.getvalue()
+        assert "console warning test message" in output
+        assert "[WARNING]" in output
+    finally:
+        Log.console_handler.stream = original_stream
+
+
+def test_warning_emitted_when_file_level_is_info(tmp_path: Path):
+    """Verify that Log.warning messages emit when file level is set to INFO."""
+    log_file = tmp_path / "test_warning_file.log"
+    Log.set_file(str(log_file), type="out", level="INFO")
+
+    file_handlers = [h for h in Log.log.handlers if isinstance(h, logging.FileHandler)]
+    assert len(file_handlers) > 0
+    created_handler = file_handlers[-1]
+    assert created_handler.level == Log.INFO
+
+    try:
+        Log.warning("file warning test message")
+        created_handler.flush()
+
+        actual_file_path = created_handler.baseFilename
+        with open(actual_file_path, "r") as f:
+            content = f.read()
+        assert "file warning test message" in content
+        assert "[WARNING]" in content
+    finally:
+        Log.log.removeHandler(created_handler)
+        created_handler.close()
+
+
+def test_cli_log_level_defaults():
+    """Verify that CLI options --logfile and --logconsole default to INFO."""
+    parser = _get_arg_parser()
+    opts = parser.parse_args([])
+    assert opts.logfile == "INFO"
+    assert opts.logconsole == "INFO"
 
 
 def test_reset_status_file_dummy():
