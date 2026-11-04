@@ -217,7 +217,7 @@ def _check_mail_address(mail_to: str | list[str] | tuple[str, ...]) -> list[str]
     if isinstance(mail_to, str):
         items = [mail_to]
     elif isinstance(mail_to, (list, tuple)):
-        items = mail_to
+        items = list(mail_to)
     else:
         raise ValueError('Recipients of mail notifications must be an email or a list of emails!')
 
