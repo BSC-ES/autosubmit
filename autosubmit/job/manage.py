@@ -248,7 +248,7 @@ def set_status(
             # Autosubmit.database_backup(expid)
         else:
             Log.printlog(
-                "Changes NOT saved to the JobList!!!!:  use -s option to save", 3000
+                "Changes NOT saved to the JobList!!!!:  use -s option to save", Log.WARNING
             )
         # Visualization stuff that should be in a function common to monitor , create, -cw flag, inspect and so on
         if not noplot:

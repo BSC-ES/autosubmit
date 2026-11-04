@@ -3717,7 +3717,7 @@ class JobList:
             Log.result("Scripts OK")
         else:
             Log.printlog(
-                "Scripts check failed\n Running after failed scripts is at your own risk!", 3000)
+                "Scripts check failed\n Running after failed scripts is at your own risk!", Log.WARNING)
         return out
 
     def _remove_job(self, job):
@@ -3870,15 +3870,16 @@ class JobList:
         return "\n".join(results)
 
     def _recursion_print(self, job, level, visited=[], status_change=None, nocolor=False) -> str:
-        """Returns the list of children in an iterative way using a worklist
-        Traverses the dependency tree
+        """Traverse the dependency tree using iterative DFS and return the formatted hierarchy.
 
-        :param job: Job object
-        :param level: Level of the tree
-        :param visited: List of visited jobs
-        :param status_change: list of changes in the list, supplied in set status
+        Uses an explicit stack rather than recursion to avoid stack overflow on deep DAGs.
 
-        :return: parent + list of children
+        :param job: Root job to start printing from
+        :param level: Indentation level of the root job in the tree
+        :param visited: List or set of visited job names to track visited nodes
+        :param status_change: Dictionary of pending status changes keyed by job name
+        :param nocolor: True to disable ANSI color codes in output
+        :return: Formatted tree string representing parent and children jobs
         """
         if job is None:
             return ""

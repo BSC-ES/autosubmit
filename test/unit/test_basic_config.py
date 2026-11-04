@@ -33,6 +33,13 @@ https://googletesting.blogspot.com.es/2008/12/static-methods-are-death-to-testab
 """
 
 
+@pytest.fixture(autouse=True)
+def reset_basic_config():
+    BasicConfig.reset()
+    yield
+    BasicConfig.reset()
+
+
 def test_update_config_set_the_right_db_path():
     # arrange
     BasicConfig.DB_PATH = 'fake-path'
