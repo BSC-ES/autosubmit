@@ -22,6 +22,7 @@ import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job_common import Status
+from autosubmit.log.log import Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from test.integration.test_utils.docker_utils import get_mailhog_messages
 
@@ -190,19 +191,22 @@ def test_notify_cpmip_threshold_violations(
 
 
 @pytest.mark.parametrize(
-    "list_recipients, expected_error_message",
-    [("test", "Recipients of mail notifications must be a list of emails!"),
-     ([], "Empty recipient list"),
-     (['test'], "Invalid email in recipient list"),
-     (['test@mail.com', 'test2@mail.com'], None)]
+    "list_recipients, expected_error_message, expected_recipients",
+    [("test", "Invalid email in recipient list: test", 0),
+     ([], "Empty recipient list", 0),
+     (['test'], "Invalid email in recipient list: test", 0),
+     (['test@mail.com', 'test2@mail.com'], None, 2),
+     ("test@mail.com, test2@mail.com", None, 2)]
 )
 @pytest.mark.docker
 def test_recipients_list(
         autosubmit_exp: 'AutosubmitExperimentFixture',
         create_mail_notifier: Callable[['AutosubmitExperiment', int], MailNotifier],
         fake_smtp_server: tuple[int, str],
+        mocker,
         list_recipients: str | list[str],
-        expected_error_message: str | None):
+        expected_error_message: str | None,
+        expected_recipients: int):
     smtp_port, api_base = fake_smtp_server
     job_name = 'SIM'
 
@@ -210,14 +214,19 @@ def test_recipients_list(
     mail_notifier = create_mail_notifier(exp, smtp_port)
 
     if expected_error_message:
-        with pytest.raises(ValueError, match=expected_error_message):
-            mail_notifier.notify_status_change(exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING],
-                Status.VALUE_TO_KEY[Status.FAILED], list_recipients  # type: ignore
-            )
+        mock_printlog = mocker.patch.object(Log, 'printlog')
+        mail_notifier.notify_status_change(
+            exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING], Status.VALUE_TO_KEY[Status.FAILED],
+            list_recipients
+        )
+        mock_printlog.assert_called_once()
+        assert expected_error_message in mock_printlog.call_args[0][0]
+        assert get_mailhog_messages(api_base).json()["count"] == 0
     else:
         mail_notifier.notify_status_change(
             exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING], Status.VALUE_TO_KEY[Status.FAILED],
-            list_recipients  # type: ignore
+            list_recipients
         )
         response = get_mailhog_messages(api_base)
-        assert len(response.json()["items"][0]["Raw"]["To"]) == len(list_recipients)
+        assert len(response.json()["items"][0]["Raw"]["To"]) == expected_recipients
+
