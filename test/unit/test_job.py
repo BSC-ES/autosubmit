@@ -2146,11 +2146,11 @@ def test_update_parameters(autosubmit_config, experiment_data, local, tmp_path):
                              'CURRENT_EC_QUEUE': '', 'CURRENT_EXCLUSIVITY': '', 'CURRENT_EXTENDED_HEADER_PATH': 'bla',
                              'CURRENT_EXTENDED_TAILER_PATH': 'bla2', 'CURRENT_FILE': 'test.sh', 'CURRENT_HOST': '',
                              'CURRENT_HYPERTHREADING': False, 'CURRENT_METRIC_FOLDER': f'{tmp_path.parent}/test_update_parameters0/scratch/t000/tmp/LOG_t000/test_job',
-                             'CURRENT_PLATFORM': 'DUMMY_PLATFORM', 'CURRENT_PROJ': '', 'CURRENT_PROJ_DIR': Path(''),
+                             'CURRENT_PLATFORM': 'DUMMY_PLATFORM', 'CURRENT_PROJ': '', 'CURRENT_PROJ_DIR': '',
                              'CURRENT_QUEUE': '', 'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3,
-                             'CURRENT_ROOTDIR': local.root_dir, 'CURRENT_RUNNING': 'chunk', 'CURRENT_SCRATCH_DIR': Path(''),
+                             'CURRENT_ROOTDIR': local.root_dir, 'CURRENT_RUNNING': 'chunk', 'CURRENT_SCRATCH_DIR': '',
                              'CURRENT_TYPE': 'ps', 'CURRENT_USER': '', 'CURRENT_WRAPPER_TYPE': 'vertical',
-                             'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT', 'CURRENT_LOGDIR': Path(local.files_path)}
+                             'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT', 'CURRENT_LOGDIR': str(local.files_path)}
     for key, value in parameters.items():
         if key.startswith("CURRENT_"):
             assert value == expected_current_only[key]
