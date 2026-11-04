@@ -581,9 +581,6 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
     exp = autosubmit_exp(experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, "t001")
-    Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
-
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {
             'DATELIST': '20000101',
@@ -798,9 +795,9 @@ def test_simple_workflow_compress_logs_slurm(
     )
 
     # Get all files in the logs directory
-    files = [f for f in Path(logs_dir).glob("*")]
+    files = [f for f in logs_dir.glob("*")]
 
-    assert len(files) > 0, f"No log files found in {logs_dir}"
+    assert len(files) > 0, f"No log files found in {str(logs_dir)}"
 
     # Get job_data
     exp_history = ExperimentHistory(
@@ -893,8 +890,8 @@ def test_compress_log_missing_tool(
     )
 
     # Get all files in the logs directory
-    files = [f for f in Path(logs_dir).glob("*")]
-    assert len(files) > 0, f"No log files found in {logs_dir}"
+    files = [f for f in logs_dir.glob("*")]
+    assert len(files) > 0, f"No log files found in {str(logs_dir)}"
 
     # Get job_data
     exp_history = ExperimentHistory(

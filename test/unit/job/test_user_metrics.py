@@ -314,5 +314,5 @@ def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPl
     )
 
     assert parameters["CURRENT_METRIC_FOLDER"] == str(
-        Path(parameters["CURRENT_ROOTDIR"]).joinpath("my_metrics_folder", job_name)
+        Path(parameters["CURRENT_ROOTDIR"]) / "my_metrics_folder" / job_name
     )

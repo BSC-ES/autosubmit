@@ -355,7 +355,7 @@ def test_inspect_calendar(tmp_path, autosubmit_exp, general_data: dict[str, Any]
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
-    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
 
     # Execute inspect
     as_conf.set_last_as_command('inspect')

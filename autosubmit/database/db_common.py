@@ -18,7 +18,6 @@
 """Module containing functions to manage autosubmit's database."""
 
 import multiprocessing
-import os
 import sqlite3
 import subprocess
 from contextlib import suppress
@@ -212,9 +211,9 @@ def check_experiment_exists(name: str, error_on_inexistence=True) -> bool:
 
     try:
         result = queue.get(True, TIMEOUT)
-    except Exception:
+    except Exception as e:
         raise AutosubmitCritical(f"The database process exceeded the timeout limit {TIMEOUT}s. "
-                                 f"Check if experiment {name} exists failed to complete.")
+                                 f"Check if experiment {name} exists failed to complete.", str(e))
     finally:
         proc.terminate()
     return result
@@ -411,7 +410,7 @@ def _check_experiment_exists(name: str, error_on_inexistence=True) -> bool:
     if row is None:
         if error_on_inexistence:
             raise AutosubmitCritical(f'The experiment "{name}" does not exist yet!!!', 7005)
-        if os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, name)):
+        if (Path(BasicConfig.LOCAL_ROOT_DIR) / name).exists():
             with suppress(Exception):
                 _save_experiment(name, 'No description', "3.14.0")
             return True

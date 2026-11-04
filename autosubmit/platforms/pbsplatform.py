@@ -148,17 +148,16 @@ class PBSPlatform(ParamikoPlatform):
 
         :rtype: None
         """
-        self.root_dir = os.path.join(
-            self.scratch, self.project_dir, self.user, self.expid)
-        self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
+        self.root_dir = Path(self.scratch) / self.project_dir / self.user / self.expid
+        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
         self.cancel_cmd = "qdel"
         self._submit_cmd = 'qsub'
         self._submit_command_name = "qsub"
         self._submit_hold_cmd = 'qhold '  # Needs the JOB_ID to hold a JOB
         self.put_cmd = "scp"
         self.get_cmd = "scp"
-        self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
-        self._submit_cmd_x11 = f'{self.remote_log_dir}'
+        self.mkdir_cmd = f"mkdir -p {self.remote_log_dir}"
+        self._submit_cmd_x11 = f"{self.remote_log_dir}"
 
     def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str) -> str:
         """Build the PBS qsub submission command for a single script.

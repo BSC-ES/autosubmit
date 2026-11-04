@@ -33,6 +33,8 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name instead of platform name #3342
 - Fix job and wrapper values like `%CURRENT_CUSTOM_DIRECTIVES%` overwriting the platform value they reference #3286
 - Fix the -cw flag name and wording in the scheduler warning #3393 (thanks @bfs2021)
+- Fixed `is_current_logged_user_owner` and `is_current_real_user_owner` raising `KeyError` when the experiment
+  folder is owned by a UID with no `passwd` entry (e.g. inside containers) #3375
 
 **New Features:**
 
