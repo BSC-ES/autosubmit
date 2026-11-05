@@ -43,6 +43,7 @@ class BasicConfig:
     DB_FILE = 'autosubmit.db'
     AS_TIMES_DB = 'as_times.db'
     DB_PATH = str(Path(DB_DIR) / DB_FILE)
+    AS_TIMES_DB_PATH = str(Path(DB_DIR) / AS_TIMES_DB)
     LOCAL_ROOT_DIR = DB_DIR
     LOCAL_TMP_DIR = 'tmp'
     LOCAL_ASLOG_DIR = 'ASLOGS'
@@ -103,6 +104,7 @@ class BasicConfig:
         """
         # Just one needed for the moment.
         BasicConfig.DB_PATH = str(Path(BasicConfig.DB_DIR) / BasicConfig.DB_FILE)
+        BasicConfig.AS_TIMES_DB_PATH = str(Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB)
 
     @staticmethod
     def __read_file_config(file_path: Path | str):

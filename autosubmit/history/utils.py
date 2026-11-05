@@ -18,16 +18,14 @@
 
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
+
+from autosubmit.config.basicconfig import BasicConfig
 
 LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S%z'
 
-
-def get_fields_as_comma_str(model):
-    """Get the fields of a namedtuple as a comma separated string."""
-    return ",".join(model._fields)
+DEFAULT_HISTORICAL_LOGS_DIR = BasicConfig.HISTORICAL_LOG_DIR
 
 
 def calculate_queue_time_in_seconds(submit_time: float, start_time: float) -> int:
@@ -50,7 +48,6 @@ def get_current_datetime() -> str:
 
 
 def get_current_datetime_if_none(argument: Any) -> str | None:
-    # type : (Any) -> Union[Any, str]
     """ Returns the current time in format '%Y-%m-%dT%H:%M:%S%z' if the supplied argument is None, else return argument. """
     if argument is None:
         return get_current_datetime()
@@ -59,23 +56,9 @@ def get_current_datetime_if_none(argument: Any) -> str | None:
 
 
 def create_file_with_full_permissions(path: str) -> None:
-    """ creates a database files with full permissions """
+    """Create a file with full permissions."""
     os.umask(0)
     os.open(path, os.O_WRONLY | os.O_CREAT, 0o777)
-
-
-def create_path_if_not_exists(path: str) -> bool:
-    """Create the directory if it does not exist.
-
-    :param path: Directory path to ensure.
-    :return: ``True`` when the directory is created, ``False`` if it already exists.
-    :raises OSError: If the directory cannot be created.
-    """
-    directory = Path(path)
-    if directory.exists():
-        return False
-    directory.mkdir(parents=True, exist_ok=True)
-    return True
 
 
 class SupportedStatus:
@@ -85,6 +68,3 @@ class SupportedStatus:
     SUBMITTED = "SUBMITTED"
     RUNNING = "RUNNING"
     SUSPENDED = "SUSPENDED"
-
-# if __name__ == "__main__":
-#   print(get_fields_as_comma_str())

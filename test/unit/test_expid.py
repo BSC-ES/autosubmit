@@ -22,7 +22,6 @@ from contextlib import contextmanager
 
 import pytest
 
-from autosubmit.database import db_common
 from autosubmit.experiment.manage import expid_fn
 from autosubmit.install import install
 from autosubmit.log.log import AutosubmitCritical
@@ -33,24 +32,11 @@ def does_not_raise():
     yield
 
 
-def build_db_mock(current_experiment_id, mock_db_common, mocker):
-    """
-    function to help to connect with the database
-
-    :param current_experiment_id:
-    :param mock_db_common:
-    :param mocker:
-    :return:
-    """
-    mock_db_common.last_name_used = mocker.Mock(return_value=current_experiment_id)
-    mock_db_common.check_experiment_exists = mocker.Mock(return_value=False)
-
-
 @pytest.mark.parametrize('copy_id, expected', [
     ('', does_not_raise()),
     ('test', pytest.raises(AutosubmitCritical))
 ], ids=['success', 'fail'])
-def test_expid_fn(copy_id, expected, tmp_path, autosubmit_config, monkeypatch) -> None:
+def test_expid_fn(copy_id, expected, tmp_path, autosubmit_config) -> None:
     """
     Function to test if the autosubmit().expid generates the paths and expid properly
 
@@ -59,7 +45,6 @@ def test_expid_fn(copy_id, expected, tmp_path, autosubmit_config, monkeypatch) -
     :return: None
     """
     install()
-    monkeypatch.setattr(db_common, 'TIMEOUT', 1)
     with expected:
         expid = expid_fn("Test", copy_id=copy_id)
         # The `describe` call was removed here due to describe now needing the db, which conflicts with mock.

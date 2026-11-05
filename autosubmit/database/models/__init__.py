@@ -15,4 +15,4 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Integration tests for the history database managers."""
+"""SQLAlchemy table definitions and record models."""

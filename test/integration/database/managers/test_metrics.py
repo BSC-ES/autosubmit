@@ -15,13 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Integration tests for ``autosubmit.job.user_metrics``."""
+"""Integration tests for the user-metrics manager."""
 from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import select
 
-from autosubmit.job.metrics_processor import UserMetricRepository
+from autosubmit.database.managers.metrics import UserMetricManager
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
@@ -33,8 +33,8 @@ if TYPE_CHECKING:
 def test_store_metric(as_db: str, autosubmit_exp, tmp_path: 'LocalPath'):
     exp = autosubmit_exp(include_jobs=True)
 
-    user_metric_repository = UserMetricRepository(exp.expid)
-    user_metric_repository.store_metric(
+    user_metric_manager = UserMetricManager(exp.expid)
+    user_metric_manager.store_metric(
         run_id=1,
         job_name="test_job",
         metric_name="test_metric",
@@ -42,13 +42,13 @@ def test_store_metric(as_db: str, autosubmit_exp, tmp_path: 'LocalPath'):
     )
 
     # Check if the metric is stored in the database
-    with user_metric_repository.engine.connect() as conn:
+    with user_metric_manager.engine.connect() as conn:
         with conn.begin():
             result = conn.execute(
-                select(user_metric_repository.table).where(
-                    user_metric_repository.table.c.run_id == 1,
-                    user_metric_repository.table.c.job_name == "test_job",
-                    user_metric_repository.table.c.metric_name == "test_metric",
+                select(user_metric_manager.table).where(
+                    user_metric_manager.table.c.run_id == 1,
+                    user_metric_manager.table.c.job_name == "test_job",
+                    user_metric_manager.table.c.metric_name == "test_metric",
                 )
             ).first()
         assert result is not None
