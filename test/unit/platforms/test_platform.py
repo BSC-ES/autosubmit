@@ -18,10 +18,14 @@
 """This file contains tests for the ``platform``."""
 
 import multiprocessing as mp
+import queue
+import time
+from multiprocessing import connection
 from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
 
+import psutil
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -96,7 +100,7 @@ def test_init_logs_log_process_no_root_dir(mocker, autosubmit_config):
     mocker.patch('autosubmit.platforms.platform._exit', return_value=0)
     mocker.patch.object(Log, 'set_console_level')
     recover_platform_job_logs_wrapper(
-        platform, None, None, None, as_conf=as_conf)  # type: ignore
+        platform, None, None, None, None, as_conf=as_conf)  # type: ignore
     assert Log.set_console_level.call_count == 1
 
 
@@ -119,7 +123,7 @@ def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):
     current_number_of_handlers = len(Log.log.handlers)
 
     recover_platform_job_logs_wrapper(
-        platform, None, None, None, as_conf=as_conf)  # type: ignore
+        platform, None, None, None, None, as_conf=as_conf)  # type: ignore
 
     assert len(Log.log.handlers) == current_number_of_handlers + 2  # + out + err
 
@@ -315,4 +319,284 @@ def test_restore_platforms_enforces_log_recovery_on_init(
         platform.try_respawn_log_recovery_process.assert_called_once_with(as_conf)
     else:
         platform.try_respawn_log_recovery_process.assert_not_called()
+
+
+def _noop():
+    pass
+
+
+def test_join_new_process_does_not_use_raw_waitpid(mocker):
+    """Reaping goes through multiprocessing so is_alive()/exitcode stay accurate."""
+    platform = LocalPlatform("t000", "test_platform", {})
+    is_alive_method = mocker.Mock(return_value=False)
+    process = SimpleNamespace(is_alive=is_alive_method, pid=123, name="child", exitcode=0)
+    platform.log_recovery_process = process
+    waitpid = mocker.patch("os.waitpid")
+
+    platform.join_new_process()
+
+    waitpid.assert_not_called()
+    is_alive_method.assert_called_once()
+
+
+@pytest.mark.skipif(
+    "fork" not in mp.get_all_start_methods(),
+    reason="The fork start method is not available on this platform",
+)
+def test_join_new_process_reaps_exited_child():
+    """join_new_process is the only call that reaps the exited child."""
+    ctx = mp.get_context("fork")
+    process = ctx.Process(target=_noop)
+    process.start()
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.log_recovery_process = process
+    try:
+        ready = connection.wait([process.sentinel], timeout=5)
+        assert process.sentinel in ready
+
+        deadline = time.time() + 5
+        status = None
+        while time.time() < deadline:
+            try:
+                status = psutil.Process(process.pid).status()
+            except psutil.NoSuchProcess:
+                break
+            if status == psutil.STATUS_ZOMBIE:
+                break
+            time.sleep(0.01)
+        assert status == psutil.STATUS_ZOMBIE, f"Expected a zombie, got {status!r}"
+
+        platform.join_new_process()
+
+        with pytest.raises(psutil.NoSuchProcess):
+            psutil.Process(process.pid).status()
+        assert process.exitcode == 0
+    finally:
+        if process.is_alive():
+            process.kill()
+        process.join(timeout=5)
+
+
+@pytest.mark.parametrize(
+    "ready,expected_failures",
+    [(False, 3), (True, 0)],
+    ids=["not-ready", "ready"],
+)
+def test_alive_process_resets_only_when_ready(
+    autosubmit_config, ready, expected_failures
+):
+    """A live child resets the streak only after it reports readiness."""
+    as_conf = autosubmit_config("t000", {"PLATFORMS": {"test_platform": {}}})
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.log_recovery_process = SimpleNamespace(is_alive=lambda: True)
+    platform._log_recovery_ready = SimpleNamespace(is_set=lambda: ready)
+    platform._recovery_consecutive_failures = 3
+
+    assert platform.try_respawn_log_recovery_process(as_conf) is True
+    assert platform._recovery_consecutive_failures == expected_failures
+
+
+def test_spawn_resets_active_flag_when_process_is_dead(mocker, autosubmit_config):
+    """A stale active flag must not prevent a new recovery process from starting."""
+    as_conf = autosubmit_config("t000", {"PLATFORMS": {"test_platform": {}}})
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.log_retrieval_process_active = True
+    platform.log_recovery_process = SimpleNamespace(is_alive=lambda: False, pid=123, name="child")
+    mocker.patch.object(platform, "prepare_process", return_value=None)
+    mocker.patch.object(platform, "join_new_process")
+
+    def _start_new_process(*_args, **_kwargs):
+        platform.log_recovery_process = SimpleNamespace(is_alive=lambda: True, pid=456, name="child")
+
+    mocker.patch.object(platform, "create_new_process", side_effect=_start_new_process)
+
+    # The stale flag is cleared and this call cannot spawn.
+    assert platform.spawn_log_retrieval_process(as_conf) is False
+    assert platform.log_retrieval_process_active is False
+
+    # A later call starts a new process.
+    assert platform.spawn_log_retrieval_process(as_conf) is True
+    assert platform.log_retrieval_process_active is True
+    assert platform._log_recovery_started_at > 0
+
+
+def test_spawn_does_not_leave_active_flag_when_prepare_process_raises(mocker, autosubmit_config):
+    """A prepare_process failure must not leave the active flag set."""
+    as_conf = autosubmit_config("t000", {"PLATFORMS": {"test_platform": {}}})
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+    platform = LocalPlatform("t000", "test_platform", {})
+    mocker.patch.object(platform, "prepare_process", side_effect=RuntimeError("boom"))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        platform.spawn_log_retrieval_process(as_conf)
+
+    assert platform.log_retrieval_process_active is False
+
+
+@pytest.mark.parametrize(
+    "ready,exitcode,cleanup,initial_failures,expected_failures",
+    [
+        (False, 0, False, 0, 1),
+        (False, 1, False, 0, 1),
+        (True, 1, False, 0, 1),
+        (True, 0, False, 0, 0),
+        (True, None, False, 0, 1),
+        (True, 1, True, 3, 3),
+        (True, 0, True, 3, 3),
+    ],
+    ids=[
+        "never-ready-zero",
+        "never-ready-one",
+        "post-init-crash",
+        "normal-exit",
+        "unknown-exit",
+        "cleanup-crash",
+        "cleanup-normal",
+    ],
+)
+def test_dead_process_classification(
+    autosubmit_config,
+    mocker,
+    ready,
+    exitcode,
+    cleanup,
+    initial_failures,
+    expected_failures,
+):
+    """A dead child is classified by readiness, exit code, and cleanup state."""
+    as_conf = autosubmit_config("t000", {"PLATFORMS": {"test_platform": {}}})
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.log_recovery_process = SimpleNamespace(
+        is_alive=lambda: False, exitcode=exitcode, pid=123, name="child"
+    )
+    platform._log_recovery_ready = SimpleNamespace(is_set=lambda: ready)
+    platform.cleanup_event = SimpleNamespace(is_set=lambda: cleanup)
+    platform._log_recovery_started_at = time.time() - 1
+    platform._recovery_consecutive_failures = initial_failures
+    mocker.patch.object(platform, "clean_log_recovery_process")
+    mocker.patch.object(platform, "_pending_still_needing_recovery", return_value={})
+    mocker.patch.object(platform, "spawn_log_retrieval_process", return_value=True)
+
+    assert platform.try_respawn_log_recovery_process(as_conf) is True
+    assert platform._recovery_consecutive_failures == expected_failures
+
+
+def test_consecutive_startup_failures_enter_backoff(autosubmit_config, mocker):
+    """A startup failure that reaches the limit enters backoff before respawning."""
+    as_conf = autosubmit_config("t000", {
+        "RUNTIME": {"LOG_RECOVERY": {
+            "CONSECUTIVE_MAX_RESTARTS": 2,
+            "RETRY_DELAY": 600,
+            "INLINE_FALLBACK": False,
+        }},
+        "PLATFORMS": {"test_platform": {}},
+    })
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.log_recovery_process = SimpleNamespace(
+        is_alive=lambda: False, exitcode=0, pid=123, name="child"
+    )
+    platform._log_recovery_ready = SimpleNamespace(is_set=lambda: False)
+    platform.cleanup_event = SimpleNamespace(is_set=lambda: False)
+    platform._log_recovery_started_at = time.time() - 1
+    platform._recovery_consecutive_failures = 1
+    spawn = mocker.patch.object(platform, "spawn_log_retrieval_process", return_value=True)
+
+    assert platform.try_respawn_log_recovery_process(as_conf) is False
+    assert platform._log_recovery_in_backoff is True
+    assert platform._recovery_consecutive_failures == 0
+    spawn.assert_not_called()
+
+
+def test_prepare_process_clears_ready_event(mocker):
+    """Each spawn starts from a cleared readiness event."""
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.ctx = mp.get_context("fork")
+    platform._log_recovery_ready = platform.ctx.Event()
+    platform._log_recovery_ready.set()
+    mocker.patch.object(platform, "create_a_new_copy", return_value=platform)
+    mocker.patch.object(platform, "load_process_info")
+    mocker.patch("autosubmit.platforms.platform.atexit.register")
+    mocker.patch("autosubmit.platforms.platform.Platform.update_workers")
+
+    platform.prepare_process()
+
+    assert platform._log_recovery_ready.is_set() is False
+
+
+def _recovery_child_platform(as_conf, mocker):
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.ctx = mp.get_context("fork")
+    platform.cleanup_event = platform.ctx.Event()
+    platform.cleanup_event.set()
+    platform.work_event = platform.ctx.Event()
+    platform._log_recovery_ready = platform.ctx.Event()
+    platform._as_conf = as_conf
+    mocker.patch("setproctitle.setproctitle")
+    mocker.patch("autosubmit.config.registry.load_config", return_value=as_conf)
+    mocker.patch.object(as_conf, "check_conf_files")
+    mocker.patch("autosubmit.platforms.platform.JobsDbManager")
+    mocker.patch.object(platform, "recover_job_log")
+    mocker.patch.object(platform, "close_connection")
+    return platform
+
+
+def test_recover_platform_job_logs_sets_ready_and_exits_zero(autosubmit_config, mocker):
+    """The child reports readiness after connecting and exits zero on a clean stop."""
+    as_conf = autosubmit_config("t000", {"PLATFORMS": {"test_platform": {}}})
+    platform = _recovery_child_platform(as_conf, mocker)
+
+    def _connect(*_args, **_kwargs):
+        platform.connected = True
+
+    mocker.patch.object(platform, "restore_connection", side_effect=_connect)
+    exit_mock = mocker.patch("autosubmit.platforms.platform._exit")
+
+    platform.recover_platform_job_logs()
+
+    assert platform._log_recovery_ready.is_set() is True
+    exit_mock.assert_called_once_with(0)
+
+
+def test_recover_platform_job_logs_exits_non_zero_on_failure(autosubmit_config, mocker):
+    """A child that cannot start must exit non-zero and must not report readiness."""
+    as_conf = autosubmit_config("t000", {"PLATFORMS": {"test_platform": {}}})
+    platform = _recovery_child_platform(as_conf, mocker)
+    mocker.patch.object(platform, "restore_connection", side_effect=Exception("boom"))
+    exit_mock = mocker.patch("autosubmit.platforms.platform._exit")
+
+    platform.recover_platform_job_logs()
+
+    assert platform._log_recovery_ready.is_set() is False
+    exit_mock.assert_called_once_with(1)
+
+
+def test_recover_platform_job_logs_exits_non_zero_when_not_connected(autosubmit_config, mocker):
+    """A connection that returns without an error but leaves connected false is a failure."""
+    as_conf = autosubmit_config("t000", {"PLATFORMS": {"test_platform": {}}})
+    platform = _recovery_child_platform(as_conf, mocker)
+    mocker.patch.object(platform, "restore_connection")
+    exit_mock = mocker.patch("autosubmit.platforms.platform._exit")
+
+    platform.recover_platform_job_logs()
+
+    assert platform._log_recovery_ready.is_set() is False
+    exit_mock.assert_called_once_with(1)
+
+
+def test_recover_job_log_stops_when_queue_turns_empty(mocker):
+    """A timeout while draining the queue must stop the loop without raising."""
+    platform = LocalPlatform("t000", "test_platform", {})
+    recovery_queue = mocker.MagicMock()
+    recovery_queue.empty.return_value = False
+    recovery_queue.get.side_effect = queue.Empty
+    platform.recovery_queue = recovery_queue
+    platform._as_conf = object()
+
+    platform.recover_job_log(mocker.MagicMock())
+
+    recovery_queue.get.assert_called_once()
 

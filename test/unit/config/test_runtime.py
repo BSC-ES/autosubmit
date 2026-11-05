@@ -22,6 +22,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from autosubmit.config.runtime import (
+    _DEFAULT_CONSECUTIVE_MAX_RESTARTS,
+    _DEFAULT_INLINE_FALLBACK,
+    _DEFAULT_RETRY_DELAY,
     LogRecoveryConfig,
     RuntimeConfig,
     resolve_log_recovery_queue_size,
@@ -36,9 +39,18 @@ if TYPE_CHECKING:
 def test_runtime_defaults() -> None:
     runtime = RuntimeConfig.from_experiment_data({})
     assert runtime.log_recovery == LogRecoveryConfig()
-    assert runtime.log_recovery.consecutive_max_restarts == 2
-    assert runtime.log_recovery.retry_delay == 600.0
-    assert runtime.log_recovery.inline_fallback is True
+    assert runtime.log_recovery.consecutive_max_restarts == _DEFAULT_CONSECUTIVE_MAX_RESTARTS
+    assert runtime.log_recovery.retry_delay == _DEFAULT_RETRY_DELAY
+    assert runtime.log_recovery.inline_fallback is _DEFAULT_INLINE_FALLBACK
+
+
+def test_runtime_defaults_are_sane() -> None:
+    defaults = LogRecoveryConfig()
+    assert isinstance(defaults.consecutive_max_restarts, int)
+    assert defaults.consecutive_max_restarts >= 0
+    assert isinstance(defaults.retry_delay, float)
+    assert defaults.retry_delay >= 0
+    assert isinstance(defaults.inline_fallback, bool)
 
 
 def test_runtime_none_experiment_data() -> None:
@@ -141,7 +153,7 @@ def test_autosubmit_config_runtime_property(autosubmit_config) -> None:
 
     assert as_conf.runtime.log_recovery.consecutive_max_restarts == 4
     assert as_conf.runtime.log_recovery.inline_fallback is False
-    assert as_conf.runtime.log_recovery.retry_delay == 600.0
+    assert as_conf.runtime.log_recovery.retry_delay == _DEFAULT_RETRY_DELAY
 
 
 @pytest.mark.parametrize(

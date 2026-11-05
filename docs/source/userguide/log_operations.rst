@@ -109,6 +109,10 @@ live in the ``RUNTIME`` section of the experiment configuration.
         recovery scan. Default: ``true``. This option does not apply to the mandatory first
         start of the process.
 
+The recovery process is considered healthy once it has connected to the platform
+and exits with code ``0``. It counts as a failed attempt if it dies before
+connecting, or if it exits with a non-zero code after connecting.
+
 Example:
 
 .. code-block:: yaml
