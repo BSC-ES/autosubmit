@@ -204,41 +204,67 @@ work. The automated tests manage their own containers, see
 
 ### Slurm
 
-This section uses the `autosubmit/slurm-openssh-container` image. The source is
-at https://github.com/BSC-ES/slurm-openssh-container and the published tags are
-at https://hub.docker.com/r/autosubmit/slurm-openssh-container. It is the image
-used by older Autosubmit instructions and it is not the image that pytest
-starts. The image ships a root SSH private key that lets you connect from the
-host.
+This section uses the same image as the automated tests,
+`giovtorres/slurm-docker:25.11.2-v0.1.7`, so a manual test matches what CI runs.
+The source is at https://github.com/giovtorres/slurm-docker.
 
 Pull and start it:
 
 ```bash
-docker pull autosubmit/slurm-openssh-container:25-05-0-1
+docker pull giovtorres/slurm-docker:25.11.2-v0.1.7
 ```
 
 ```bash
-docker run --rm -it --cgroupns=host --privileged \
-  --volume /sys/fs/cgroup:/sys/fs/cgroup:rw \
-  --hostname slurmctld --name slurm-container \
-  -p 2222:2222 autosubmit/slurm-openssh-container:25-05-0-1
+docker run --rm -it --init --privileged --cgroupns=host \
+  --hostname slurmctl --name slurm-container \
+  -e MYSQL_USER=autosubmit \
+  -e MYSQL_PASSWORD=autosubmit \
+  -e SSH_PORT=2222 \
+  -p 2222:2222 \
+  giovtorres/slurm-docker:25.11.2-v0.1.7
 ```
 
-In another terminal, copy the private key to the host and protect it. The image
-names it `container_root_pubkey`, and the SSH client uses it as the identity
-file:
+`--hostname slurmctl` is required because the image sets
+`SlurmctldHost=slurmctl`. `MYSQL_USER` and `MYSQL_PASSWORD` are required because
+the entrypoint substitutes them into `slurmdbd.conf`. The container runs three
+simulated nodes.
+
+Wait until the logs print `---> All services started`. Then check that Slurm is
+up and that the default QOS exists:
+
+```bash
+docker exec slurm-container sinfo
+docker exec slurm-container sacctmgr show qos format=name
+```
+
+Create the scratch directory that the platform definition expects:
+
+```bash
+docker exec slurm-container mkdir -p /tmp/scratch/group/root
+```
+
+In another terminal, create a key for the container and authorize it. The image
+allows root login with a public key:
 
 ```bash
 mkdir -p "$HOME/.ssh"
 chmod 700 "$HOME/.ssh"
-docker cp slurm-container:/root/.ssh/container_root_pubkey "$HOME/.ssh/container_root_pubkey"
-chmod 600 "$HOME/.ssh/container_root_pubkey"
+ssh-keygen -t rsa -b 4096 -f "$HOME/.ssh/container_root_key" -N ""
+docker cp "$HOME/.ssh/container_root_key.pub" slurm-container:/tmp/container_root_key.pub
+docker exec slurm-container sh -c \
+  'cat /tmp/container_root_key.pub >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && rm /tmp/container_root_key.pub'
 ```
 
-If `docker cp` fails, check that the container is running and that its name is
-`slurm-container` before continuing.
+The key is stored only in this container. If you stop or recreate the
+container, run this step again. Check that the key was added:
 
-Add the host alias used by the experiment configuration:
+```bash
+docker exec slurm-container wc -l /root/.ssh/authorized_keys
+```
+
+Add the host alias used by the experiment configuration. Add this block once. If
+`~/.ssh/config` already contains a `Host localDocker` block, update its
+`IdentityFile` instead of appending another one.
 
 ```bash
 cat <<- EOF >> $HOME/.ssh/config
@@ -247,21 +273,22 @@ Host localDocker
     User root
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
-    IdentityFile $HOME/.ssh/container_root_pubkey
+    IdentityFile $HOME/.ssh/container_root_key
     Port 2222
     ForwardX11 yes
 EOF
 ```
 
-Wait until Slurm is ready. The container takes a few seconds to start, and the
-first connections may fail. Retry until `sinfo` lists the `normal` partition:
+Check the SSH connection:
 
 ```bash
 ssh localDocker "sinfo"
 ```
 
-The image already creates `/tmp/scratch/group/root`, which the platform
-definition below uses.
+If you get `Permission denied (publickey)`, check that
+`/root/.ssh/authorized_keys` in the container has the key and that `IdentityFile`
+points to `$HOME/.ssh/container_root_key`. An older `Host localDocker` block that
+points to another key is a common cause.
 
 Now make Autosubmit use that host. Initialize Autosubmit first if you have not
 done it yet (see [Initialize Autosubmit](#initialize-autosubmit)), then create
@@ -290,13 +317,14 @@ PLATFORMS:
     TEMP_DIR: ''
     ADD_PROJECT_TO_HOST: false
     MAX_WALLCLOCK: '48:00'
-    MAX_PROCESSORS: 2
+    MAX_PROCESSORS: 6
     PROCESSORS_PER_NODE: 2
 ```
 
-The values above match the image. Check them with `ssh localDocker "sinfo"` and
-`ssh localDocker "scontrol show node"` if you use a different tag, and adjust
-`QUEUE`, `PROJECT`, `SCRATCH_DIR` and the resources.
+`QUEUE` maps to `SBATCH --qos`, and the image creates a default QOS named
+`normal` when the cluster is registered. The partition is also called `normal`
+and is the default partition, so no `PARTITION` is needed. `MAX_PROCESSORS: 6`
+matches the three nodes with two CPUs each.
 
 Create and run the experiment:
 
@@ -318,8 +346,9 @@ docker stop slurm-container
 ```
 
 Remove the `Host localDocker` block from `$HOME/.ssh/config` and delete
-`$HOME/.ssh/container_root_pubkey` if you no longer need them. The experiments
-stay in the Autosubmit directory and can be deleted with `autosubmit delete`.
+`$HOME/.ssh/container_root_key` and `$HOME/.ssh/container_root_key.pub` if you
+no longer need them. The experiments stay in the Autosubmit directory and can be
+deleted with `autosubmit delete`.
 
 ### PostgreSQL
 
