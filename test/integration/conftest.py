@@ -457,6 +457,13 @@ def slurm_server(
         return_value=fork_context,
     )
 
+    fork_context = multiprocessing.get_context("fork")
+
+    mocker.patch(
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
+    )
+
     start = perf_counter()
     container, ssh_port = get_slurm_container()
     print(f"get_slurm_container: {perf_counter() - start:.2f}s")
