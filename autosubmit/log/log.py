@@ -205,7 +205,7 @@ class Log:
     """
 
     def __init__(self):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def init_variables(self, file_path="") -> None:
         self.file_path = file_path
@@ -345,7 +345,7 @@ class Log:
                 status_file_handler.addFilter(custom_filter_failed)
                 Log.log.addHandler(status_file_handler)
         except Exception:  # retry again
-            pass
+            ...
 
     @staticmethod
     def set_console_level(level: int | str) -> None:

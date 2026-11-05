@@ -62,7 +62,7 @@ class Strategy(metaclass=ABCMeta):
         job_data_dcs_in_wrapper: list["JobData"],
         slurm_monitor: "SlurmMonitor",
     ) -> list["JobData"]:
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def set_job_data_dc_as_processed(self, job_data_dc: "JobData", original_ssh_output: str) -> "JobData":
         job_data_dc.platform_output = original_ssh_output

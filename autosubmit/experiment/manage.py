@@ -732,7 +732,7 @@ def copy_code(
             try:
                 rmtree(local_proj_dir, ignore_errors=True)
             except Exception:
-                pass
+                ...
             raise AutosubmitCritical(
                 f"Can not check out revision {svn_project_revision} {svn_project_url} "
                 f"into {local_proj_dir}",
@@ -1394,7 +1394,7 @@ def report(
                             continue
                         jobs_parameters["JOBS" + "." + job.section + "." + key] = value
             except Exception:
-                pass
+                ...
             parameters.update(jobs_parameters)
             with open(parameter_path, "w") as parameter_file:
                 for key, value in parameters.items():
