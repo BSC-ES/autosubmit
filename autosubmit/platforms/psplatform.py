@@ -80,7 +80,7 @@ class PsPlatform(ParamikoPlatform):
         return '1'
 
     def parse_queue_reason(self, output, job_id):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def create_a_new_copy(self):
         return PsPlatform(self.expid, self.name, self.config)

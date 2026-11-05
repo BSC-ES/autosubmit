@@ -479,7 +479,7 @@ class ParamikoPlatform(Platform):
             if first_line.startswith('[INFO] JOBID='):
                 return int(first_line.split('=', 1)[1].strip())
         except (ValueError, OSError, IndexError):
-            pass
+            ...
         return None
 
     def connect(
@@ -2167,7 +2167,7 @@ class ParamikoPlatform(Platform):
         self._check_and_cancel_duplicated_job_names(scripts_to_submit)
 
     def _set_submit_cmd(self, ec_queue):
-        pass
+        ...
 
     def _check_for_unrecoverable_errors(self):
         """Check for unrecoverable errors in the command output"""

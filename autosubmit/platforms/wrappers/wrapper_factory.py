@@ -95,7 +95,7 @@ class WrapperFactory:
         raise NotImplementedError(self.exception)  # pragma: no cover
 
     def header_directives(self, **kwargs):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def allocated_nodes(self):
         return ''

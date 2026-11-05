@@ -2247,7 +2247,7 @@ class JobList:
         return date_format
 
     def copy_ordered_jobs_by_date_member(self):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def get_ordered_jobs_by_date_member(self, wrapper_name: str) -> None | dict:
         """Get the dictionary of jobs ordered according to wrapper's
@@ -3485,7 +3485,7 @@ class JobList:
                                             job.platform.send_command(job.platform.cancel_cmd +
                                                                       " " + str(job.id), ignore_log=True)
                                 except Exception:
-                                    pass  # jobid finished already
+                                    ...  # jobid finished already
                                 job.status = Status.SKIPPED
                                 save = True
                     elif job.running == 'member':
@@ -3503,7 +3503,7 @@ class JobList:
                                             job.platform.send_command(job.platform.cancel_cmd +
                                                                       " " + str(job.id), ignore_log=True)
                                 except Exception:
-                                    pass  # job_id finished already
+                                    ...  # job_id finished already
                                 job.status = Status.SKIPPED
                                 save = True
         return save

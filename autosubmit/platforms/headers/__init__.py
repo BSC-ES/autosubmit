@@ -31,7 +31,7 @@ class PlatformHeader(Protocol):
     PARALLEL: str
 
     def get_queue_directive(self, job: 'Job', parameters: dict[str, Any]):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def calculate_het_header(self, job: 'Job', parameters: dict[str, Any]):
-        pass  # pragma: no cover
+        ...  # pragma: no cover

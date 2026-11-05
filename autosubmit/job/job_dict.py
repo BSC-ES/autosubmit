@@ -536,7 +536,7 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
                 jobs_flattened = [job for jobs_to_flatten in jobs for job in jobs_to_flatten]
                 jobs = jobs_flattened
             except TypeError:
-                pass
+                ...
         if sort_string:
             # I want to have first chunks then member then date to easily filter later on
             if len(jobs) > 0:
