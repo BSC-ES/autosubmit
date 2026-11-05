@@ -415,7 +415,6 @@ def test_experiment_history_migrates_old_schema(tmp_path):
     assert result == {}
 
 
-
 def test_get_finish_data_dc(tmp_path, monkeypatch):
     """Test that get_finish_data_dc retrieves the correct JobData after a full submit/start/finish cycle.
 

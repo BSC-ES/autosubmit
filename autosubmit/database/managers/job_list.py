@@ -95,11 +95,13 @@ class JobsDbManager(DbManager):
     It supports the SQLite and PostgreSQL backends used by Autosubmit.
     """
 
-    # Schema version of the job_list database, recorded in ``schema_version``.
     SCHEMA_VERSION = JOB_LIST_SCHEMA_VERSION
+    """Schema version of the job_list database, recorded in ``schema_version``."""
 
-    # The job_list schema is shared with the history tables on PostgreSQL.
     SCHEMA_VERSION_TABLE_NAME = "job_list_schema_version"
+    """Tracking table name, separate because the job_list schema is shared
+    with the history tables on PostgreSQL.
+    """
 
     def __init__(self, schema: str | None = None) -> None:
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
