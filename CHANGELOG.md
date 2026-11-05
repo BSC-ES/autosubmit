@@ -117,6 +117,7 @@ several bug fixes and enhancements to improve the overall user experience.
   multiple times, partially addressing #3326. #3327
 - Updating the Autosubmit version of an experiment (e.g., `create -v`) now creates the `db` folder #3293
 - Added a development Docker Compose setup for Autosubmit and Postgres #3363
+- Updated project coverage replacing pass statements by ... #2585 (thanks @Vietpr)
 
 ### 4.1.17.2: Bug fixes and enhancements (port of #3309)
 

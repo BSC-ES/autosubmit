@@ -1336,7 +1336,7 @@ class AutosubmitConfig:
             if str(parser_data["MAIL"].get("NOTIFICATIONS", "false")).lower() == "true":
                 mails = parser_data["MAIL"].get("TO", "")
                 if type(mails) is list:
-                    pass
+                    ...
                 elif "," in mails:
                     mails = mails.split(',')
                 else:
