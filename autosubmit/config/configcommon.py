@@ -1335,12 +1335,8 @@ class AutosubmitConfig:
         if parser_data.get("MAIL", "") != "":
             if str(parser_data["MAIL"].get("NOTIFICATIONS", "false")).lower() == "true":
                 mails = parser_data["MAIL"].get("TO", "")
-                if type(mails) is list:
-                    pass
-                elif "," in mails:
-                    mails = mails.split(',')
-                else:
-                    mails = mails.split(' ')
+                if isinstance(mails, str):
+                    mails = [mail for mail in re.split(r'[\s,;]+', mails) if mail]
                 self.experiment_data["MAIL"]["TO"] = mails
 
                 for mail in self.experiment_data["MAIL"]["TO"]:
@@ -2653,11 +2649,11 @@ class AutosubmitConfig:
         """
         return str(self.get_section(['STORAGE', 'COPY_REMOTE_LOGS'], "true")).lower()
 
-    def get_mails_to(self) -> str:
+    def get_mails_to(self) -> str | list[str]:
         """
         Returns the address where notifications will be sent from autosubmit's config file
 
-        :return: mail address
+        :return: The recipients as written in the configuration; a string or a list.
         """
         return self.get_section(['MAIL', 'TO'], "")
 
