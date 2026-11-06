@@ -202,16 +202,14 @@ def _generate_message_cpmip_threshold_violations(
         remember that you can disable these messages on Autosubmit config file.\n''')
 
 
-def _check_mail_address(mail_to: str | list[str] | tuple[str, ...]) -> list[str]:
+def _check_mail_address(mail_to: str | list | tuple) -> list[str]:
     """Normalise and validate the recipients of a mail notification.
 
     Accepts a single address, a string with several addresses separated by
     commas, semicolons or whitespace, or a list/tuple of such strings.
 
     :param mail_to: The recipients as configured in ``MAIL.TO``.
-    :type mail_to: str | list[str] | tuple[str, ...]
     :return: The flat list of validated email addresses.
-    :rtype: list[str]
     :raises ValueError: The recipients have an unsupported type, are empty, or are invalid.
     """
     if isinstance(mail_to, str):
@@ -237,16 +235,14 @@ def _check_mail_address(mail_to: str | list[str] | tuple[str, ...]) -> list[str]
     return recipients
 
 
-def _get_valid_recipients(mail_to: str | list[str] | tuple[str, ...]) -> list[str]:
+def _get_valid_recipients(mail_to: str | list | tuple) -> list[str]:
     """Return the validated recipients, or an empty list if they are invalid.
 
     A misconfigured ``MAIL.TO`` must never stop an experiment, so the error
     is logged as a warning instead of being raised.
 
     :param mail_to: The recipients as configured in ``MAIL.TO``.
-    :type mail_to: str | list[str] | tuple[str, ...]
     :return: The validated recipients, or an empty list.
-    :rtype: list[str]
     """
     try:
         return _check_mail_address(mail_to)
@@ -268,11 +264,8 @@ class MailNotifier:
         the listing by name).
 
         :param exp_id: The experiment id.
-        :type exp_id: str
         :param mail_to: The recipients, as configured in ``MAIL.TO``.
-        :type mail_to: str | list[str]
         :param platform: The platform.
-        :type platform: Platform
         """
         mail_to = _get_valid_recipients(mail_to)
         if not mail_to:
@@ -312,15 +305,10 @@ class MailNotifier:
         """Send an email notifying that a job changed status.
 
         :param exp_id: The experiment id.
-        :type exp_id: str
         :param job_name: The name of the job.
-        :type job_name: str
         :param prev_status: The previous status.
-        :type prev_status: str
         :param status: The current status.
-        :type status: str
         :param mail_to: The recipients, as configured in ``MAIL.TO``.
-        :type mail_to: str | list[str]
         """
         mail_to = _get_valid_recipients(mail_to)
         if not mail_to:
@@ -345,13 +333,9 @@ class MailNotifier:
         """Send an email listing the CPMIP thresholds a job violated.
 
         :param exp_id: The experiment id.
-        :type exp_id: str
         :param job_name: The name of the job.
-        :type job_name: str
         :param violations: The CPMIP threshold violations, keyed by metric name.
-        :type violations: dict
         :param mail_to: The recipients, as configured in ``MAIL.TO``.
-        :type mail_to: str | list[str]
         """
         mail_to = _get_valid_recipients(mail_to)
         if not mail_to:
