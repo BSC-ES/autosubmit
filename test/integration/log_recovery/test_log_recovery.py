@@ -108,11 +108,11 @@ def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
     assert local.log_recovery_process.is_alive()
-    # Give the child enough time to drain the queue and exit after the keep-alive timeout.
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline and local.log_recovery_process.is_alive():
-        time.sleep(0.1)
-    assert local.log_recovery_process.is_alive() is False
+    # The child exits once the keep-alive timeout passes with no new work, but it first has to
+    # load the configuration and open its connection, which can take several seconds on a busy
+    # CI runner. join() returns as soon as the child exits, so the timeout only bounds a hang.
+    local.log_recovery_process.join(timeout=30)
+    assert not local.log_recovery_process.is_alive()
 
 
 def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
