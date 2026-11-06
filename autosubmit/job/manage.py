@@ -161,7 +161,7 @@ def set_status(
                 restore_platforms([platform], as_conf=as_conf)
                 definitive_platforms.append(platform.name)
             except Exception:
-                pass
+                ...
         ##### End of the ""function""
         # This will raise an autosubmit critical if any of the filters has issues in the format specified by the user
         validate_job_filters(

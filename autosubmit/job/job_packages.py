@@ -499,7 +499,7 @@ class JobPackageThread(JobPackageBase):
                 self.platform.send_file(real_name)
 
     def _common_script_content(self) -> str:
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
 
 class JobPackageThreadWrapped(JobPackageThread):

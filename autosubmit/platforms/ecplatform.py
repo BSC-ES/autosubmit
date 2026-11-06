@@ -83,7 +83,7 @@ class EcPlatform(ParamikoPlatform):
         return ''
 
     def parse_queue_reason(self, output, job_id):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def get_check_all_jobs_cmd(self, jobs_id):
         """Return the batch job-list command for ecaccess.
@@ -558,7 +558,7 @@ class EcPlatform(ParamikoPlatform):
             if first_line.startswith('[INFO] JOBID='):
                 return int(first_line.split('=', 1)[1].strip())
         except (ValueError, OSError, subprocess.CalledProcessError):
-            pass
+            ...
         finally:
             local_path.unlink(missing_ok=True)
         return None

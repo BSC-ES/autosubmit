@@ -273,7 +273,7 @@ class Platform(ABC):
                 if event_worker not in cls.worker_events:
                     cls.worker_events.append(event_worker)
             except ValueError:
-                pass
+                ...
             except AttributeError as e:
                 Log.warning(f"The event couldn't be stored, event has an invalid state: \n{str(e)}")
 
@@ -287,7 +287,7 @@ class Platform(ABC):
                 if event_worker in cls.worker_events:
                     cls.worker_events.remove(event_worker)
             except ValueError:
-                pass
+                ...
             except AttributeError as e:
                 Log.warning(f"The event couldn't be removed, event has an invalid state: \n{str(e)}")
 
