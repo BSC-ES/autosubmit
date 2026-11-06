@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
@@ -148,8 +147,8 @@ class PBSPlatform(ParamikoPlatform):
 
         :rtype: None
         """
-        self.root_dir = Path(self.scratch) / self.project_dir / self.user / self.expid
-        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
+        self.root_dir = str(Path(self.scratch) / self.project_dir / self.user / self.expid)
+        self.remote_log_dir = Path(self.root_dir) / f"LOG_{self.expid}"
         self.cancel_cmd = "qdel"
         self._submit_cmd = 'qsub'
         self._submit_command_name = "qsub"
@@ -423,8 +422,7 @@ class PBSPlatform(ParamikoPlatform):
         while not file_exist and retries < max_retries:
             try:
                 # This return IOError if a path does not exist
-                self._ftpChannel.stat(os.path.join(
-                    self.get_files_path(), src))
+                self._ftpChannel.stat(str(self.get_files_path() / src))
                 file_exist = True
             except OSError:  # File does not exist, retry in sleeptime
                 sleep(sleeptime)

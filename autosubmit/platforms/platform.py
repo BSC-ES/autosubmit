@@ -195,7 +195,7 @@ class Platform(ABC):
         self._scratch = ''
         self._project_dir = ''
         self.temp_dir = ''
-        self._root_dir: Path = Path("")
+        self._root_dir: str = ""
         self.service = None
         self.scheduler = None
         self.directory = None
@@ -703,7 +703,7 @@ class Platform(ABC):
         if not job.max_checkpoint_step:
             job.max_checkpoint_step = 0
         if job.current_checkpoint_step < job.max_checkpoint_step:
-            remote_checkpoint_path = f'{self.get_files_path()}/CHECKPOINT_'
+            remote_checkpoint_path = f"{self.get_files_path()}/CHECKPOINT_"
             self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
             while self.check_file_exists(
                     f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}') and job.current_checkpoint_step < job.max_checkpoint_step:
@@ -1456,7 +1456,7 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def compress_file(self, file_path: str) -> str | None:
+    def compress_file(self, file_path: Path) -> str | None:
         """Compress a file.
 
         :param file_path: file path
