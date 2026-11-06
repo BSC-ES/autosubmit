@@ -18,10 +18,13 @@
 """Unit tests for ``autosubmit.database.models.tables``."""
 
 import pytest
-from sqlalchemy import MetaData
+from sqlalchemy import BigInteger, MetaData
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.schema import CreateTable
 
 from autosubmit.database.models.tables import (
     ExperimentTable,
+    JobsTable,
     TableRegistry,
     create_wrapper_tables,
     get_all_tables_by_name,
@@ -33,6 +36,18 @@ def meta() -> MetaData:
     """Return a fresh SQLAlchemy MetaData instance."""
     return MetaData()
 
+
+
+@pytest.mark.parametrize(
+    "column_name",
+    ["start_time_timestamp", "submit_time_timestamp", "finish_time_timestamp"],
+)
+def test_jobs_table_timestamps_are_64_bit(column_name: str) -> None:
+    """Job timestamps such as ``20261027164231`` do not fit a 32-bit integer (#3386)."""
+    assert isinstance(JobsTable.c[column_name].type, BigInteger)
+
+    ddl = str(CreateTable(JobsTable).compile(dialect=postgresql.dialect()))
+    assert f"{column_name} BIGINT" in ddl
 
 
 def test_get_table():

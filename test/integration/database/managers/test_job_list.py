@@ -396,6 +396,29 @@ def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmi
 
 
 @pytest.mark.postgres
+def test_db_job_list_jobs_timestamps_beyond_32_bits(as_db: str, autosubmit_exp):
+    """Job timestamps are stored as YYYYMMDDHHMMSS, which does not fit a 32-bit integer (#3386)."""
+    as_exp = autosubmit_exp()
+    timestamp = 20261027164231
+    assert timestamp > 2**31 - 1
+
+    db_manager = JobsDbManager(as_exp.expid)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
+    for job in job_list.get_job_list():
+        job.start_time_timestamp = timestamp
+        job.submit_time_timestamp = timestamp
+        job.finish_time_timestamp = timestamp
+    job_list.save_jobs()
+
+    loaded_jobs = job_list.dbmanager.load_jobs(full_load=True)
+    assert len(loaded_jobs) == len(raw_job_list)
+    for job in loaded_jobs:
+        assert job["start_time_timestamp"] == timestamp
+        assert job["submit_time_timestamp"] == timestamp
+        assert job["finish_time_timestamp"] == timestamp
+
+
+@pytest.mark.postgres
 @pytest.mark.parametrize("full_load", [True, False])
 def test_db_job_list_jobs_and_edges_together(
     tmp_path: Path, full_load: bool, as_db: str, autosubmit_exp
