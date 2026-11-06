@@ -53,6 +53,15 @@ from autosubmit.scripts._cli_function import cli_function
 from autosubmit.scripts._validation import validate_expid
 
 
+class _SetstatusLockDescriptor:
+    """Class and instance descriptor for conditional lock acquisition."""
+
+    def __get__(self, instance, owner=None) -> bool:
+        if instance is None:
+            return True
+        return not getattr(instance, "updated_list", False)
+
+
 class SetstatusOptions(ExpidOptions):
     """Options for the setstatus command."""
 
@@ -73,8 +82,11 @@ class SetstatusOptions(ExpidOptions):
     notransitive: bool
     check_wrapper: bool
     detail: bool
+    updated_list: bool
 
-    acquires_lock = True
+    acquires_lock = _SetstatusLockDescriptor()
+
+
 
 def args_parser() -> ArgumentParser:
     parser = create_argparse_parser(__doc__)
@@ -205,6 +217,14 @@ def args_parser() -> ArgumentParser:
         default=False,
         help="Generate detailed view of changes.",
     )
+    parser.add_argument(
+        "-ul",
+        "--updated-list",
+        action="store_true",
+        default=False,
+        dest="updated_list",
+        help="Write the modified job statuses to the updated_list_<EXPID>.txt file.",
+    )
 
     return parser
 
@@ -235,4 +255,5 @@ def main(opts: SetstatusOptions) -> int | bool | None:
         opts.expand_status,
         opts.check_wrapper,
         opts.detail,
+        opts.updated_list,
     )

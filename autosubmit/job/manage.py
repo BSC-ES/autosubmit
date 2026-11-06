@@ -61,6 +61,7 @@ def set_status(
     expand_status: str | None = None,
     check_wrapper=False,
     detail=False,
+    updated_list: bool = False,
 ) -> bool:
     """Set status of jobs.
 
@@ -80,6 +81,7 @@ def set_status(
     :param expand_status: The status to use when expanding.
     :param check_wrapper: check wrapper
     :param detail: detail
+    :param updated_list: write changes to the updated_list_<EXPID>.txt file
     :return: ``True`` if executed successfully.
     :raises AutosubmitCritical: if any of the filters is malformed or if no filter is provided, with a message describing the errors found.
     """
@@ -133,35 +135,36 @@ def set_status(
         # Getting db connections
         # To be added in a function that checks which platforms must be connected to
         job_list = load_job_list(expid, as_conf, monitor=True, new=False)
-        submitter = ParamikoSubmitter(as_conf=as_conf)
-        hpcarch = as_conf.get_platform()
-        for job in job_list.get_job_list():
-            job.platform_name = (
-                as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
-            )
-            if not job.platform_name:
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            job.platform = submitter.platforms[job.platform_name]
-        platforms_to_test = set()
-        platforms = submitter.platforms
-        for job in job_list.get_job_list():
-            job.submitter = submitter
-            if job.platform_name is None:
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            job.platform = platforms[job.platform_name]
-            # noinspection PyTypeChecker
-            if job.status in [Status.QUEUING, Status.SUBMITTED, Status.RUNNING]:
-                platforms_to_test.add(platforms[job.platform_name])
-        # establish the connection to all platforms
         definitive_platforms = []
-        for platform in platforms_to_test:
-            try:
-                restore_platforms([platform], as_conf=as_conf)
-                definitive_platforms.append(platform.name)
-            except Exception:
-                pass
+        if not updated_list:
+            submitter = ParamikoSubmitter(as_conf=as_conf)
+            hpcarch = as_conf.get_platform()
+            for job in job_list.get_job_list():
+                job.platform_name = (
+                    as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
+                )
+                if not job.platform_name:
+                    job.platform_name = hpcarch
+                # noinspection PyTypeChecker
+                job.platform = submitter.platforms[job.platform_name]
+            platforms_to_test = set()
+            platforms = submitter.platforms
+            for job in job_list.get_job_list():
+                job.submitter = submitter
+                if job.platform_name is None:
+                    job.platform_name = hpcarch
+                # noinspection PyTypeChecker
+                job.platform = platforms[job.platform_name]
+                # noinspection PyTypeChecker
+                if job.status in [Status.QUEUING, Status.SUBMITTED, Status.RUNNING]:
+                    platforms_to_test.add(platforms[job.platform_name])
+            # establish the connection to all platforms
+            for platform in platforms_to_test:
+                try:
+                    restore_platforms([platform], as_conf=as_conf)
+                    definitive_platforms.append(platform.name)
+                except Exception:
+                    pass
         ##### End of the ""function""
         # This will raise an autosubmit critical if any of the filters has issues in the format specified by the user
         validate_job_filters(
@@ -208,6 +211,28 @@ def set_status(
         ]
         # Time to change status
         Log.info(f"The selected number of jobs to change is: {len(final_list)}")
+        if updated_list:
+            if not final_list:
+                Log.warning("No changes were performed.")
+                return True
+            if detail:
+                for job in final_list:
+                    Log.info(f"Job: {job.name} -> {final}")
+            if save:
+                status_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "status"
+                status_path.mkdir(parents=True, exist_ok=True)
+                update_file = status_path / f"updated_list_{expid}.txt"
+                with update_file.open("a", encoding="utf-8") as f:
+                    for job in final_list:
+                        f.write(f"{job.name} {final}\n")
+                Log.info(f"Appended {len(final_list)} jobs to {update_file.name}")
+            else:
+                Log.printlog(
+                    f"Changes NOT saved to updated_list_{expid}.txt: use -s option to save",
+                    3000,
+                )
+            return True
+
         performed_changes = change_status(
             final, final_status, final_list, save, definitive_platforms
         )
