@@ -20,6 +20,7 @@ import datetime
 from functools import cached_property
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -165,9 +166,9 @@ JobsTable = Table(
     Column("date_split", String),
     Column("max_checkpoint_step", Integer, nullable=False, default=0),
     Column("start_time", String),
-    Column("start_time_timestamp", Integer),
-    Column("submit_time_timestamp", Integer),
-    Column("finish_time_timestamp", Integer),
+    Column("start_time_timestamp", BigInteger),
+    Column("submit_time_timestamp", BigInteger),
+    Column("finish_time_timestamp", BigInteger),
     Column("ready_date", String),
     Column("local_logs_out", String),  # tuple, to modify double value in two
     Column("local_logs_err", String),  # tuple, to modify double value in two
