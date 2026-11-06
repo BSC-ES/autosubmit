@@ -313,7 +313,7 @@ def _assert_exit_code(final_status: str, exit_code: int) -> None:
         assert exit_code == 0
 
 
-def _print_wrapper_db_results(wrapper_db_check_list, info_rows_as_dicts, jobs_rows_as_dicts, run_tmpdir, preview):
+def _print_wrapper_db_results(wrapper_db_check_list, run_tmpdir, preview):
     """
     Print the wrapper database check results.
     """
