@@ -140,7 +140,7 @@ class EcPlatform(ParamikoPlatform):
             self._ec_retry_count = 100
         self._ec_retry_flag = f"-retry {self._ec_retry_count}"
         self._allow_python_jobs = False
-        self.root_dir: Path | None = None
+        self.root_dir: str | None = None
         self.remote_log_dir: Path = Path("")
         self.cancel_cmd = ""
         self._checkjob_cmd = ""
@@ -163,8 +163,8 @@ class EcPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Updates commands for platforms"""
-        self.root_dir = Path(self.scratch) / self.project / self.user / self.expid
-        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
+        self.root_dir = str(Path(self.scratch) / self.project / self.user / self.expid)
+        self.remote_log_dir = Path(self.root_dir) / f"LOG_{self.expid}"
         self.cancel_cmd = f"ecaccess-job-delete {self._ec_retry_flag}"
         self._checkjob_cmd = f"ecaccess-job-list {self._ec_retry_flag} "
         self._checkhost_cmd = f"ecaccess-certificate-list {self._ec_retry_flag}"
@@ -511,7 +511,7 @@ class EcPlatform(ParamikoPlatform):
         if file_path.exists():
             file_path.unlink()
 
-        command = f'{self.get_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)} {file_path}'
+        command = f'{self.get_cmd} {self.host}:{str(self.get_files_path() / filename)} {file_path}'
         try:
             retries = 0
             sleeptime = 5
@@ -564,12 +564,12 @@ class EcPlatform(ParamikoPlatform):
         return None
 
     def delete_file(self, filename: str) -> bool:
-        command = f'{self.del_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)}'
+        command = f'{self.del_cmd} {self.host}:{str(self.get_files_path() / filename)}'
         try:
             FNULL = open(os.devnull, 'w')
             subprocess.check_call(command, stdout=FNULL, stderr=FNULL, shell=True)
         except subprocess.CalledProcessError:
-            Log.debug('Could not remove file {0}', os.path.join(self.get_files_path(), filename))
+            Log.debug(f"Could not remove file {str(self.get_files_path() / filename)}", )
             return False
         return True
 

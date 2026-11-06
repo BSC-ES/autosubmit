@@ -176,7 +176,7 @@ def test_check_file_exists(mocker, slurm_platform, monkeypatch, tmp_path, exists
     monkeypatch.setattr(
         slurm_platform,
         "get_files_path",
-        lambda: str(tmp_path)
+        lambda: tmp_path
     )
 
     slurm_platform._ftpChannel = mocker.MagicMock()

@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/
 
 import copy
-import datetime
 import json
 import locale
 import os
@@ -24,6 +23,7 @@ import re
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from functools import reduce
 from pathlib import Path
 from threading import Thread
@@ -58,6 +58,8 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.template import TemplateSnippet
     from autosubmit.platforms.platform import Platform
 
 Log.get_logger("Autosubmit")
@@ -285,7 +287,7 @@ class Job:
         self.status = Status.KEY_TO_VALUE[state["status"]]
 
         if date_str := state.get("date"):
-            self.date = datetime.datetime.fromisoformat(date_str)
+            self.date = datetime.fromisoformat(date_str)
         else:
             self.date = None
 
@@ -315,9 +317,7 @@ class Job:
         job_data["remote_logs_err"] = self.remote_logs[1] if self.remote_logs[1] else ""
         if job_data["date"]:
             job_data["date"] = job_data["date"].isoformat()
-        job_data["modified"] = datetime.datetime.now(datetime.timezone.utc).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        job_data["modified"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         del job_data["local_logs"]
         del job_data["remote_logs"]
@@ -527,7 +527,7 @@ class Job:
 
     def init_runtime_parameters(
         self,
-        as_conf: "AutosubmitConfig",
+        as_conf: 'AutosubmitConfig',
         reset_logs: bool,
         called_from_log_recovery: bool,
     ) -> None:
@@ -563,7 +563,7 @@ class Job:
         if not self.id:
             self.id = 0
         if not called_from_log_recovery and self.status == Status.READY:
-            self.start_time_timestamp = date2str(datetime.datetime.now(), "S")
+            self.start_time_timestamp = date2str(datetime.now(), "S")
 
         self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get(
             "WORKFLOW_COMMIT", ""
@@ -1021,7 +1021,7 @@ class Job:
         self._validate_template = value
 
     def read_header_tailer_script(
-        self, script_path: str, as_conf: "AutosubmitConfig", is_header: bool
+        self, script_path: str, as_conf: 'AutosubmitConfig', is_header: bool
     ):
         """Opens and reads a script. If it is not a BASH script it will fail :(
 
@@ -1416,7 +1416,7 @@ class Job:
             Log.warning(f"Log file {logname} does not exist")
             return 0
 
-    def _get_from_total_stats(self, index) -> list[datetime.datetime]:
+    def _get_from_total_stats(self, index) -> list[datetime]:
         """Returns list of values from given column index position in TOTAL_STATS file associated to job
 
         :param index: column position to retrieve
@@ -1446,7 +1446,7 @@ class Job:
         """Return end time (epoch seconds) from line 2 of the STAT file."""
         return self._get_from_stat(2, attempt)
 
-    def check_retrials_end_time(self) -> list[int]:
+    def check_retrials_end_time(self) -> list[datetime]:
         """Returns list of end datetime for retrials from total stats file
 
         :return: date and time
@@ -1463,14 +1463,14 @@ class Job:
                 stat_file.unlink()
         return result > 0
 
-    def check_retrials_start_time(self) -> list[int]:
+    def check_retrials_start_time(self) -> list[datetime]:
         """Returns list of start datetime for retrials from total stats file
 
         :return: date and time
         """
         return self._get_from_total_stats(1)
 
-    def get_last_retrials(self) -> list[list[datetime.datetime]]:
+    def get_last_retrials(self) -> list[list[datetime]]:
         """Returns the retrials of a job, including the last COMPLETED run.
 
         The selection stops, and does not include when the previous COMPLETED job
@@ -1478,7 +1478,7 @@ class Job:
 
         :return: list of dates of retrial [submit, start, finish] in datetime format
         """
-        log_name = os.path.join(self._tmp_path, self.name + "_TOTAL_STATS")
+        log_name = Path(self._tmp_path, f"{self.name}_TOTAL_STATS")
         retrials_list: list = []
         if os.path.exists(log_name):
             already_completed = False
@@ -1515,7 +1515,7 @@ class Job:
             )
         return remote_logs
 
-    def check_remote_log_exists(self, show_logs: bool = False) -> bool:
+    def check_remote_log_exists(self) -> bool:
         """Checks if remote log file exists on remote host
 
         :param show_logs: Whether to show logs during the check
@@ -1548,12 +1548,10 @@ class Job:
 
         # Compress if enabled
         for idx, remote_log in enumerate(remote_logs):
-            log_full_path = Path(self.platform.get_files_path(), remote_log)
+            log_full_path = str(self.platform.get_files_path() / remote_log)
             if self.platform.compress_remote_logs:
-                compressed_path = self.platform.compress_file(str(log_full_path))
-                remote_logs[idx] = (
-                    str(Path(compressed_path).name) if compressed_path else remote_log
-                )
+                compressed_path = self.platform.compress_file(log_full_path)
+                remote_logs[idx] = Path(compressed_path).name if compressed_path else remote_log
 
         # Back to unmutable
         remote_logs = tuple(remote_logs)
@@ -1588,7 +1586,7 @@ class Job:
         """Read submit_time from the local STAT file (line 0) and set ``submit_time_timestamp``."""
         submit_epoch = self.check_submit_time(attempt)
         if submit_epoch:
-            self.submit_time_timestamp = datetime.datetime.fromtimestamp(
+            self.submit_time_timestamp = datetime.fromtimestamp(
                 submit_epoch
             ).strftime("%Y%m%d%H%M%S")
 
@@ -1667,8 +1665,8 @@ class Job:
                     result_local = self.local_logs
                     result_remote = self.remote_logs
             else:
-                remote_out = Path(self.platform.get_files_path(), self.remote_logs[0])
-                parsed_id = self.platform.read_jobid_from_remote_log(str(remote_out))
+                remote_out = str(self.platform.get_files_path() / self.remote_logs[0])
+                parsed_id = self.platform.read_jobid_from_remote_log(remote_out)
                 if parsed_id is not None:
                     self.id = parsed_id
                 self._sync_retrieve_logfiles()
@@ -1727,7 +1725,7 @@ class Job:
                 return seconds
         return None
 
-    def _time_in_seconds_and_margin(self, wallclock: datetime.timedelta) -> int:
+    def _time_in_seconds_and_margin(self, wallclock: timedelta) -> int:
         """Calculate the total wallclock time in seconds and the wallclock time with a margin.
 
         This method increases the given wallclock time by 30%.
@@ -1748,11 +1746,11 @@ class Job:
                 f"Setting wallclock time to the maximum allowed by the platform."
             )
             total = total_platform
-        wallclock_delta = datetime.timedelta(seconds=total)
+        wallclock_delta = timedelta(seconds=total)
         return int(wallclock_delta.total_seconds())
 
-    def parse_time(self, wallclock) -> datetime.timedelta | None:
-        """Convert a ``HH:MM[:SS]`` wallclock to a :class:`datetime.timedelta`.
+    def parse_time(self, wallclock) -> timedelta | None:
+        """Convert a ``HH:MM[:SS]`` wallclock to a :class:`timedelta`.
 
         :param wallclock: Wallclock to convert, e.g. ``'07:30'`` or ``'07:30:00'``.
         :return: The wallclock as a timedelta, or ``None`` if it cannot be parsed. ``'00:00'``
@@ -1760,11 +1758,11 @@ class Job:
             timedelta as a test workaround.
         """
         if type(wallclock) is not str:
-            return datetime.timedelta(24 * 60 * 60)
+            return timedelta(24 * 60 * 60)
         seconds = wallclock_to_seconds(wallclock)
         if seconds is None:
             return None
-        return datetime.timedelta(seconds=seconds)
+        return timedelta(seconds=seconds)
 
     def is_over_wallclock(self, effective_wallclock=None) -> bool:
         """Check if the job is over the wallclock time, it is an alternative method to avoid platform issues."""
@@ -1775,7 +1773,7 @@ class Job:
                 f"Job {self.name} does not have start time timestamp, trying to set it from remote stat file"
             )
             self.platform.set_start_time_from_remote_stat_file([self])
-        elapsed = datetime.datetime.now() - datetime.datetime.strptime(
+        elapsed = datetime.now() - datetime.strptime(
             str(self.start_time_timestamp), "%Y%m%d%H%M%S"
         )
         if int(elapsed.total_seconds()) > effective_wallclock:
@@ -1785,7 +1783,7 @@ class Job:
             return True
         return False
 
-    def update_status(self, as_conf: "AutosubmitConfig") -> Status:
+    def update_status(self, as_conf: 'AutosubmitConfig') -> Status:
         """Updates job status, checking COMPLETED file if needed.
 
         :param as_conf: Autosubmit configuration.
@@ -1841,7 +1839,7 @@ class Job:
         else:
             self.new_status = default_status
 
-    def get_metric_folder(self, as_conf: "AutosubmitConfig") -> str:
+    def get_metric_folder(self, as_conf: 'AutosubmitConfig') -> str:
         """Returns the default metric folder for the job.
 
         :return: The metric folder path.
@@ -1850,9 +1848,9 @@ class Job:
         # Check if the job platform is a subclass of ParamikoPlatform
         # TODO: Every platform is an instance of Paramiko, no?
         if isinstance(self.platform, ParamikoPlatform):
-            base_path = Path(self.platform.remote_log_dir)
+            base_path = self.platform.root_dir
         else:
-            base_path = Path(self.platform.root_dir).joinpath(self.expid)
+            base_path = str(Path(self.platform.root_dir) / self.expid)
 
         # Get the defined metric folder from the configuration if it exists
         try:
@@ -1862,13 +1860,11 @@ class Job:
             Log.printlog(f"Failed to get metric folder from config: {exc}", code=6019)
 
         # Construct the metric folder path by adding the job name
-        metric_folder = base_path.joinpath(self.name)
+        metric_folder = Path(base_path) / self.name
 
         return str(metric_folder)
 
-    def update_current_parameters(
-        self, as_conf: "AutosubmitConfig", parameters: dict
-    ) -> dict:
+    def update_current_parameters(self, as_conf: 'AutosubmitConfig', parameters: dict) -> dict:
         """
         Populate and update `CURRENT_XXX` parameters and placeholders in the given parameters dictionary.
 
@@ -1892,7 +1888,7 @@ class Job:
         parameters['CURRENT_TYPE'] = parameters.get("CURRENT_TYPE", self.platform.TYPE.value)
         parameters['CURRENT_SCRATCH_DIR'] = parameters.get("CURRENT_SCRATCH_DIR", self.platform.scratch)
         parameters['CURRENT_PROJ_DIR'] = parameters.get("CURRENT_PROJ_DIR", self.platform.project_dir)
-        parameters['CURRENT_ROOTDIR'] = parameters.get("CURRENT_ROOTDIR", str(self.platform.root_dir))
+        parameters['CURRENT_ROOTDIR'] = parameters.get("CURRENT_ROOTDIR", self.platform.root_dir)
         parameters['CURRENT_LOGDIR'] = parameters.get("CURRENT_LOGDIR", str(self.platform.get_files_path()))
 
         for key, value in as_conf.jobs_data[self.section].items():
@@ -1923,9 +1919,7 @@ class Job:
 
         return parameters
 
-    def process_scheduler_parameters(
-        self, job_platform: "Platform", chunk: int
-    ) -> None:
+    def process_scheduler_parameters(self, job_platform: 'Platform', chunk: int) -> None:
         """Parsers YAML data stored in the dictionary and calculates the components of the heterogeneous job if any."""
         if type(self.processors) is list:
             hetsize = len(self.processors)
@@ -2039,34 +2033,9 @@ class Job:
 
         else:
             self.memory_per_task = str(self.memory_per_task)
-        if type(self.reservation) is list:
-            # Get the reservation name, each element can be a str
-            self.het["RESERVATION"] = []
-            if len(self.reservation) == 1:
-                for x in range(self.het["HETSIZE"]):
-                    self.het["RESERVATION"].append(self.reservation)
-            else:
-                for x in self.reservation:
-                    self.het["RESERVATION"].append(str(x))
-            self.reservation = str(self.het["RESERVATION"][0])
-        else:
-            self.reservation = (
-                self.reservation
-                if isinstance(self.reservation, str) and self.reservation.strip()
-                else ""
-            )
-        if type(self.exclusive) is list:
-            # Get the exclusive, each element can be only be bool
-            self.het["EXCLUSIVE"] = []
-            if len(self.exclusive) == 1:
-                for x in range(self.het["HETSIZE"]):
-                    self.het["EXCLUSIVE"].append(self.exclusive)
-            else:
-                for x in self.exclusive:
-                    self.het["EXCLUSIVE"].append(x)
-            self.exclusive = self.het["EXCLUSIVE"][0]
-        else:
-            self.exclusive = self.exclusive
+        self.reservation = self.reservation if isinstance(self.reservation, str) and self.reservation.strip() else ""
+
+        self.exclusive = self.exclusive
         if type(self.hyperthreading) is list:
             # Get the hyperthreading, each element can be only be bool
             self.het["HYPERTHREADING"] = []
@@ -2116,17 +2085,11 @@ class Job:
         if self.custom_directives == "":
             if job_platform.custom_directives is None:
                 job_platform.custom_directives = ""
-            if type(job_platform.custom_directives) is list:
-                self.custom_directives = json.dumps(job_platform.custom_directives)
-                self.custom_directives = (
-                    self.custom_directives.replace("'", '"').strip("[]").strip(", ")
-                )
-            else:
-                self.custom_directives = (
-                    job_platform.custom_directives.replace("'", '"')
-                    .strip("[]")
-                    .strip(", ")
-                )
+            self.custom_directives = (
+                job_platform.custom_directives.replace("'", '"')
+                .strip("[]")
+                .strip(", ")
+            )
         if self.custom_directives != "":
             if self.custom_directives[0] != '"':
                 self.custom_directives = '"' + self.custom_directives
@@ -2176,7 +2139,7 @@ class Job:
         )
 
     def update_platform_associated_parameters(
-        self, as_conf: "AutosubmitConfig", parameters: dict, chunk, set_attributes
+        self, as_conf: 'AutosubmitConfig', parameters: dict, chunk, set_attributes
     ) -> dict:
         if set_attributes:
             self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
@@ -2363,7 +2326,7 @@ class Job:
         self._chunk_size = as_conf.get_chunk_size()
         self._chunk_size_unit = as_conf.get_chunk_size_unit().lower()
 
-    def update_check_variables(self, as_conf: "AutosubmitConfig") -> None:
+    def update_check_variables(self, as_conf: 'AutosubmitConfig') -> None:
         """Update job check variables from Autosubmit configuration.
         :param as_conf: The Autosubmit configuration object."""
 
@@ -2427,19 +2390,19 @@ class Job:
             split_length = get_split_size(as_conf.experiment_data, self.section)
             start_date = parameters.get("CHUNK_START_DATE", None)
             if set_attributes and start_date:
-                self.date_split = datetime.datetime.strptime(start_date, "%Y%m%d")
+                self.date_split = datetime.strptime(start_date, "%Y%m%d")
             split_start = chunk_start_date(
                 self.date_split, int(self.split), split_length, split_unit, cal
             )
             if parameters["SPLIT_LAST"].lower() == "true":
-                split_end = datetime.datetime.strptime(
+                split_end = datetime.strptime(
                     parameters["CHUNK_END_DATE"], "%Y%m%d"
                 )
             else:
                 split_end = chunk_end_date(split_start, split_length, split_unit, cal)
 
             if split_unit == ChunkUnit.HOUR:
-                split_end_1 = split_end - datetime.timedelta(hours=1)
+                split_end_1 = split_end - timedelta(hours=1)
             else:
                 split_end_1 = previous_day(split_end, cal)
 
@@ -2499,8 +2462,8 @@ class Job:
             )
 
             if chunk_unit == ChunkUnit.HOUR:
-                chunk_end_1 = chunk_end - datetime.timedelta(hours=1)
-                last_day_chunk = last_chunk_end - datetime.timedelta(hours=1)
+                chunk_end_1 = chunk_end - timedelta(hours=1)
+                last_day_chunk = last_chunk_end - timedelta(hours=1)
             else:
                 chunk_end_1 = previous_day(chunk_end, cal)
                 last_day_chunk = previous_day(last_chunk_end, cal)
@@ -2663,7 +2626,7 @@ class Job:
 
     @staticmethod
     def update_placeholders(
-        as_conf: "AutosubmitConfig", parameters: dict, replace_by_empty=False
+        as_conf: 'AutosubmitConfig', parameters: dict, replace_by_empty=False
     ) -> dict:
         """Find and substitute dynamic placeholders in `parameters` using the provided
         Autosubmit configuration helpers.
@@ -2720,7 +2683,7 @@ class Job:
 
     def update_parameters(
         self,
-        as_conf: "AutosubmitConfig",
+        as_conf: 'AutosubmitConfig',
         set_attributes: bool = False,
         reset_logs: bool = False,
     ) -> dict:
@@ -2743,7 +2706,7 @@ class Job:
                 self.reset_logs()
             self._init_runtime_parameters()
             if not hasattr(self, "start_time"):
-                self.start_time = datetime.datetime.now()
+                self.start_time = datetime.now()
             # Parameters that affect to all the rest of parameters
             self.update_dict_parameters(as_conf)
         self.init_platform(as_conf)
@@ -2767,7 +2730,7 @@ class Job:
         self.updated = True
         return parameters
 
-    def init_platform(self, as_conf: "AutosubmitConfig") -> None:
+    def init_platform(self, as_conf: 'AutosubmitConfig') -> None:
         """Initialize the job's platform.
 
         The submitter comes from the job_list.submitter during an autosubmit run/inspect, but if not, it is created here.
@@ -2786,7 +2749,7 @@ class Job:
 
     @staticmethod
     def update_content_extra(
-        as_conf: "AutosubmitConfig", files: list[str]
+        as_conf: 'AutosubmitConfig', files: list[str]
     ) -> list[str]:
         additional_templates = []
         for file in files:
@@ -2805,7 +2768,7 @@ class Job:
         return additional_templates
 
     def update_content(
-        self, as_conf: "AutosubmitConfig", parameters: dict
+        self, as_conf: 'AutosubmitConfig', parameters: dict
     ) -> tuple[str, list[str]]:
         """Create the script content to be run for the job.
 
@@ -2856,7 +2819,7 @@ class Job:
         additional_content = self.update_content_extra(as_conf, self.additional_files)
         return template_content, additional_content
 
-    def get_wrapped_content(self, as_conf: "AutosubmitConfig", parameters: dict):
+    def get_wrapped_content(self, parameters: dict):
         snippet: TemplateSnippet = get_template_snippet(Language.EMPTY)
         template = f"python $SCRATCH/{self.expid}/LOG_{self.expid}/{self.name}.cmd"
         return self._get_paramiko_template(snippet, template, parameters)
@@ -2919,7 +2882,7 @@ class Job:
                 return True
         return False
 
-    def create_script(self, as_conf: "AutosubmitConfig") -> str:
+    def create_script(self, as_conf: 'AutosubmitConfig') -> str:
         """Create the script file to be run for the job.
 
         :param as_conf: Configuration object.
@@ -3042,7 +3005,7 @@ class Job:
     def _substitute_placeholders(
         content: str,
         parameters: dict,
-        as_conf: "AutosubmitConfig",
+        as_conf: 'AutosubmitConfig',
         undefined_variables: list[str] | None = None,
     ) -> str:
         """Replace placeholders in the template content.
@@ -3115,7 +3078,7 @@ class Job:
         self, as_conf: "AutosubmitConfig", wrapper_tag="wrapped"
     ) -> str:
         parameters = self.update_parameters(as_conf, set_attributes=False)
-        template_content = self.get_wrapped_content(as_conf, parameters)
+        template_content = self.get_wrapped_content(parameters)
         for key, value in parameters.items():
             template_content = re.sub(
                 "%(?<!%%)" + key + "%(?!%%)",
@@ -3137,7 +3100,7 @@ class Job:
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
         return script_name
 
-    def check_script(self, as_conf: "AutosubmitConfig", show_logs="false") -> bool:
+    def check_script(self, as_conf: 'AutosubmitConfig', show_logs: str= "false") -> bool:
         """Checks if the script is well-formed.
 
         :param as_conf: Autosubmit configuration.
@@ -3291,7 +3254,7 @@ class Job:
             attempt
         )  # last known start time from the .cmd file
         if start_time_:
-            self.start_time_timestamp = datetime.datetime.fromtimestamp(
+            self.start_time_timestamp = datetime.fromtimestamp(
                 start_time_
             ).strftime("%Y%m%d%H%M%S")
         else:
@@ -3301,7 +3264,7 @@ class Job:
             self.start_time_timestamp = (
                 self.start_time_timestamp
                 if self.start_time_timestamp
-                else date2str(datetime.datetime.now(), "S")
+                else date2str(datetime.now(), "S")
             )
 
     def fix_local_logs_timestamps(
@@ -3352,7 +3315,7 @@ class Job:
             qos=self.queue,
             job_id=self.id,
             wrapper_queue=self._wrapper_queue,
-            wrapper_code=0 if not self.packed else 1,
+            wrapper_code="0" if not self.packed else "1",
             children=self.children_names_str,
             fail_count=attempt,
         )
@@ -3361,7 +3324,7 @@ class Job:
     @staticmethod
     def _datestr_to_epoch(timestamp: str) -> int:
         """Convert a date string in the format YYYYMMDDHHMMSS to epoch time."""
-        return int(datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S").timestamp())
+        return int(datetime.strptime(timestamp, "%Y%m%d%H%M%S").timestamp())
 
     def has_valid_submit_time(self) -> bool:
         """Whether the submit time can be used for log recovery.
@@ -3385,11 +3348,11 @@ class Job:
         self.status = Status.COMPLETED if completed else Status.FAILED
         end_time = self.check_end_time(attempt)
         if end_time > 0:
-            self.finish_time_timestamp = datetime.datetime.fromtimestamp(
+            self.finish_time_timestamp = datetime.fromtimestamp(
                 end_time
             ).strftime("%Y%m%d%H%M%S")
         if not self.finish_time_timestamp:
-            self.finish_time_timestamp = date2str(datetime.datetime.now(), "S")
+            self.finish_time_timestamp = date2str(datetime.now(), "S")
         self._write_time("end")
         self._write_time("status")
 
@@ -3460,7 +3423,7 @@ class Job:
         else:
             return False
 
-    def is_parent(self, job: "Job"):
+    def is_parent(self, job: 'Job'):
         """Check if the given job is a parent
 
         :param job: job to be checked if is a parent
@@ -3468,7 +3431,7 @@ class Job:
         """
         return job in self.parents
 
-    def is_ancestor(self, job: "Job") -> bool:
+    def is_ancestor(self, job: 'Job') -> bool:
         """Check if the given job is an ancestor
 
         :param job: job to be checked if is an ancestor
@@ -3480,7 +3443,7 @@ class Job:
         return False
 
     def synchronize_logs(
-        self, platform: "Platform", remote_logs, local_logs, last=True
+        self, platform: 'Platform', remote_logs, local_logs, last=True
     ):
         platform.move_file(remote_logs[0], local_logs[0])  # .out
         platform.move_file(remote_logs[1], local_logs[1])  # .err
@@ -3488,7 +3451,7 @@ class Job:
             self.local_logs = local_logs
             self.remote_logs = copy.deepcopy(local_logs)
 
-    def recover_log(self, as_conf: "AutosubmitConfig") -> None:
+    def recover_log(self, as_conf: 'AutosubmitConfig') -> None:
         """Recover log files and submit time for this job.
 
         ``log_recovery_call_count`` caps how many recovery attempts are made for this job.
@@ -3518,14 +3481,14 @@ class Job:
                     if line_info and line_info[0].isdigit():
                         self.ready_date = line_info[0]
                     else:
-                        self.ready_date = datetime.datetime.fromtimestamp(
+                        self.ready_date = datetime.fromtimestamp(
                             stat_file.stat().st_mtime
                         ).strftime("%Y%m%d%H%M%S")
                         Log.debug(
                             f"Failed to recover ready date for the job {self.name}"
                         )
                 else:  # Default to last mod time
-                    self.ready_date = datetime.datetime.fromtimestamp(
+                    self.ready_date = datetime.fromtimestamp(
                         stat_file.stat().st_mtime
                     ).strftime("%Y%m%d%H%M%S")
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
@@ -3568,7 +3531,7 @@ class Job:
                 Log.error(f"Error sending CPMIP notification for {self.name}: {error}")
 
     def assign_platform(
-        self, submitter: "ParamikoSubmitter", create: bool, new: bool
+        self, submitter: 'ParamikoSubmitter', create: bool, new: bool
     ) -> None:
         """Assigns the platform to the job.
         :param submitter: Submitter object containing platform information.
@@ -3630,7 +3593,7 @@ class WrapperJob(Job):
         self.num_processors = num_processors
         self.as_config = as_config
         # save start time, wallclock and processors?!
-        self.checked_time = datetime.datetime.now()
+        self.checked_time = datetime.now()
         self.inner_jobs_running: list = []
         self.is_wrapper = True
         self._safe_wait = 60  # seconds to wait before considering a wrapper stuck in RUNNING when all the inner jobs are finished
@@ -3790,7 +3753,7 @@ class WrapperJob(Job):
                 inner_job.new_status = Status.WAITING
         return True
 
-    def _sync_inner_job_statuses(self, as_conf: "AutosubmitConfig") -> None:
+    def _sync_inner_job_statuses(self, as_conf: 'AutosubmitConfig') -> None:
         """Persist status changes for inner jobs that have transitioned.
 
         :param as_conf: Autosubmit configuration object.
@@ -3822,7 +3785,7 @@ class WrapperJob(Job):
 
         return True
 
-    def check_and_update_status(self, as_conf: "AutosubmitConfig") -> bool:
+    def check_and_update_status(self, as_conf: 'AutosubmitConfig') -> bool:
         """Check the status of the wrapper job and its inner jobs.
 
         :param as_conf: Autosubmit configuration object.
