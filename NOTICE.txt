@@ -1,0 +1,17 @@
+Autosubmit
+Copyright (C) Barcelona Supercomputing Center (BSC)
+
+Acknowledgements
+
+Cylc Flow (https://github.com/cylc/cylc-flow): Inspired the autosubmit cat-log command
+and the docstring-based command-line interface introduced in Autosubmit, following
+similar approaches in Cylc Flow 8.
+
+StreamFlow (https://github.com/alpha-unito/streamflow): Inspired most the implementation of
+RO-Crate support in Autosubmit.
+
+PyCOMPSs (https://github.com/bsc-wdc/compss): Inspired the RO-Crate configuration patch mechanism
+for RO-Crate in Autosubmit, to complement the rest of the work inspired by StreamFlow.
+
+These acknowledgements refer to technical inspiration and design approaches.
+No source code from these projects has been incorporated.
