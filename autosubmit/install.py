@@ -19,7 +19,6 @@
 
 import os
 from configparser import ConfigParser
-from importlib.resources import files
 from pathlib import Path
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -70,13 +69,11 @@ def create_required_directories() -> None:
     directories = _get_required_directories()
     _create_directories(directories)
 
+    directory_list = "\n".join(f"  {directory}" for directory in directories)
+
     Log.result(
-        "\n".join(
-            [
-                "Directories have been created and configured successfully:",
-                *map(str, directories),
-            ]
-        )
+        "Autosubmit directory structure has been initialized successfully:\n"
+        f"{directory_list}\n"
     )
 
 
@@ -94,10 +91,8 @@ def _create_sqlite_database() -> bool:
 
     Log.info("Creating autosubmit database...")
 
-    query_file = files("autosubmit.database") / "data/autosubmit.sql"
-    query = query_file.read_text()
-
-    if not create_db(query):
+    # The schema comes from the SQLAlchemy definitions, not from a ``.sql`` file.
+    if not create_db():
         Log.error("Can not write database file")
         return False
 
@@ -113,10 +108,11 @@ def _create_postgres_database() -> bool:
     """
     Log.info("Creating autosubmit Postgres database...")
 
-    if not create_db(""):
+    if not create_db():
         Log.error("Failed to create Postgres database")
         return False
 
+    Log.result("Autosubmit database created successfully")
     return True
 
 

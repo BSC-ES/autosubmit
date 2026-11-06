@@ -21,6 +21,13 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
+- Add per-target `schema_version` tracking and create the `job_data(job_name)` index in the SQLAlchemy history database manager #3114
+- Align the SQLAlchemy history manager lookups and bulk updates, and remove the temporary table from `select_jobs_data` #3114
+- Use SQLAlchemy for all history and experiment status database managers, dropping the legacy SQLite-only managers #3114
+- Fix log recovery skipping historical stats when the scheduler reuses job ids across chunks #3114
+- Record `schema_version` with a dialect upsert to avoid races when databases are written concurrently #3114
+- Make the general database and experiment details use only SQLAlchemy, dropping the last raw-sqlite3 code paths and the legacy `db_version` table #3114
+- Move every database manager into `autosubmit/database` (`models/` and `managers/` subpackages) #3114
 - Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295
 - Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
 - Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
@@ -36,6 +43,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `is_current_logged_user_owner` and `is_current_real_user_owner` raising `KeyError` when the experiment
   folder is owned by a UID with no `passwd` entry (e.g. inside containers) #3375
 - Fixed mail notifications crashing the experiment when `MAIL.TO` is a string #2974
+- Fix job timestamps overflowing the PostgreSQL `jobs` table: `start_time_timestamp`, `submit_time_timestamp` and `finish_time_timestamp` are now `BigInteger` #3386 (thanks @Shakhtar-Sankur)
 
 **New Features:**
 
@@ -51,7 +59,13 @@ several bug fixes and enhancements to improve the overall user experience.
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
 - Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
 - Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
-- Added `RUNTIME.LOG_RECOVERY` options to configure log recovery resiliency: `CONSECUTIVE_MAX_RESTARTS` (consecutive restart attempts before waiting to retry, default `2`, `0` disables the limit), `RETRY_DELAY` (seconds to wait after exhausting those attempts before trying to start the recovery process again, default `600`) and `INLINE_FALLBACK` (recover pending logs in the main process while the separate process is unavailable, default `true`) #3342
+- Added `RUNTIME.LOG_RECOVERY` options to configure log recovery resiliency:
+  `CONSECUTIVE_MAX_RESTARTS` (consecutive restart attempts before waiting to retry,
+  default `2`, `0` disables the limit),
+  `RETRY_DELAY` (seconds to wait after exhausting those attempts before trying to
+  start the recovery process again, default `600`) and
+  `INLINE_FALLBACK` (recover pending logs in the main process while the separate
+  process is unavailable, default `true`) #3342
 - Add `[database] backup` option to `autosubmitrc` to disable SQLite backups #3129
 
 **Migration from `job_list.pkl` to Database**
@@ -103,6 +117,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - The ``AutosubmitConfig`` instances are now centralised in a registry, to avoid re-loading the YAML files
   multiple times, partially addressing #3326. #3327
 - Updating the Autosubmit version of an experiment (e.g., `create -v`) now creates the `db` folder #3293
+- Added a development Docker Compose setup for Autosubmit and Postgres #3363
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 
