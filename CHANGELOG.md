@@ -118,6 +118,16 @@ several bug fixes and enhancements to improve the overall user experience.
 - Updating the Autosubmit version of an experiment (e.g., `create -v`) now creates the `db` folder #3293
 - Added a development Docker Compose setup for Autosubmit and Postgres #3363
 
+### 4.1.17.2: Bug fixes and enhancements (port of #3309)
+
+**Bug fixes:**
+
+- Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
+
+**Enhancements:**
+
+- Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
+
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 
 **Bug fixes:**
