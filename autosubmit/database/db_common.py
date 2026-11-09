@@ -274,16 +274,21 @@ def delete_experiment(experiment_id: str) -> bool:
                 tables.ExperimentTable.c.name == experiment_id
             )
         )
-        if conn.dialect.name == "postgresql":
-            conn.execute(text(f'DROP SCHEMA IF EXISTS "{experiment_id}" CASCADE'))
+
+        # A nested transaction so it can fail without marking the transaction as aborted!
         try:
-            conn.execute(
-                delete(tables.ExperimentStatusTable).where(
-                    tables.ExperimentStatusTable.c.name == experiment_id
+            with conn.begin_nested():
+                conn.execute(
+                    delete(tables.ExperimentStatusTable).where(
+                        tables.ExperimentStatusTable.c.name == experiment_id
+                    )
                 )
-            )
         except Exception as e:
             Log.debug(f"The experiment {experiment_id} has no status: {e}")
+
+        # In Postgres each experiment has its own schema (for now...)
+        if conn.dialect.name == "postgresql":
+            conn.execute(text(f'DROP SCHEMA IF EXISTS "{experiment_id}" CASCADE'))
 
         if result.rowcount > 0:
             Log.debug(f"The experiment {experiment_id} has been deleted!!!")
