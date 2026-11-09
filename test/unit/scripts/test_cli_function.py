@@ -418,3 +418,49 @@ def test_cli_function_without_profile_does_not_create_profiler(
     decorated()
 
     profiler_class.assert_not_called()
+
+
+def test_cli_function_bypasses_lock_when_instance_acquires_lock_is_false(
+    mocker,
+    cli_factory,
+):
+    """Test that experiment_lock is bypassed if opts.acquires_lock is False."""
+    mock_lock = mocker.patch("autosubmit.scripts._cli_function.experiment_lock")
+
+    class LockingOptions(Options):
+        acquires_lock = True
+
+        def __init__(self, should_lock=True):
+            super().__init__()
+            self.expid = "a000"
+            self.acquires_lock = should_lock
+
+    command = mocker.Mock(return_value=0)
+    decorated_unlocked, _, parser_unlocked = cli_factory(
+        command,
+        parser=ArgumentParser(prog="run"),
+        options_type=LockingOptions,  # type: ignore
+    )
+
+    mocker.patch.object(
+        parser_unlocked,
+        "parse_args",
+        return_value=LockingOptions(should_lock=False),
+    )
+    decorated_unlocked()
+    mock_lock.assert_not_called()
+
+    decorated_locked, _, parser_locked = cli_factory(
+        command,
+        parser=ArgumentParser(prog="run"),
+        options_type=LockingOptions,  # type: ignore
+    )
+    mocker.patch.object(
+        parser_locked,
+        "parse_args",
+        return_value=LockingOptions(should_lock=True),
+    )
+    decorated_locked()
+    mock_lock.assert_called_once_with("a000")
+
+
