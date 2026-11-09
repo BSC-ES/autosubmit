@@ -21,31 +21,42 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
-- Add per-target `schema_version` tracking and create the `job_data(job_name)` index in the SQLAlchemy history database manager #3114
+- Add per-target `schema_version` tracking and create the `job_data(job_name)` index in the SQLAlchemy
+  history database manager #3114
 - Align the SQLAlchemy history manager lookups and bulk updates, and remove the temporary table from `select_jobs_data` #3114
 - Use SQLAlchemy for all history and experiment status database managers, dropping the legacy SQLite-only managers #3114
 - Fix log recovery skipping historical stats when the scheduler reuses job ids across chunks #3114
 - Record `schema_version` with a dialect upsert to avoid races when databases are written concurrently #3114
-- Make the general database and experiment details use only SQLAlchemy, dropping the last raw-sqlite3 code paths and the legacy `db_version` table #3114
+- Make the general database and experiment details use only SQLAlchemy, dropping the last raw-sqlite3 code paths and
+  the legacy `db_version` table #3114
 - Move every database manager into `autosubmit/database` (`models/` and `managers/` subpackages) #3114
 - Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295
 - Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
 - Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
-- Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
+- Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run
+  totals were wiped to zero at the end of the run #3151
 - Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
 - Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
-- Fixed vertical wrappers silently reporting jobs as `COMPLETED` when the inner job script was truncated. The wrapper ran the script through `bash -s` on stdin, so any command in the job body that read stdin swallowed the rest of the script. The inner script now runs as a regular file, with its stdin detached from the wrapper. jira-external#1494
-- Fixed vertical wrappers not stopping an inner job that ignored `SIGTERM`, which could let the job outlive its wallclock inside the wrapper. The per-job `timeout` now also forces a `SIGKILL` after a grace period. jira-external#1494
-- Fixed the log recovery process being silently skipped when it died, which lost the logs and stats of the affected jobs. Autosubmit now restarts it and re-queues the pending jobs #3342
-- Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name instead of platform name #3342
+- Fixed vertical wrappers silently reporting jobs as `COMPLETED` when the inner job script was truncated.
+  The wrapper ran the script through `bash -s` on stdin, so any command in the job body that read stdin
+  swallowed the rest of the script. The inner script now runs as a regular file, with its stdin detached
+  from the wrapper. jira-external#1494
+- Fixed vertical wrappers not stopping an inner job that ignored `SIGTERM`, which could let the job outlive its
+  wallclock inside the wrapper. The per-job `timeout` now also forces a `SIGKILL` after a grace period. jira-external#1494
+- Fixed the log recovery process being silently skipped when it died, which lost the logs and stats of the affected
+  jobs. Autosubmit now restarts it and re-queues the pending jobs #3342
+- Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name
+  instead of platform name #3342
 - Fix job and wrapper values like `%CURRENT_CUSTOM_DIRECTIVES%` overwriting the platform value they reference #3286
 - Fix the -cw flag name and wording in the scheduler warning #3393 (thanks @bfs2021)
 - Fixed `is_current_logged_user_owner` and `is_current_real_user_owner` raising `KeyError` when the experiment
   folder is owned by a UID with no `passwd` entry (e.g. inside containers) #3375
 - Fixed mail notifications crashing the experiment when `MAIL.TO` is a string #2974
-- Fix job timestamps overflowing the PostgreSQL `jobs` table: `start_time_timestamp`, `submit_time_timestamp` and `finish_time_timestamp` are now `BigInteger` #3386 (thanks @Shakhtar-Sankur)
+- Fix job timestamps overflowing the PostgreSQL `jobs` table: `start_time_timestamp`, `submit_time_timestamp`
+  and `finish_time_timestamp` are now `BigInteger` #3386 (thanks @Shakhtar-Sankur)
 - Fixed `Log.set_file` failing (after retrying) when the log directory had missing parent directories or
   when given a bare file name; the directory is now created with its parents #3240 (thanks @anyingiit)
+- Ensure Autosubmit deletes PostgreSQL database schemas when deleting an experiment #3383
 
 **New Features:**
 
