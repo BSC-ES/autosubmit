@@ -1569,3 +1569,102 @@ Using 4 members 1 datelist and 4 different job sections.
     :caption: Example showing the asim job starting only from chunk 3.
     :alt: select_members
 
+Example 5: Select startdates
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``DATES_FROM`` selects which startdates of the child job a dependency applies to, and ``DATES_TO``
+selects which startdates of the parent job it waits for.
+
+.. tab-set-code::
+
+    .. code-block:: yaml
+
+        EXPERIMENT:
+          DATELIST: 19600101 19650101 19700101
+          MEMBERS: "00"
+          CHUNKSIZEUNIT: day
+          CHUNKSIZE: '1'
+          NUMCHUNKS: '2'
+          CALENDAR: standard
+
+        JOBS:
+          SIM:
+            SCRIPT: 'sleep 0'
+            RUNNING: date
+
+          POST:
+            SCRIPT: 'sleep 0'
+            RUNNING: date
+            DEPENDENCIES:
+              SIM:
+                DATES_FROM:
+                  '[19600101:19650101]':
+                    DATES_TO: all
+
+The rule covers the first two startdates, so ``POST`` at ``19600101`` and ``19650101`` waits for
+all three ``SIM`` startdates. ``POST`` at ``19700101`` is not selected by the rule and keeps the
+default dependency, meaning it waits for the ``SIM`` of its own startdate.
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: select_startdates.png
+    :name: select_startdates
+    :figname: fig-select-startdates
+    :width: 100%
+    :align: center
+    :caption: ``POST`` on the first two startdates waits for every ``SIM`` startdate.
+    :alt: select_startdates
+
+Example 6: Select a split
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``SPLITS_FROM`` selects which child splits a rule applies to, and ``SPLITS_TO`` selects the parent
+splits they wait for. Child splits that no rule selects keep the default link to all parent splits.
+
+.. tab-set-code::
+
+    .. code-block:: yaml
+
+        EXPERIMENT:
+          DATELIST: '19600101'
+          MEMBERS: "00"
+          CHUNKSIZEUNIT: month
+          CHUNKSIZE: '4'
+          NUMCHUNKS: '1'
+          CALENDAR: standard
+
+        JOBS:
+          SIM:
+            SCRIPT: 'sleep 0'
+            RUNNING: chunk
+            SPLITS: '4'
+
+          POST:
+            SCRIPT: 'sleep 0'
+            RUNNING: chunk
+            SPLITS: '4'
+            DEPENDENCIES:
+              SIM:
+                SPLITS_FROM:
+                  '[1:2]':
+                    SPLITS_TO: '1'
+
+``POST`` splits 1 and 2 wait for split 1 of ``SIM`` only. Splits 3 and 4 are outside the range, so
+they wait for all four ``SIM`` splits.
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: select_split.png
+    :name: select_split
+    :figname: fig-select-split
+    :width: 100%
+    :align: center
+    :caption: The first two ``POST`` splits wait for a single ``SIM`` split.
+    :alt: select_split
+
