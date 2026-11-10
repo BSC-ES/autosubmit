@@ -101,7 +101,7 @@ class CPMIPNotifier:
             expid,
             job.name,
             violations,
-            as_conf.experiment_data["MAIL"]["TO"],
+            as_conf.experiment_data.get("MAIL", {}).get("TO", ""),
         )
 
 

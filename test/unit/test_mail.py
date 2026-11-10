@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import email.utils
+import socket
 from email.mime.text import MIMEText
 from pathlib import Path
 from smtplib import SMTPException
@@ -26,7 +27,7 @@ import pytest
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
-from autosubmit.notifications.mail_notifier import MailNotifier
+from autosubmit.notifications.mail_notifier import MailNotifier, _check_mail_address
 
 # -- fixtures
 
@@ -151,10 +152,12 @@ def test_compress_file(
         else:
             mock_printlog.assert_not_called()
 
-            # First we call sendmail, then we call quit. Thus, the [0].
-            # The first arguments are the sender and recipient. Third
-            # (or [2]) is the MIME message.
-            message_arg = mock_smtp.method_calls[0].args[2]
+            # The SMTP connection is used as a context manager, so sendmail
+            # is called on the object returned by ``__enter__``. The first
+            # arguments are the sender and recipient; the third (or [2]) is
+            # the MIME message.
+            sendmail_call = next(c for c in mock_smtp.mock_calls if c[0].endswith('sendmail'))
+            message_arg = sendmail_call.args[2]
 
             if number_of_files > 0:
                 assert '.zip' in message_arg
@@ -171,7 +174,7 @@ def test_compress_file(
 
         # Log connection error: Simulate an error while sending email
         (SMTPException("SMTP server error"),
-         'Trace:SMTP server error\nAn error has occurred while sending a warning mail about remote_platform')
+         'Trace: SMTP server error\nAn error has occurred while sending a notification mail')
     ],
     ids=[
         "Normal case: No errors",
@@ -215,7 +218,7 @@ def test_notify_status_change(
     "sendmail_error,expected_log_message",
     [
         (SMTPException("SMTP server error"),
-         'Trace:SMTP server error\nAn error has occurred while sending a warning mail about remote_platform')
+         'Trace: SMTP server error\nAn error has occurred while sending a notification mail')
     ],
     ids=[
         "Log connection error (SMTP server error)"
@@ -250,3 +253,80 @@ def test_notify_cpmip_threshold_violations_errors(
     mock_printlog.assert_called_once_with(expected_log_message, 6011)
     log_calls = [call[0][0] for call in mock_printlog.call_args_list]
     assert 'Traceback' not in log_calls
+
+
+@pytest.mark.parametrize(
+    "mail_to, expected",
+    [
+        ("a@bsc.es", ["a@bsc.es"]),
+        ("a@bsc.es, b@bsc.es", ["a@bsc.es", "b@bsc.es"]),
+        ("a@bsc.es b@bsc.es;c@bsc.es", ["a@bsc.es", "b@bsc.es", "c@bsc.es"]),
+        (["a@bsc.es", " b@bsc.es"], ["a@bsc.es", "b@bsc.es"]),
+        (("a@bsc.es",), ["a@bsc.es"]),
+        (["a@bsc.es, b@bsc.es"], ["a@bsc.es", "b@bsc.es"]),
+    ],
+    ids=[
+        "Single string",
+        "Comma-separated string",
+        "Mixed separators",
+        "List with whitespace",
+        "Tuple",
+        "List item with commas",
+    ]
+)
+def test_check_mail_address_valid(mail_to, expected):
+    assert _check_mail_address(mail_to) == expected
+
+
+@pytest.mark.parametrize(
+    "mail_to, error_message",
+    [
+        (None, "must be an email or a list of emails"),
+        ({"to": "a@bsc.es"}, "must be an email or a list of emails"),
+        ("", "Empty recipient list"),
+        ([], "Empty recipient list"),
+        ("a@bsc.es, b@", "Invalid email in recipient list: b@"),
+    ],
+    ids=["None", "Dict", "Empty string", "Empty list", "Invalid address"]
+)
+def test_check_mail_address_invalid(mail_to, error_message):
+    with pytest.raises(ValueError, match=error_message):
+        _check_mail_address(mail_to)
+
+
+@pytest.mark.parametrize("mail_to", ["", None, "not-an-email"])
+def test_notify_status_change_invalid_recipients_does_not_raise(mock_basic_config, mocker, mail_to):
+    mock_send_mail = mocker.patch.object(MailNotifier, '_send_mail')
+    mock_printlog = mocker.patch.object(Log, 'printlog')
+
+    MailNotifier().notify_status_change('a123', 'Job1', 'RUNNING', 'FAILED', mail_to)
+
+    mock_send_mail.assert_not_called()
+    mock_printlog.assert_called_once()
+    assert 'Check MAIL.TO' in mock_printlog.call_args[0][0]
+
+
+@pytest.mark.parametrize(
+    "error",
+    [ConnectionRefusedError("refused"), TimeoutError("timed out"), socket.gaierror("unknown host")],
+    ids=["Connection refused", "Timeout", "Unknown host"]
+)
+def test_notify_status_change_connection_error_does_not_raise(mock_basic_config, mocker, error):
+    mocker.patch('autosubmit.notifications.mail_notifier.smtplib.SMTP', side_effect=error)
+    mock_printlog = mocker.patch.object(Log, 'printlog')
+
+    MailNotifier().notify_status_change('a123', 'Job1', 'RUNNING', 'FAILED', ['a@bsc.es'])
+
+    mock_printlog.assert_called_once()
+    assert 'error has occurred while sending a notification mail' in mock_printlog.call_args[0][0]
+
+
+def test_notify_status_change_accepts_string_recipients(mock_basic_config, mocker):
+    mock_send_mail = mocker.patch.object(MailNotifier, '_send_mail')
+
+    MailNotifier().notify_status_change('a123', 'Job1', 'RUNNING', 'FAILED', 'a@bsc.es, b@bsc.es')
+
+    mock_send_mail.assert_called_once()
+    recipients = mock_send_mail.call_args[0][1]
+    assert recipients == [email.utils.formataddr((m, m)) for m in ['a@bsc.es', 'b@bsc.es']]
+
