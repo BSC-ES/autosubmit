@@ -1,8 +1,0 @@
-include LICENSE
-include VERSION
-include CHANGELOG.md
-include README.md
-include README_PIP.md
-include docs/autosubmit.pdf
-include autosubmit/config/files/*
-global-include *.conf *.sql *.yml
