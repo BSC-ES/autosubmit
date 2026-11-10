@@ -1,0 +1,32 @@
+# Add deployment and service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autosubmit-deployment
+  labels:
+    app: autosubmit-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: autosubmit-demo
+  template:
+    metadata:
+      labels:
+        app: autosubmit-demo
+    spec:
+      containers:
+      # Main Autosubmit docker image with exposed ports 8888 and 8000
+      - name: autosubmit-container
+        image: {{ .Values.images.autosubmitDemo.image }}
+        imagePullPolicy: {{ .Values.images.autosubmitDemo.imagePullPolicy }}
+        ports:
+        - containerPort: 8888
+        - containerPort: 8000
+      # GUI docker image with exposed port 3000
+      - name: autosubmit-gui-container
+        image: {{ .Values.images.autosubmitDemoGUI.image }}
+        imagePullPolicy: {{ .Values.images.autosubmitDemoGUI.imagePullPolicy }}
+        ports:
+        - containerPort: 8080
+

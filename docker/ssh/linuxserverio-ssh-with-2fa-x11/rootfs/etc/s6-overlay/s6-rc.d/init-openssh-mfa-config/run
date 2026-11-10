@@ -1,0 +1,20 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+USER_NAME=${USER_NAME:-linuxserver.io}
+HOME_DIR=$(getent passwd "${USER_NAME}" | cut -d: -f6)
+
+if [[ "$MFA" == "true" ]]; then
+  echo "Enabling SSH MFA"
+  # sshd
+  sed -i 's/#UsePAM no/UsePAM yes/' /config/sshd/sshd_config
+  sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /config/sshd/sshd_config
+  echo "AuthenticationMethods password keyboard-interactive" >> /config/sshd/sshd_config
+  echo "ChallengeResponseAuthentication yes" >> /config/sshd/sshd_config
+  # google authenticator
+  echo -e 'X5C4VLHDCECGFHPP3PHDCS7KAE\n" TOTP_AUTH\n55192054\n18998816\n51868999\n99315827\n42932878' > "${HOME_DIR}/.google_authenticator"
+  chmod 0600 "${HOME_DIR}/.google_authenticator"
+  chown "${USER_NAME}": "${HOME_DIR}/.google_authenticator"
+else
+  echo "SSH MFA is disabled"
+fi

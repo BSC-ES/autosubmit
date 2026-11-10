@@ -1,0 +1,26 @@
+experiment:
+  DATELIST: 20000101
+  MEMBERS: "fc0"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '1'
+  CALENDAR: standard
+JOBS:
+  SIM:
+    FILE: sim.sh
+    RUNNING: once
+    SPLITS: '6'
+    DEPENDENCIES:
+      SIM:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous-2
+  POST:
+    FILE: post.sh
+    RUNNING: once
+    SPLITS: '6'
+    DEPENDENCIES:
+      SIM:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: all

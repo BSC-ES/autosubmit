@@ -1,0 +1,827 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+import datetime
+import locale
+import os
+import re
+import subprocess
+from contextlib import suppress
+from pathlib import Path
+from time import sleep
+from typing import TYPE_CHECKING
+
+from bscearth.utils.date import date2str
+
+from autosubmit.job.job_common import Status
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
+from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
+from autosubmit.platforms.headers.ec_header import EcHeader
+from autosubmit.platforms.headers.slurm_header import SlurmHeader
+from autosubmit.platforms.paramiko_platform import (
+    ParamikoPlatform,
+    ParamikoPlatformException,
+)
+from autosubmit.platforms.platform_type import PlatformType
+from autosubmit.platforms.wrappers.wrapper_factory import EcWrapperFactory
+
+if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+
+_EC_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
+    # ecaccess-job-submit: returns a bare numeric job ID on success.
+    re.compile(r"^\s*\d+\s*$", re.MULTILINE),
+    # ecaccess-job-list: known ecaccess job-state words in the tabular output.
+    re.compile(r"\b(done|exec|init|retr|stdby|wait|stop)\b", re.IGNORECASE),
+    # ecaccess-job-list: column-header row ("JOB Id ... Status ...").
+    re.compile(r"\bStatus\b|\bJOB\s+Id\b", re.IGNORECASE),
+    # ecaccess-file-dir: directory listing contains completion markers or logs.
+    re.compile(r"_COMPLETED|\.out\b|\.err\b", re.IGNORECASE),
+)
+
+
+class EcPlatform(ParamikoPlatform):
+    """
+    Class to manage queues with ecaccess
+
+    :param expid: experiment's identifier
+    :param scheduler: scheduler to use
+    """
+
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.ECACCESS
+
+    def parse_all_jobs_output(self, output, job_id):
+        """Parse ecaccess-job-list tabular output for a single job ID.
+
+        :param output: Raw output from :meth:`get_check_all_jobs_cmd`.
+        :param job_id: ecaccess job ID to look up.
+        :return: Job status word (e.g. ``EXEC``, ``DONE``, ``STOP``) or
+            an empty string if the job is not found.
+        """
+        if not output:
+            return ''
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 3 and parts[0] == str(job_id):
+                return parts[2]
+        return ''
+
+    def parse_queue_reason(self, output, job_id):
+        ...  # pragma: no cover
+
+    def get_check_all_jobs_cmd(self, jobs_id):
+        """Return the batch job-list command for ecaccess.
+
+        ``ecaccess-job-list`` without arguments lists all active jobs for the
+        user, so a single call covers every job in *jobs_id*.
+
+        :param jobs_id: Comma-separated job IDs (ignored by ecaccess).
+        :return: ``ecaccess-job-list`` command.
+        """
+        return f"ecaccess-job-list {self._ec_retry_flag}"
+
+    def _check_jobid_in_queue(self, ssh_output: str, job_list_cmd: str) -> bool:
+        """Bypass the retry loop for missing job IDs.
+
+        Completed ecaccess jobs disappear from ``ecaccess-job-list`` output.
+        Retrying would only delay status updates. Transient errors are already
+        handled by :meth:`send_command`.
+
+        :return: Always ``True``.
+        """
+        return True
+
+    def __init__(self, expid, name, config, scheduler):
+        ParamikoPlatform.__init__(self, expid, name, config)
+        # version=scheduler
+        scheduler_lower = scheduler.lower()
+        if scheduler_lower == PlatformType.PBS.lower():
+            self._header = EcCcaHeader()
+        elif scheduler_lower == PlatformType.LOAD_LEVELER.lower():
+            self._header = EcHeader()
+        elif scheduler_lower == PlatformType.SLURM.lower():
+            self._header = SlurmHeader()
+        else:
+            raise ParamikoPlatformException(f'ecaccess scheduler {scheduler} not supported')
+        self._wrapper = EcWrapperFactory(self)
+        self.job_status = {}
+        self.job_status['COMPLETED'] = ['DONE']
+        self.job_status['RUNNING'] = ['EXEC']
+        self.job_status['QUEUING'] = ['INIT', 'RETR', 'STDBY', 'WAIT']
+        self.job_status['FAILED'] = ['STOP']
+        self._pathdir = "\\$HOME/LOG_" + self.expid
+        self._allow_arrays = False
+        self._allow_wrappers = False  # TODO
+        try:
+            self._ec_retry_count = int(
+                self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("ECACCESS_RETRIES", 100)
+            )
+        except (ValueError, TypeError):
+            Log.warning(
+                f"Invalid ECACCESS_RETRIES value for {self.name}, "
+                f"falling back to default 100."
+            )
+            self._ec_retry_count = 100
+        self._ec_retry_flag = f"-retry {self._ec_retry_count}"
+        self._allow_python_jobs = False
+        self.root_dir: Path | None = None
+        self.remote_log_dir: Path = Path("")
+        self.cancel_cmd = ""
+        self._checkjob_cmd = ""
+        self._checkhost_cmd = ""
+        self._submit_cmd = ""
+        self._submit_command_name = ""
+        self.put_cmd = ""
+        self.get_cmd = ""
+        self.del_cmd = ""
+        self.mkdir_cmd = ""
+        self.check_remote_permissions_cmd = ""
+        self.check_remote_permissions_remove_cmd = ""
+        self.update_cmds()
+        self.scheduler = scheduler
+        self._uses_local_api: bool = True
+        # Pre-submission snapshot used by get_submitted_jobs_by_name to exclude
+        # stale jobs from previous runs.
+        self._pre_submission_ids: dict[str, set[int]] = {}
+        self.has_scheduler = False
+
+    def update_cmds(self):
+        """Updates commands for platforms"""
+        self.root_dir = Path(self.scratch) / self.project / self.user / self.expid
+        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
+        self.cancel_cmd = f"ecaccess-job-delete {self._ec_retry_flag}"
+        self._checkjob_cmd = f"ecaccess-job-list {self._ec_retry_flag} "
+        self._checkhost_cmd = f"ecaccess-certificate-list {self._ec_retry_flag}"
+        self._checkvalidcert_cmd = f"ecaccess-gateway-connected {self._ec_retry_flag}"
+        self._submit_command_name = f"ecaccess-job-submit {self._ec_retry_flag}"
+        self.put_cmd = f"ecaccess-file-put {self._ec_retry_flag}"
+        self.get_cmd = f"ecaccess-file-get {self._ec_retry_flag}"
+        self.del_cmd = f"ecaccess-file-delete {self._ec_retry_flag}"
+        self.mkdir_cmd = (f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}; "
+                          f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
+        self.check_remote_permissions_cmd = (f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:"
+                            f"{Path(self.scratch) / self.project / self.user / '_permission_checker_azxbyc'}")
+        self.check_remote_permissions_remove_cmd = (f"ecaccess-file-rmdir {self._ec_retry_flag} {self.host}: "
+                                    f"{Path(self.scratch) / self.project / self.user / '_permission_checker_azxbyc'}")
+
+    def get_remote_log_dir(self) -> Path:
+        return self.remote_log_dir
+
+    def check_remote_log_dir(self) -> None:
+        """Create the remote log directory and all required parent directories.
+
+        ``ecaccess-file-mkdir`` has no ``-p`` option, so each intermediate path
+        level must be created in sequence.  Failures for levels that already
+        exist are silenced; only a failure on the final LOG directory is
+        reported.
+
+        :raises AutosubmitError: If the log directory cannot be created.
+        """
+        levels = [
+            f"{self.host}:{self.scratch}",
+            f"{self.host}:{self.scratch}/{self.project}",
+            f"{self.host}:{self.scratch}/{self.project}/{self.user}",
+            f"{self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}",
+            f"{self.host}:{self.remote_log_dir}",
+        ]
+        for path in levels[:-1]:
+            with suppress(Exception):
+                subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {path}", shell=True,
+                                        stderr=subprocess.DEVNULL)
+        try:
+            subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {levels[-1]}", shell=True,
+                                    stderr=subprocess.DEVNULL)
+            Log.debug(f"{self.remote_log_dir} has been created on {self.host}.")
+        except subprocess.CalledProcessError:
+            # Directory may already exist — treat as success.
+            Log.debug(f"{self.remote_log_dir} already exists on {self.host}.")
+        except Exception as e:
+            raise AutosubmitError(
+                f"Couldn't create {self.remote_log_dir} on {self.host}", 6004, str(e)
+            )
+
+    def confirm_done_jobs_via_stat(self, job_list: list) -> dict[str, "Status"]:
+        """Confirm job statuses via STAT files using ecaccess commands.
+
+        Overrides the base ``awk``-based implementation because EcPlatform runs
+        commands locally via subprocess and cannot read remote files directly.
+
+        STAT format: submit_time (L0), start_time (L1), end_time (L2), status (L3).
+        A single numeric line means the job is submitted but not yet started → QUEUING.
+
+        :param job_list: Jobs to confirm.
+        :return: Mapping of job names to resolved statuses.
+        """
+        if not job_list:
+            return {}
+
+        result: dict[str, Status] = {}
+
+        # List files in the remote log directory
+        try:
+            self.send_command(f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
+            dir_output = self.get_ssh_output()
+        except Exception:
+            return result
+
+        # Build a set of available STAT file names
+        # ecaccess-file-dir output format: filename|size  NNNN
+        available_stats: set[str] = set()
+        for line in dir_output.splitlines():
+            file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
+            if "_STAT_" in file_name:
+                available_stats.add(file_name)
+
+        # Download and read each STAT file that matches a job
+        for job in job_list:
+            stat_name = f"{job.name}_STAT_{job.fail_count}"
+            if stat_name not in available_stats:
+                continue
+
+            remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
+            local_path = self.tmp_path / stat_name
+
+            # The job may still be queuing and not yet running, in that case the
+            # STAT file won't exist on the remote side and the download will fail.
+            try:
+                subprocess.check_output(
+                    f"{self.get_cmd} {remote_path} {local_path}",
+                    shell=True,
+                    stderr=subprocess.DEVNULL,
+                )
+            except subprocess.CalledProcessError:
+                continue
+            content = local_path.read_text().strip()
+            if content:
+                lines = content.splitlines()
+                if len(lines) == 1 and lines[-1].isdigit():
+                    result[job.name] = Status.QUEUING
+                else:
+                    result[job.name] = self._resolve_status(lines[-1])
+            local_path.unlink(missing_ok=True)
+
+        return result
+
+    def set_start_time_from_remote_stat_file(self, job_list: list) -> None:
+        """Set ``start_time_timestamp`` from line 1 (second line) of each remote STAT file.
+
+        Reads line 1 (not line 0) because L0 is now submit_time.
+
+        :param job_list: Jobs whose start times should be filled from remote STAT files.
+        """
+        if not job_list:
+            return
+
+        # List files in the remote log directory
+        self.send_command(f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
+        dir_output = self.get_ssh_output()
+
+        # ecaccess-file-dir output format: filename|size  NNNN
+        available_stats: set[str] = set()
+        for line in dir_output.splitlines():
+            file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
+            if "_STAT_" in file_name:
+                available_stats.add(file_name)
+
+        for job in job_list:
+            stat_name = f"{job.name}_STAT_{job.fail_count}"
+            if stat_name not in available_stats:
+                continue
+
+            remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
+            local_path = self.tmp_path / stat_name
+
+            try:
+                subprocess.check_output(
+                    f"{self.get_cmd} {remote_path} {local_path}",
+                    shell=True,
+                    stderr=subprocess.DEVNULL,
+                )
+                content = local_path.read_text().strip()
+                if content:
+                    lines = content.splitlines()
+                    start_epoch = float(lines[1]) if len(lines) >= 2 else float(lines[0])
+                    job.start_time_timestamp = datetime.datetime.fromtimestamp(start_epoch).strftime("%Y%m%d%H%M%S")
+            except Exception:
+                Log.warning(
+                    f"Could not parse start time from STAT file for job {job.name}. "
+                    f"Using current datetime."
+                )
+                job.start_time_timestamp = date2str(datetime.datetime.now(), 'S')
+
+    def get_mkdir_cmd(self):
+        return self.mkdir_cmd
+
+    def _set_submit_cmd(self, ec_queue: str):
+        """Set the ecaccess-job-submit command for the given queue.
+
+        The ``-retry`` flag tells ecaccess to retry the **initial SSL handshake**
+        up to 30 times (one attempt per ~5 s) before giving up. This guards against
+        transient SSL failures that occasionally occur when first connecting to the
+        ECMWF gateway; without it, a single bad handshake would abort the submission
+        entirely. It does **not** affect job-level retries or any subsequent requests
+        made after the connection is established.
+
+        See: https://confluence.ecmwf.int/display/ECAC/ecaccess-job-submit
+
+        :param ec_queue: Queue to submit the job to.
+        """
+        self._submit_cmd = f"{self._submit_command_name} -distant -queueName {ec_queue} {self.host}:"
+
+    def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
+        """Gets the command to submit a job, for the current platform, with the given parameters.
+         This needs to be adapted to each scheduler, the default assumes that is being launched directly.
+
+        :param script_name: name of the script to submit
+        :param pre: command part to be placed before the script name, e.g. timeout, export, executable
+        :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
+        :param x11_options: x11 options to run the script, if any
+        :return: command to submit a job
+        """
+
+        if x11_options:
+            raise AutosubmitCritical(
+                "X11 options are not supported for ecaccess jobs, as they need to be launched within an iterative node , which is not compatible with the current submission method. Please remove x11 options from your job configuration.")
+
+        return f"{pre} {self._submit_cmd}{script_name} {post}"
+
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
+        """Parses the output of the submit command to get the job ID.
+
+        :param output: output of the submit command.
+        :param x11: whether the job is an x11 job, which has a different output format.
+        :return: job ID of the submitted job.
+        """
+
+        return [out.strip() for out in output.splitlines()]
+
+    def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
+        """Establishes an SSH connection to the host.
+
+        :param as_conf: The Autosubmit configuration object.
+        :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
+        :param log_recovery_process: Specifies if the call is made from the log retrieval process.
+        :return: None
+        """
+        output = subprocess.check_output(self._checkvalidcert_cmd, shell=True).decode(locale.getlocale()[1])
+        if not output:
+            output = ""
+        try:
+            if output.lower().find("yes") != -1:
+                self.connected = True
+            else:
+                Log.warning(
+                    f"Connection to {self.host} could not be established. Please remember to weekly renew your ecaccess-certificate if you are using one.")
+                self.connected = False
+        except Exception:
+            self.connected = False
+        if self.connected and not log_recovery_process:
+            self.spawn_log_retrieval_process(as_conf)
+
+    def create_a_new_copy(self):
+        return EcPlatform(self.expid, self.name, self.config, self.scheduler)
+
+    def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
+        """
+        Restores the SSH connection to the platform.
+
+        :param as_conf: The Autosubmit configuration object used to establish the connection.
+        :param log_recovery_process: Indicates that the call is made from the log retrieval process.
+        """
+        output = subprocess.check_output(self._checkvalidcert_cmd, shell=True).decode(locale.getlocale()[1])
+        if not output:
+            output = ""
+        try:
+            if output.lower().find("yes") != -1:
+                self.connected = True
+            else:
+                self.connected = False
+        except Exception:
+            self.connected = False
+
+    def test_connection(self, as_conf: 'AutosubmitConfig') -> None:
+        """
+        Tests the connection using the provided configuration.
+
+        :param as_conf: The configuration to use for testing the connection.
+        """
+        self.connect(as_conf)
+
+    def check_remote_permissions(self) -> bool:
+        """Checks if the necessary permissions are in place on the remote host.
+         There is no mkdir -p equivalent in ecaccess-file-mkdir.
+         So we need to check permissions for each level of the path separately."""
+        with suppress(Exception):
+            subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
+        with suppress(Exception):
+            subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}", shell=True)
+        with suppress(Exception):
+            subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}/{self.project}", shell=True)
+        with suppress(Exception):
+            subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}/{self.project}/{self.user}",
+                                    shell=True)
+        with suppress(Exception):
+            subprocess.check_output(
+                f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}", shell=True)
+        try:
+            subprocess.check_output(self.check_remote_permissions_cmd, shell=True)
+            subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
+            return True
+        except Exception as e:
+            Log.warning(f"Remote permissions check failed: {e}")
+            return False
+
+    def send_command(self, command, ignore_log=False, x11=False) -> bool:
+        lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
+        err_message = 'command not executed'
+        for _ in range(3):
+            try:
+                self._ssh_output = subprocess.check_output(command, shell=True).decode(lang)
+            except Exception as e:
+                err_message = str(e)
+                sleep(1)
+            else:
+                break
+        else:  # if break was not called in the for, all attemps failed!
+            raise AutosubmitError(f'Could not execute command {command} on {self.host}', 7500, str(err_message))
+        self._check_for_unrecoverable_errors()
+        return True
+
+    def send_file(self, filename, check=True) -> bool:
+        self.check_remote_log_dir()
+        self.delete_file(filename)
+        command = f'{self.put_cmd} {self.tmp_path / filename} {self.host}:{self.get_files_path() / os.path.basename(filename)}'
+        command = f'{self.put_cmd} {os.path.join(self.tmp_path, filename)} {self.host}:{os.path.join(self.get_files_path(), os.path.basename(filename))}'
+        try:
+            subprocess.check_call(command, shell=True)
+        except subprocess.CalledProcessError as e:
+            raise AutosubmitError(f"Could not send file {self.tmp_path / filename} to {self.get_files_path() / filename}", 6005, str(e))
+            raise AutosubmitError('Could not send file {0} to {1}'.format(os.path.join(self.tmp_path, filename),
+                                                                          os.path.join(self.get_files_path(),
+                                                                                       filename)), 6005, str(e))
+        return True
+
+    def move_file(self, src, dest, must_exist=False):
+        command = (f"ecaccess-file-move {self._ec_retry_flag} {self.host}:{self.remote_log_dir / src} "
+                   f"{self.host}:{self.remote_log_dir / dest}")
+        try:
+            retries = 0
+            sleeptime = 5
+            process_ok = False
+            FNULL = open(os.devnull, 'w')
+            while not process_ok and retries < 5:
+                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=FNULL)
+                out, _ = process.communicate()
+                out = out.decode(locale.getlocale()[1])
+                if 'No such file' in out or process.returncode != 0:
+                    retries = retries + 1
+                    process_ok = False
+                    sleeptime = sleeptime + 5
+                    sleep(sleeptime)
+                else:
+                    process_ok = True
+        except Exception:
+            process_ok = False
+        if not process_ok:
+            Log.printlog(f"Log file don't recovered {src}", 6004)
+        return process_ok
+
+    def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
+        local_path = (self.tmp_path/ relative_path)
+        if not local_path.exists():
+            local_path.mkdir()
+
+        file_path = (local_path / filename)
+        if file_path.exists():
+            file_path.unlink()
+
+        command = f'{self.get_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)} {file_path}'
+        try:
+            retries = 0
+            sleeptime = 5
+            process_ok = False
+            FNULL = open(os.devnull, 'w')
+            while not process_ok and retries < 5:
+                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=FNULL)
+                out, _ = process.communicate()
+                out = out.decode(locale.getlocale()[1])
+                if 'No such file' in out or process.returncode != 0:
+                    retries = retries + 1
+                    process_ok = False
+                    sleeptime = sleeptime + 5
+                    sleep(sleeptime)
+                else:
+                    process_ok = True
+        except Exception:
+            process_ok = False
+        if not process_ok and must_exist:
+            Log.printlog(f"Completed/Stat File don't recovered {filename}", 6004)
+        if not process_ok:
+            Log.printlog(f"Log file don't recovered {filename}", 6004)
+        return process_ok
+
+    def read_jobid_from_remote_log(self, remote_path: str) -> int | None:
+        """Read the JOBID from the first line of the remote output file.
+
+        Overrides ``ParamikoPlatform.read_jobid_from_remote_log`` because
+        ``EcPlatform.send_command`` runs commands *locally*, so a plain
+        ``head -1`` would not find the remote file.
+
+        Downloads the file via ``ecaccess-file-get`` and parses the JOBID
+        from the ``[INFO] JOBID=`` marker on the first line.
+        """
+        filename = Path(remote_path).name
+        local_path = self.tmp_path / f".tmp_{filename}"
+        try:
+            subprocess.check_output(
+                f"{self.get_cmd} {self.host}:{remote_path} {local_path}",
+                shell=True,
+                stderr=subprocess.DEVNULL,
+            )
+            first_line = local_path.read_text().strip()
+            if first_line.startswith('[INFO] JOBID='):
+                return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, subprocess.CalledProcessError):
+            ...
+        finally:
+            local_path.unlink(missing_ok=True)
+        return None
+
+    def delete_file(self, filename: str) -> bool:
+        command = f'{self.del_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)}'
+        try:
+            FNULL = open(os.devnull, 'w')
+            subprocess.check_call(command, stdout=FNULL, stderr=FNULL, shell=True)
+        except subprocess.CalledProcessError:
+            Log.debug('Could not remove file {0}', os.path.join(self.get_files_path(), filename))
+            return False
+        return True
+
+    def get_ssh_output(self):
+        return self._ssh_output
+
+    def get_ssh_output_err(self):
+        return self._ssh_output_err
+
+    @staticmethod
+    def wrapper_header(filename, queue, project, wallclock, num_procs, expid, dependency, rootdir, directives):
+        return """\
+        #!/bin/bash
+        ###############################################################################
+        #              {0}
+        ###############################################################################
+        #
+        #PBS -N {0}
+        #PBS -q {1}
+        #PBS -l EC_billing_account={2}
+        #PBS -o {7}/LOG_{5}/{0}.out
+        #PBS -e {7}/LOG_{5}/{0}.err
+        #PBS -l walltime={3}:00
+        #PBS -l EC_total_tasks={4}
+        #PBS -l EC_hyperthreads=1
+        {6}
+        {8}
+        #
+        ###############################################################################
+        """.format(filename, queue, project, wallclock, num_procs, expid, dependency, rootdir,
+                   '\n'.ljust(13).join(str(s) for s in directives))
+
+    def get_completed_job_names(self, job_names: list[str] | None = None) -> list[str]:
+        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        Uses ``ecaccess-file-dir`` to inspect the remote directory and filters
+        results locally. If ``job_names`` is provided, only those names are checked.
+
+        :param job_names: Optional job names to restrict the lookup.
+        :return: Job names whose ``_COMPLETED`` marker exists remotely.
+        """
+        completed_job_names = []
+
+        if self.expid in str(self.remote_log_dir):
+            expected_files = (
+                {f"{name}_COMPLETED" for name in job_names}
+                if job_names
+                else None
+            )
+
+            cmd = f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}"
+            self.send_command(cmd)
+            output = self.get_ssh_output()
+
+            # ecaccess-file-dir output format: filename|size  NNNN
+            for line in output.splitlines():
+                file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
+                if not file_name.endswith("_COMPLETED") or (expected_files and file_name not in expected_files):
+                    continue
+
+                completed_job_names.append(file_name.removesuffix("_COMPLETED"))
+
+        return completed_job_names
+
+    def delete_previous_run_files_by_job_names(self, job_names: list[str]) -> None:
+        """Delete COMPLETED and FAILED marker files for the given job names using ecaccess.
+
+        Overrides the base SSH ``find``-based implementation because EcPlatform
+        runs commands locally via subprocess, not over SSH.
+
+        :param job_names: Job names whose COMPLETED and FAILED files should be deleted.
+        """
+        if not job_names or self.expid not in str(self.remote_log_dir):
+            return
+        for name in job_names:
+            for suffix in ("_COMPLETED", "_FAILED"):
+                remote_path = f"{self.host}:{self.remote_log_dir}/{name}{suffix}"
+                with suppress(Exception):
+                    subprocess.check_call(
+                        f"{self.del_cmd} {remote_path}",
+                        shell=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+
+    def delete_previous_stat_files_by_job_names(self, job_names: list[str]) -> None:
+        """Delete all STAT marker files for the given job names using ecaccess.
+
+        Lists the remote log directory via ``ecaccess-file-dir`` and removes any
+        matching ``{name}_STAT_*`` files one at a time.  Overrides the base SSH
+        ``find``-based implementation because EcPlatform runs commands locally.
+
+        :param job_names: Job names whose STAT files should be deleted.
+        """
+        if not job_names or self.expid not in str(self.remote_log_dir):
+            return
+        try:
+            self.send_command(f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
+            output = self.get_ssh_output()
+            name_set = set(job_names)
+            # ecaccess-file-dir output format: filename|size  NNNN
+            for line in output.splitlines():
+                file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
+                if "_STAT_" not in file_name:
+                    continue
+                stem = file_name.rsplit("_STAT_", 1)[0]
+                if stem not in name_set:
+                    continue
+                remote_path = f"{self.host}:{self.remote_log_dir}/{file_name}"
+                with suppress(Exception):
+                    subprocess.check_call(
+                        f"{self.del_cmd} {remote_path}",
+                        shell=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+        except Exception as e:
+            Log.debug(f"Could not delete previous stat files: {e}")
+
+    def cancel_jobs(self, job_ids: list[str]) -> None:
+        """Cancel ecaccess jobs by their IDs.
+
+        :param job_ids: List of ecaccess job IDs to cancel.
+        """
+        if not job_ids:
+            return
+        command = " ; ".join(f"{self.cancel_cmd} {job_id}" for job_id in job_ids)
+        self.send_command(command)
+
+    def _check_and_cancel_duplicated_job_names(self, scripts_to_submit: dict) -> None:
+        """Check for duplicated job names in the submitted packages.
+
+        :param scripts_to_submit: Package script names and their info.
+        """
+        # There isen't a reliable way to check for duplicated job names in ecaccess, as the job list command doesn't return all the information needed to identify them,
+        # pragma: no cover
+
+    def _check_for_unrecoverable_errors(self) -> None:
+        """Check ecaccess command output for recoverable and unrecoverable errors.
+
+        :raises AutosubmitError: For transient errors.
+        :raises AutosubmitCritical: For permanent errors.
+        """
+        out = self._ssh_output
+        err = self._ssh_output_err
+
+        # Fast-exit: stdout matches a known ecaccess success pattern.
+        if any(pat.search(out) for pat in _EC_EXPECTED_OUTPUT):
+            return
+
+        # ecaccess errors appear in stdout, not stderr; search both together.
+        combined_raw = (out + "\n" + err).strip()
+        combined = combined_raw.lower()
+        if not combined:
+            return
+
+        # Transient / recoverable patterns → AutosubmitError (6016).
+        transient_patterns: list[str] = [
+            "not active",
+            "git clone",
+            "no gateway",
+            "connection refused",
+            "connection timed out",
+            "socket timed out",
+            "network is unreachable",
+            "ssl",
+            "temporary failure in name resolution",
+        ]
+
+        for pattern in transient_patterns:
+            if pattern in combined:
+                raise AutosubmitError(
+                    f"Transient ecaccess error: {combined_raw}",
+                    6016,
+                )
+
+        # Permanent / unrecoverable patterns → AutosubmitCritical (7014).
+        critical_patterns: list[str] = [
+            "invalid queue",
+            "certificate not found",
+            "queue does not exist",
+            "no permission",
+            "not authorized",
+            "access denied",
+            "job not found",
+            "invalid job",
+            "not submitted",
+            "submission failed",
+            "command not found",
+        ]
+
+        for pattern in critical_patterns:
+            if pattern in combined:
+                raise AutosubmitCritical(
+                    f"Permanent ecaccess error: {combined_raw}",
+                    7014,
+                )
+
+    def _snapshot_job_ids_before_submission(self, script_names: list[str]) -> None:
+        """Snapshot currently active ecaccess job IDs for the given script names.
+
+        :param script_names: Script filenames about to be submitted.
+        """
+
+        with suppress(Exception):
+            self.send_command(f"ecaccess-job-list {self._ec_retry_flag}")
+            output = self.get_ssh_output()
+            pre: dict[str, set[int]] = {}
+            for line in output.splitlines():
+                parts = line.split()
+                if len(parts) >= 2 and parts[0].isdigit() and parts[-1] in script_names:
+                    pre.setdefault(parts[-1], set()).add(int(parts[0]))
+            self._pre_submission_ids = pre
+
+    def _pre_submission_snapshot(self, script_names: list[str]) -> None:
+        """Snapshot currently active ecaccess job IDs before a submission batch.
+
+        Overrides the base to populate `_pre_submission_ids` with
+        ecaccess job IDs so that `get_submitted_jobs_by_name` can
+        distinguish freshly submitted jobs from those of a previous run.
+
+        :param script_names: Script filenames about to be submitted.
+        """
+        self._pre_submission_ids = {}
+        self._snapshot_job_ids_before_submission(script_names)
+
+    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
+        """Return submitted ecaccess job IDs by script name.
+
+        This fallback is used when the batched submit command does not return
+        one recoverable job identifier per submitted script.
+
+        :param script_names: Submitted script filenames.
+        :return: Matching ecaccess job IDs in submission order, one per script.
+            Returns an empty list if any script name has no newly submitted job.
+        """
+        self.send_command(f"ecaccess-job-list {self._ec_retry_flag}")
+        output = self.get_ssh_output()
+
+        name_to_ids: dict[str, set[int]] = {}
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].isdigit():
+                name_to_ids.setdefault(parts[-1], set()).add(int(parts[0]))
+
+        submitted_job_ids: list[int] = []
+        for script_name in script_names:
+            job_name = Path(script_name).stem
+            all_ids = name_to_ids.get(job_name, set())
+            new_ids = all_ids - self._pre_submission_ids.get(job_name, set())
+            if not new_ids:
+                return []
+            submitted_job_ids.append(max(new_ids))
+
+        return submitted_job_ids

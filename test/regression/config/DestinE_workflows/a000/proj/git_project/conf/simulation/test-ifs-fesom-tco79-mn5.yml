@@ -1,0 +1,32 @@
+
+experiment:
+    DATELIST: 2020012000
+    MEMBERS: fc0
+    CHUNKSIZEUNIT: day
+    CHUNKSIZE: 1
+    NUMCHUNKS: 2
+    CALENDAR: standard
+
+JOBS:
+   SIM:
+       WALLCLOCK: "00:30"
+
+CONFIGURATION:
+    DATA_PORTFOLIO: production
+    DQC_PROFILE: lowres
+    RAPS_EXPERIMENT: "hist"
+    RAPS_USER_FLAGS: "--no-ozone --drhook --hugepages --preload-mir-cache"
+    ICMCL: "monthly"
+    IFS:
+        EXPVER: hz9m
+        GTYPE: tco
+        RESOL: 79
+        LEVELS: 137
+        LABEL: LWDA
+        IO_TASKS: 12
+    FESOM:
+        IO_TASKS: 4
+
+REQUEST:
+    ACTIVITY: CMIP6
+    EXPERIMENT: hist

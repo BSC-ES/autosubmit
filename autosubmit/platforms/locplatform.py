@@ -1,0 +1,413 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+import locale
+import os
+import subprocess
+from pathlib import Path
+from time import sleep
+from typing import TYPE_CHECKING
+
+import autosubmit.log.utils as log_utils
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.log.log import AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
+from autosubmit.platforms.headers.local_header import LocalHeader
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
+
+if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+
+
+class LocalPlatform(ParamikoPlatform):
+    """Class to manage jobs to localhost."""
+
+    EXECUTION_MODE = ExecutionMode.DIRECT
+    TYPE = PlatformType.LOCAL
+
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str | list[str] | None = None):
+        ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
+        self.cancel_cmd = None
+        self.mkdir_cmd = None
+        self.del_cmd = None
+        self.get_cmd = None
+        self.put_cmd = None
+        self._checkhost_cmd = None
+        self._header = LocalHeader()
+        self.job_status = {}
+        self.job_status['COMPLETED'] = ['1']
+        self.job_status['RUNNING'] = ['0']
+        self.job_status['QUEUING'] = []
+        self.job_status['FAILED'] = []
+        self._allow_wrappers = False
+        self.update_cmds()
+        self.has_scheduler = False
+
+    def get_check_all_jobs_cmd(self, jobs_id: str) -> str:
+        """Return a shell command that checks the status of all given process IDs.
+
+        For each PID, the command outputs a line ``<pid> <status>`` where status
+        is ``0`` if the process is running (non-zombie) and ``1`` otherwise.
+
+        :param jobs_id: Comma-separated list of process IDs to check.
+        :return: Shell command outputting ``<pid> <status>`` per line.
+        """
+        pids = jobs_id.replace(',', ' ')
+        return (
+            f"for pid in {pids}; do "
+            f"echo \"$pid $(ps -o stat= -p $pid 2>/dev/null | grep -qv '^Z' && echo 0 || echo 1)\"; "
+            f"done"
+        )
+
+    def parse_all_jobs_output(self, output: str, job_id: int) -> str:
+        """Parse process-status output for the given job ID.
+
+        :param output: Output of :meth:`get_check_all_jobs_cmd`.
+        :param job_id: Process ID to look up.
+        :return: ``'0'`` if running, ``'1'`` if not running or not found.
+        """
+        for line in output.splitlines():
+            parts = line.split()
+            if parts and parts[0] == str(job_id):
+                return parts[1] if len(parts) > 1 else '1'
+        return '1'
+
+    def create_a_new_copy(self):
+        return LocalPlatform(self.expid, self.name, self.config)
+
+    def update_cmds(self):
+        """Updates commands for platforms."""
+        self.root_dir = Path(self.config.get("LOCAL_ROOT_DIR", BasicConfig.LOCAL_ROOT_DIR)) / self.expid
+        self.remote_log_dir = self.root_dir / "tmp" / f"LOG_{self.expid}"
+        self.cancel_cmd = "kill -2"
+        self._checkhost_cmd = "echo 1"
+        self.put_cmd = "cp -p"
+        self.get_cmd = "cp"
+        self.del_cmd = "rm -f"
+        self.mkdir_cmd = f"mkdir -p {self.remote_log_dir}"
+
+
+    def get_remote_log_dir(self) -> Path:
+        return self.remote_log_dir
+
+    def get_mkdir_cmd(self):
+        return self.mkdir_cmd
+
+    def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
+        """Parses the output of the submit command to get the job ID.
+
+        :param raw_output: output of the submit command.
+        :param x11: whether the job is an x11 job, which has a different output format.
+        :return: job ID of the submitted job.
+        """
+        return [output.strip() for output in raw_output.splitlines() if output.strip()]
+
+    def write_jobid(self, jobid: str, complete_path: str) -> None:
+        try:
+            lang = locale.getlocale()[1]
+            if lang is None:
+                lang = locale.getdefaultlocale()[1]
+                if lang is None:
+                    lang = 'UTF-8'
+            title_job = b"[INFO] JOBID=" + str(jobid).encode(lang)
+            if Path(complete_path).exists():
+                file_type = complete_path[-3:]
+                if file_type == "out" or file_type == "err":
+                    with open(complete_path, "rb+") as f:
+                        # Reading into memory (Potentially slow)
+                        first_line = f.readline()
+                        # Not rewrite
+                        if not first_line.startswith(b'[INFO] JOBID='):
+                            content = f.read()
+                            f.seek(0, 0)
+                            f.write(title_job + b"\n\n" + first_line + content)
+                        f.close()
+        except Exception as exc:
+            Log.error("Writing Job Id Failed : " + str(exc))
+
+    def read_jobid_from_remote_log(self, remote_path: str) -> int | None:
+        try:
+            if Path(remote_path).exists():
+                with open(remote_path) as f:
+                    first_line = f.readline()
+                if first_line.startswith('[INFO] JOBID='):
+                    return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, IndexError):
+            ...
+        return None
+
+    def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
+        """Establishes an SSH connection to the host.
+
+        :param as_conf: The Autosubmit configuration object.
+        :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
+        :param log_recovery_process: Specifies if the call is made from the log retrieval process.
+        :return: None
+        """
+        self.connected = True
+        if not log_recovery_process:
+            self.spawn_log_retrieval_process(as_conf)
+
+    def test_connection(self, as_conf: 'AutosubmitConfig') -> None:
+        if not self.connected:
+            self.connect(as_conf)
+
+    def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
+        """Restores the SSH connection to the platform.
+
+        :param as_conf: The Autosubmit configuration object used to establish the connection.
+        :type as_conf: AutosubmitConfig
+        :param log_recovery_process: Indicates that the call is made from the log retrieval process.
+        :type log_recovery_process: bool
+        """
+        self.connected = True
+
+    def send_command(self, command: str, ignore_log=False, x11=False) -> bool:
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            self._ssh_output = result.stdout.strip()
+
+            if result.stderr and not ignore_log:
+                Log.warning(f"Command '{command}' succeeded with warning: {result.stderr.strip()}")
+
+            Log.debug(f"Sent command {command} successfully: {self._ssh_output}")
+
+            self._check_for_unrecoverable_errors()
+
+            return True
+        except subprocess.CalledProcessError as e:
+            if not ignore_log:
+                error_trace = (
+                    f"Execution failed on {self.host}\n"
+                    f"Command: {e.cmd}\n"
+                    f"Exit Code: {e.returncode}\n"
+                    f"Stdout: {e.stdout.strip() if e.stdout else 'None'}\n"
+                    f"Stderr: {e.stderr.strip() if e.stderr else 'None'}"
+                )
+                Log.error(error_trace)
+            self._ssh_output = e.stderr or e.stdout
+            return False
+        except Exception as e:
+            if not ignore_log:
+                Log.error(f"Unexpected error executing command: {str(e)}")
+            return False
+
+    def send_file(self, filename: str, check: bool = True) -> bool:
+        """Sends a file to a specified location using a command.
+
+        :param filename: The name of the file to send.
+        :type filename: str
+        :param check: Unused in this platform.
+        :type check: bool
+        :return: True if the file was sent successfully.
+        :rtype: bool
+        """
+        command = (f"{self.put_cmd} {self.tmp_path / Path(filename).name} "
+                   f"{self.tmp_path / f'LOG_{self.expid}' / Path(filename).name}; "
+                   f"chmod 770 {self.tmp_path / f'LOG_{self.expid}' / Path(filename).name}")
+        try:
+            subprocess.check_call(command, shell=True)
+        except subprocess.CalledProcessError:
+            Log.error(
+                f"Could not send file {self.tmp_path / filename} to {self.tmp_path / f'LOG_{self.expid}' / filename}")
+            raise
+        return True
+
+    def remove_multiple_files(self, filenames: str) -> str:
+        """Creates a shell script to remove multiple files in the remote and sets the appropriate permissions.
+
+        :param filenames: A string containing the filenames to be removed.
+        :return: An empty string.
+        """
+        # This function is a copy of the slurm one
+        log_dir = self.tmp_path / f"LOG_{self.expid}"
+        multiple_delete_previous_run = Path(log_dir) / "multiple_delete_previous_run.sh"
+        if log_dir.exists():
+            lang = locale.getlocale()[1]
+            if lang is None:
+                lang = 'UTF-8'
+            open(multiple_delete_previous_run, 'wb+').write(("rm -f" + filenames).encode(lang))
+            multiple_delete_previous_run.chmod(mode=0o770)
+        return ""
+
+    def get_file(self,
+            filename: str, must_exist: bool=True, relative_path: str='', ignore_log: bool=False, wrapper_failed: bool=False
+        ) -> bool:
+        local_path = self.tmp_path / relative_path
+        if not local_path.exists():
+            local_path.mkdir(parents=True, exist_ok=True)
+        file_path = local_path / filename
+        if file_path.exists():
+            file_path.unlink()
+        command = f"{self.get_cmd} {self.tmp_path / f'LOG_{self.expid}' / filename} {file_path}"
+        try:
+            subprocess.check_call(command, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'), shell=True)
+        except subprocess.CalledProcessError:
+            if must_exist:
+                raise Exception(f'File {filename} does not exist')
+            return False
+        return True
+
+    def check_remote_permissions(self) -> bool:
+        return True
+
+    # Moves .err .out
+    def check_file_exists(
+            self,
+            src: str,
+            wrapper_failed: bool = False,
+            sleeptime: int = 1,
+            max_retries: int = 1,
+    ):
+        """Checks if a file exists in the platform.
+
+        :param src: source name.
+        :param wrapper_failed: Checks inner jobs files. Defaults to False.
+        :param sleeptime: Time to sleep between retries. Defaults to 1.
+        :param max_retries: Maximum number of retries. Defaults to 1
+        :return: True if the file exists, False otherwise.
+        """
+        # This function has a short sleep as the files are locally
+        sleeptime = 1
+        for i in range(max_retries):
+            if Path(self.get_files_path(), src).is_file():
+                return True
+            sleep(sleeptime)
+        return False
+
+    def delete_file(self, filename, del_cmd=False):
+        if del_cmd:
+            command = f"{self.del_cmd} {self.tmp_path / f'LOG_{self.expid}' / filename}"
+        else:
+            command = f"{self.del_cmd} {self.tmp_path / f'LOG_{self.expid}' / filename}"
+            command += f" ; {self.del_cmd} {self.tmp_path / filename}"
+        try:
+            subprocess.check_call(command, shell=True)
+        except subprocess.CalledProcessError:
+            Log.debug(f"Could not remove file {self.tmp_path / filename}")
+            return False
+        return True
+
+    def move_file(self, src: str, dest: str, must_exist: bool=False) -> bool:
+        """Moves a file on the platform (includes .err and .out)
+
+        :param src: source name.
+        :param dest: destination name.
+        :param must_exist: ignore if file exist or not.
+        """
+        try:
+            path_root = Path(self.get_files_path())
+            (path_root / src).rename(path_root / dest)
+            return True
+        except OSError as e:
+            if must_exist:
+                raise AutosubmitError(f"File {path_root / src} does not exist", 6004, str(e))
+            else:
+                Log.debug(f"File {str(path_root)} does not exist ")
+                return False
+        except Exception as e:
+            if str(e) in "Garbage":
+                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exist', 6004, str(e))
+            if must_exist:
+                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exist", 6004, str(e))
+            else:
+                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
+                return False
+
+    def get_ssh_output(self):
+        return self._ssh_output
+
+    def get_ssh_output_err(self):
+        return self._ssh_output_err
+
+    def get_logs_files(self, exp_id: str, remote_logs: tuple[str, str]) -> None:
+        """Do nothing because the log files are already in the local platform (redundancy)."""
+        return
+
+    def read_file(self, src: str | Path, max_size: int | None = None) -> bytes | None:
+        """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+
+        :param src: file path
+        :param max_size: maximum size to read
+        """
+        try:
+            with open(src, "rb") as f:
+                return f.read(max_size)
+        except Exception as e:
+            Log.debug(f"Error reading file {src}: {str(e)}")
+        return None
+
+    def compress_file(self, file_path: str) -> None:
+        Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
+        try:
+            compression_level = self.compression_level
+            if self.remote_logs_compress_type == "xz":
+                output = log_utils.compress_xz(
+                    file_path, preset=compression_level, keep_input=False
+                )
+            else:
+                output = log_utils.compress_gzip(
+                    file_path, compression_level=compression_level, keep_input=False
+                )
+
+            Log.debug(f"File {file_path} compressed")
+            return output
+        except Exception as exc:
+            Log.error(f"Error compressing file {file_path}: {exc}")
+        return None
+
+    def cancel_jobs(self, job_ids: list[str]) -> None:
+        """Cancel local processes by their PIDs.
+
+        :param job_ids: List of local process IDs to cancel.
+        """
+        if not job_ids:
+            return
+        pids = " ".join(str(job_id) for job_id in job_ids)
+        self.send_command(f"{self.cancel_cmd} {pids}")
+
+    def _get_job_names_cmd(self, job_names: list) -> str:
+        """Gets command to check for duplicated job names on remote platforms (UNIX).
+
+        Checks if there is a job name already present on the remote platform and
+        returns the oldest ID (process or job_id) entry for each duplicated job name,
+        separated by commas.
+        """
+        # check processes with the same name, and return the oldest one (if any)
+        # avoid truncating
+        return f"ps -eo pid,cmd | grep -E '({'|'.join(job_names)})' | awk '{{print $1}}' | sort -n | uniq -d"
+
+    def _get_process_list_output(self) -> str:
+        """Return the local ``ps -eo pid,cmd`` output via subprocess.
+
+        :return: Raw process list output, or an empty string on failure.
+        """
+        try:
+            return subprocess.check_output("ps -eo pid,cmd", shell=True).decode("utf-8", errors="replace")
+        except subprocess.CalledProcessError:
+            return ""
+
+    def _check_for_unrecoverable_errors(self) -> None:
+        """Return immediately; local commands raise exceptions on failure."""
+        return

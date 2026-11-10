@@ -1,0 +1,482 @@
+name: CI
+
+on:
+  workflow_run:
+    workflows: [Lint]
+    types: [completed]
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+permissions:
+  contents: read
+
+env:
+  # Disable the ryuk sidekick container used in TestContainers to monitor
+  # the test containers launched (and kill them -- what a sidekick...).
+  TESTCONTAINERS_RYUK_DISABLED: true
+
+jobs:
+  test-unit:
+    env:
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
+    # needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          # See: https://github.com/actions/setup-python#caching-packages-dependencies
+          cache: 'pip' # caching pip dependencies
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl graphviz rsync r-base
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
+
+      # NOTE: We used `--trace --full-trace` with pytest but had strange
+      #       bugs in unit tests with py3.11:
+      #       - TypeError: 'list' object is not callable
+      #       - TypeError: 'traceback' object is not callable
+      #       It appeared to be a bug in Python3.11, pdb, pytest-xdist.
+      - name: Unit tests
+        run: |
+          pytest \
+            -n $(nproc) \
+            --verbose --verbosity="2" \
+            test/unit -m "not postgres and not profile and not profilelong"
+
+      - name: Coverage report
+        run: |
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
+          coverage report
+          coverage xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage_unit_py-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+
+  test-integration:
+    env:
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        # NOTE: We use 3.11 and not the latest 3.12 as the debugger of 3.12 is buggy
+        #       and 3.11 is the current version used at the BSC ES department.
+        python-version: ["3.10", "3.12"]
+        pytest-markers: ["not postgres and not slurm and not profile and not profilelong and not benchmark"]
+        # Here we include an extra build with the lowest version of Python and Postgres.
+        # We do it this way to avoid wasting CICD resources since we already tested the
+        # code with SQLite. So we run just one build with Postgres (normally newer versions
+        # of Python may succeed while older fail -- e.g. using newer features in a code that
+        # must support older versions).
+        # https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow#example-adding-configurations
+        include:
+          - python-version: '3.10'
+            pytest-markers: 'postgres and not slurm and not profile and not profilelong and not benchmark'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          # See: https://github.com/actions/setup-python#caching-packages-dependencies
+          cache: 'pip' # caching pip dependencies
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl git subversion graphviz rsync xvfb r-base
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
+
+      - name: Set up Git
+        run: |
+          # From: https://stackoverflow.com/questions/62960533/how-to-use-git-commands-during-a-github-action
+          # Set up dummy configuration for integration tests.
+          git --version
+          git config --global user.email "test@bsc.es"
+          git config --global user.name "GitHub Actions"
+
+      # In GitHub Actions we run all the integration tests, including those that require
+      # dependencies such as Docker (see `-m ''`, which means all markers). Read the
+      # CONTRIBUTING.md file for details how to set up your environment to run these.
+      - name: Integration tests
+        run: |
+          Xvfb :99 -screen 0 1024x768x24 -ac &
+          export DISPLAY=:99
+
+          pytest \
+            -n $(nproc) \
+            test/integration \
+            -m "${{ matrix.pytest-markers }}"
+
+      - name: Coverage report
+        run: |
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+              if ! sqlite3 "$f" "PRAGMA integrity_check;" 2>/dev/null | grep -q '^ok$'; then
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
+          coverage report
+          coverage xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage_integration_py-${{ matrix.python-version }}-${{ matrix.pytest-markers }}
+          path: coverage.xml
+          retention-days: 7
+
+      - name: Tar logs
+        id: tar_logs
+        if: failure()
+        run: |
+          logs_found=false
+
+          if [ -d ../container_logs_ssh_server ]; then
+            echo "Found container logs for SSH server, moving them to container_logs_integration"
+            mv ../container_logs_ssh_server/ container_logs_integration
+            logs_found=true
+          else
+            echo "No container logs found for SSH server"
+          fi
+
+          if [ -d ../container_logs_git_server ]; then
+            echo "Found container logs for Git server, moving them to container_logs_integration_git"
+            mv ../container_logs_git_server/ container_logs_integration_git
+            logs_found=true
+          else
+            echo "No container logs found for Git server"
+          fi
+
+          # Write the value to the GH Actions step output, so other steps can use it.
+          echo "logs_found=$logs_found" >> $GITHUB_OUTPUT
+
+      - name: Upload logs to GitHub
+        if: failure() && steps.tar_logs.outputs.logs_found == 'true'
+        uses: actions/upload-artifact@master
+        with:
+          name: container_logs_integration_${{ github.run_id }}
+          path: |
+            container_logs_integration
+            container_logs_integration_git
+          retention-days: 5
+          overwrite: true
+
+  test-regression:
+    env:
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl graphviz rsync
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
+
+      # Run regression tests
+      - name: Regression tests
+        run: |
+          pytest \
+            -n $(nproc) \
+            test/regression \
+            -m ''
+
+      - name: Coverage report
+        run: |
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
+          coverage report
+          coverage xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage_regression_py-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+
+  test-slurm:
+    env:
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging
+          pip install --upgrade -e .[all]
+
+      - name: Set up Git
+        run: |
+          # From: https://stackoverflow.com/questions/62960533/how-to-use-git-commands-during-a-github-action
+          # Set up dummy configuration for integration tests.
+          git --version
+          git config --global user.email "test@bsc.es"
+          git config --global user.name "GitHub Actions"
+
+      - name: Integration tests
+        run: |
+          pytest -x \
+            -n 3 \
+            test/integration \
+            -m 'slurm and not profile and not profilelong'
+
+      - name: Coverage report
+        run: |
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
+          coverage report
+          coverage xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage_slurm_py-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+
+      - name: Tar logs
+        id: tar_logs
+        if: failure()
+        run: |
+          logs_found=false
+
+          if [ -d ../container_logs_slurm_server ]; then
+            echo "Found container logs for SLURM server, moving them to container_logs_slurm"
+            mv ../container_logs_slurm_server/ container_logs_slurm
+            logs_found=true
+          else
+            echo "No container logs found for SLURM server"
+          fi
+
+          # Write the value to the GH Actions step output, so other steps can use it.
+          echo "logs_found=$logs_found" >> $GITHUB_OUTPUT
+
+      - name: Upload logs to GitHub
+        if: failure() && steps.tar_logs.outputs.logs_found == 'true'
+        uses: actions/upload-artifact@master
+        with:
+          name: container_logs_slurm_${{ github.run_id }}
+          path: |
+            container_logs_slurm
+          retention-days: 1
+          overwrite: true
+
+  # NOTE: The docs are already built on ReadTheDocs. We perform another quick build,Add commentMore actions
+  #       without checking or deploying the produced HTML, just to i) verify that
+  #       we can build it and ii) collect the coverage of the examples executed.
+  test-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        python-version: [ "3.12" ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl graphviz rsync
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
+
+      # Run regression tests
+      - name: Build docs
+        run: |
+          cd docs && make xml_coverage
+
+      - name: Coverage report
+        run: |
+          cd docs
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
+          coverage report
+          coverage xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage_docs-${{ matrix.python-version }}
+          path: docs/coverage.xml
+          retention-days: 7
+
+  test-misc:
+    env:
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      matrix:
+        python-version: [ "3.12" ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging setuptools twine
+          # To validate CFF citation files.
+          python -m pip install cffconvert
+
+      - name: Validate citation file
+        run: |
+          cffconvert --validate -i CITATION.cff
+
+
+  coverage:
+    needs: [test-unit, test-integration, test-regression, test-slurm, test-docs]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v8
+
+      - name: Codecov upload
+        uses: codecov/codecov-action@v7
+        with:
+          name: ${{ github.workflow }}
+          flags: fast-tests
+          fail_ci_if_error: true
+          verbose: true
+          # Token is not required for public repositories but avoids upload failure due
+          # to rate-limiting (but not for PRs opened from forks)
+          token: ${{ secrets.CODECOV_TOKEN }}

@@ -1,0 +1,24 @@
+## In this file we define the simulations that are being run as defined 
+## in M340.5.1.1) (?)
+
+experiment:
+    DATELIST: 19900101
+    MEMBERS: fc0
+    CHUNKSIZEUNIT: day
+    CHUNKSIZE: 1
+    NUMCHUNKS: 5
+    CALENDAR: standard
+
+JOBS:
+   SIM:
+       WALLCLOCK: "00:30"
+
+CONFIGURATION:
+    DQC_PROFILE: lowres
+    DATA_PORTFOLIO: production
+    ICMCL: "daily"
+    RAPS_EXPERIMENT: "hist"
+    RAPS_USER_FLAGS: "--cbmf_reduced --no-ozone --drhook --hugepages --preload-mir-cache"
+    IFS:
+        EXPVER: awi0
+

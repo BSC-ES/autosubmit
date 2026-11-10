@@ -1,0 +1,193 @@
+Platforms:
+  marenostrum5:
+    TYPE: slurm
+    HOST: mn5-cluster1
+        # This needs that a ~/.ssh/config exists with the following:
+        # the login node in mn0 allows internet acces
+        # Host mn4-cluster1
+        #     Hostname mn0.bsc.es
+        #     IdentifyFile ~/.ssh/<your_sshkey>
+        #     User <bsc user>
+    PROJECT: ehpc01
+    HPC_PROJECT_DIR: /gpfs/projects/ehpc01
+    USER: <to-be-overloaded-in-user-conf>
+    QUEUE: gp_debug
+    SCRATCH_DIR: /gpfs/scratch
+    PROJECT_SCRATCH: "%PLATFORMS.MARENOSTRUM5.SCRATCH_DIR%/%PLATFORMS.MARENOSTRUM5.PROJECT%"
+    CONTAINER_DIR: "%PLATFORMS.MARENOSTRUM5.HPC_PROJECT_DIR%/containers"
+    FDB_DIR: /gpfs/scratch/ehpc01/experiments
+    FDB_PROD: /gpfs/projects/ehpc01/dte/fdb
+    ADD_PROJECT_TO_HOST: False
+    TEMP_DIR: ''
+    PROCESSORS_PER_NODE: 112
+    APP_PARTITION: gp_bsces
+    EXCLUSIVE: "True"
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL', '#SBATCH --hint=nomultithread']"
+    HPCARCH_short: "MN5"
+    MAX_WALLCLOCK: '02:00'
+  marenostrum5-login:
+    TYPE: ps
+    HOST: mn5-cluster1
+        # This needs that a ~/.ssh/config exists with the following:
+        # the login node in mn0 allows internet acces
+        # Host mn4-cluster1
+        #     Hostname mn0.bsc.es
+        #     IdentifyFile ~/.ssh/<your_sshkey>
+        #     User <bsc user>
+    PROJECT: ehpc01
+    HPC_PROJECT_DIR: /gpfs/projects/ehpc01
+    FDB_DIR: "/gpfs/scratch/%PLATFORMS.MARENOSTRUM5.PROJECT%/experiments"
+    FDB_PROD: /gpfs/projects/ehpc01/dte/fdb
+    USER: <to-be-overloaded-in-user-conf>
+    SCRATCH_DIR: /gpfs/scratch
+    PROJECT_SCRATCH: "%PLATFORMS.MARENOSTRUM5.SCRATCH_DIR%/%PLATFORMS.MARENOSTRUM5.PROJECT%"
+    CONTAINER_DIR: "%PLATFORMS.MARENOSTRUM5.HPC_PROJECT_DIR%/containers"
+    ADD_PROJECT_TO_HOST: False
+    QUEUE: gp_interactive
+    PROCESSORS: 4
+    MAX_WALLCLOCK: '2:00'
+    HPCARCH_short: "MN5"
+  juwels-login:
+    TYPE: ps
+    HOST: juwels-cluster
+        # This needs that a ~/.ssh/config exists with the following:
+        # Host juwels-cluster
+        #     Hostname %.fz-juelich.de
+        #     IdentifyFile ~/.ssh/<your_sshkey>
+        #     User <juwels user>
+    PROJECT: hhb19
+    USER: <to-be-overloaded-in-user-conf>
+    SCRATCH_DIR: /p/scratch
+    SCRATCH_PROJECT_DIR: chhb19
+    ADD_PROJECT_TO_HOST: False
+    TEMP_DIR: ''
+  juwels:
+    TYPE: slurm
+    HOST: juwels-cluster
+        # This needs that a ~/.ssh/config exists with the following:
+        # Host juwels-cluster
+        #     Hostname %.fz-juelich.de
+        #     IdentifyFile ~/.ssh/<your_sshkey>
+        #     User <juwels user>
+    PROJECT: hhb19
+    USER: <to-be-overloaded-in-user-conf>
+    QUEUE: ""
+    CUSTOM_DIRECTIVES: '#SBATCH -p standard -N 1 --ntasks-per-node=24 --cpus-per-task=2'
+    SCRATCH_DIR: /p/scratch
+    SCRATCH_PROJECT_DIR: chhb19
+    PARTITION: devel
+    ADD_PROJECT_TO_HOST: False
+    MAX_WALLCLOCK: '48:00'
+    TEMP_DIR: ''
+    PROCESSORS_PER_NODE: 24
+  lumi-login:
+    TYPE: ps
+    HOST: lumi-cluster
+        # This needs that a ~/.ssh/config exists with the following:
+        # Host lumi-cluster
+        #     Hostname lumi.csc.fi
+        #     IdentifyFile ~/.ssh/<your_sshkey>
+        #     User <lumi user>
+    PROJECT: project_465000454
+    HPC_PROJECT_DIR: /projappl/project_465000454/
+    FDB_DIR: "/scratch/%PLATFORMS.LUMI.PROJECT%/experiments"
+    FDB_PROD: "/appl/local/climatedt"
+    USER: <to-be-overloaded-in-user-conf>
+    SCRATCH_DIR: /scratch
+    PROJECT_SCRATCH: "%PLATFORMS.LUMI.SCRATCH_DIR%/%PLATFORMS.LUMI.PROJECT%"
+    CONTAINER_DIR: "%PLATFORMS.LUMI.HPC_PROJECT_DIR%/containers"
+    ADD_PROJECT_TO_HOST: False
+    TEMP_DIR: ''
+    DATABRIDGE_FDB_HOME: "/appl/local/climatedt/databridge"
+    TOTAL_JOBS: 1
+    MAX_WAITING_JOBS: 1
+    HPCARCH_short: "lumi"
+  lumi:
+    TYPE: slurm
+    HOST: lumi-cluster #lumi.csc.fi
+        # This needs that a ~/.ssh/config exists with the following:
+        # Host lumi-cluster
+        #     Hostname lumi.csc.fi
+        #     IdentifyFile ~/.ssh/<your_sshkey>
+        #     User <lumi user>
+    PROJECT: project_465000454
+    HPC_PROJECT_DIR: /projappl/project_465000454/
+    FDB_DIR: "/scratch/%PLATFORMS.LUMI.PROJECT%/experiments"
+    USER: <to-be-overloaded-in-user-conf>
+    SCRATCH_DIR: /scratch
+    PROJECT_SCRATCH: "%PLATFORMS.LUMI.SCRATCH_DIR%/%PLATFORMS.LUMI.PROJECT%"
+    CONTAINER_DIR: "%PLATFORMS.LUMI.HPC_PROJECT_DIR%/containers"
+    ADD_PROJECT_TO_HOST: False
+    TEMP_DIR: ''
+    BUDGET: "%PLATFORMS.LUMI.PROJECT%"
+    EXECUTABLE: "/bin/bash --login"
+    DATABRIDGE_FDB_HOME: "/appl/local/climatedt/databridge"
+    EXCLUSIVE: "True"
+    MEMORY: "224G" # Default for LUMI-C
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL', '#SBATCH --hint=nomultithread']"
+    APP_PARTITION: small
+    FDB_PROD: "/appl/local/climatedt"
+    MAX_PROCESSORS: 99999
+    MAX_WALLCLOCK: "00:30"
+    HPCARCH_short: "lumi"
+  lumi-transfer:
+    TYPE: slurm
+    HOST: lumi-cluster #lumi.csc.fi
+        # This needs that a ~/.ssh/config exists with the following:
+        # Host lumi-cluster
+        #     Hostname lumi.csc.fi
+        #     IdentifyFile ~/.ssh/<your_sshkey>
+        #     User <lumi user>
+    PROJECT: project_465000454
+    HPC_PROJECT_DIR: /projappl/project_465000454/
+    FDB_DIR: "/scratch/%PLATFORMS.LUMI.PROJECT%/experiments"
+    USER: <to-be-overloaded-in-user-conf>
+    SCRATCH_DIR: /scratch
+    PROJECT_SCRATCH: "%PLATFORMS.LUMI.SCRATCH_DIR%/%PLATFORMS.LUMI.PROJECT%"
+    CONTAINER_DIR: "%PLATFORMS.LUMI.PROJECT_SCRATCH%/containers"
+    ADD_PROJECT_TO_HOST: False
+    TEMP_DIR: ''
+    BUDGET: "%PLATFORMS.LUMI.PROJECT%"
+    EXECUTABLE: "/bin/bash --login"
+    DATABRIDGE_FDB_HOME: "/appl/local/climatedt/databridge"
+    EXCLUSIVE: "True"
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL']"
+    FDB_PROD: "/appl/local/climatedt"
+    MAX_WALLCLOCK: "05:00"
+    PARTITION: small
+    MAX_PROCESSORS: 1024
+    TOTALJOBS: 1
+    PROCESSORS_PER_NODE: 128
+  levante-login:
+    TYPE: ps
+    HOST: levante
+        # This needs that a ~/.ssh/config exists with the following:
+        # Host levante-cluster
+        #     Hostname levante.dkrz.de
+        #     IdentifyFile ~/.ssh/<your_sshkey>
+        #     User <levante user>
+    PROJECT: <to-be-overloaded-by-user>
+    USER: <to-be-overloaded-in-user-conf>
+    SCRATCH_DIR: /work
+    ADD_PROJECT_TO_HOST: False
+    TEMP_DIR: ''
+    EXECUTABLE: "/usr/bin/bash -l" # this is needed on levante to make it find the module command
+  levante:
+    TYPE: slurm
+    HOST: levante
+        # This needs that a ~/.ssh/config exists with the following:
+        # Host levante-cluster
+        #     Hostname levante.dkrz.de
+        #     IdentifyFile ~/.ssh/<your_sshkey>
+        #     User <levante user>
+    PROJECT: <to-be-overloaded-by-user>
+    PARTITION: 'compute'
+    USER: <to-be-overloaded-in-user-conf>
+    QUEUE: ""
+    SCRATCH_DIR: /work
+    ADD_PROJECT_TO_HOST: False
+    MAX_WALLCLOCK: '00:29'
+    TEMP_DIR: ''
+    PROCESSORS_PER_NODE: 128
+    BUDGET: <to-be-overloaded-by-user>
+    EXECUTABLE: "/usr/bin/bash -l" # this is needed on levante to make it find the module command

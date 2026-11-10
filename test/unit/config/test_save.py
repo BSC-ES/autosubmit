@@ -1,0 +1,74 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+from pathlib import Path
+
+import pytest
+from ruamel.yaml import YAML
+
+from autosubmit.config.basicconfig import BasicConfig
+
+
+@pytest.mark.parametrize(
+    "data,owner",
+    [
+        ({
+             "DEFAULT": {
+                 "HPCARCH": "LOCAL",
+             },
+         }, True),
+        ({
+             "DEFAULT": {
+                 "HPCARCH": "LOCAL",
+             },
+         }, False)
+    ],
+    ids=["local_true", "local_false"]
+)
+def test_save(autosubmit_config, mocker, data: dict, owner: bool):
+    as_conf = autosubmit_config(expid='t000', experiment_data=data, include_basic_config=True)
+    data['ROOTDIR'] = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid)
+    # TODO: figure why some autosubmit_config conf_test( I hope ) is adding functions to experiment_data
+    as_conf.experiment_data = {k: v for k, v in data.items() if not callable(v)}
+    as_conf.load_common_parameters(as_conf.experiment_data)
+    as_conf.load_as_env_variables(as_conf.experiment_data)
+    owner_uid = Path(data['ROOTDIR']).stat().st_uid
+    mocker.patch("os.getuid", return_value=owner_uid if owner else owner_uid + 1)
+    as_conf.save()
+    if not owner:
+        assert not as_conf.metadata_folder.exists()
+    else:
+        assert as_conf.metadata_folder.exists()
+        assert (as_conf.metadata_folder / 'experiment_data.yml').exists()
+
+        # check contents
+        with open(as_conf.metadata_folder / 'experiment_data.yml', 'r') as f:
+            yaml = YAML(typ="safe")
+            loaded = yaml.load(f)
+            assert data['DEFAULT']['HPCARCH'] == loaded['DEFAULT']['HPCARCH']
+            assert data['ROOTDIR'] == loaded['ROOTDIR']
+
+        # Test .bak generated.
+        as_conf.save()
+        assert (as_conf.metadata_folder / 'experiment_data.yml.bak').exists()
+        # force fail save
+        mocker.patch("builtins.open", side_effect=Exception("Forced exception"))
+        mocker.patch("shutil.copyfile", return_value=True)
+        as_conf.save()
+        assert as_conf.metadata_folder / 'experiment_data.yml' not in as_conf.metadata_folder.iterdir()
+        assert as_conf.data_changed is True
+        assert as_conf.last_experiment_data == {}

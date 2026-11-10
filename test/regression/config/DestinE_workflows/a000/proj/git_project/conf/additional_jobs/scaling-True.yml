@@ -1,0 +1,13 @@
+JOBS:
+  SIM:
+    FILE: templates/sim_%MODEL.NAME%.sh
+    FOR:
+        NAME: ["nodes_200","nodes_300","nodes_400","nodes_500","nodes_600","nodes_700"]
+        NODES: ["200","300","400","500","600","700"]
+    PLATFORM: "%DEFAULT.HPCARCH%"
+    DEPENDENCIES: INI
+    RUNNING: chunk
+    WALLCLOCK: "03:00"
+    CHECK: on_submission
+
+

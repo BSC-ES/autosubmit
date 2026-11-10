@@ -1,0 +1,11 @@
+JOBS:
+  CLEAN:
+    FILE: templates/clean.sh
+    PLATFORM: "%DEFAULT.HPCARCH%-login"
+    DEPENDENCIES: SIM
+    RUNNING: chunk
+    WALLCLOCK: '00:30'
+    TASKS: 1
+    THREADS: 1
+    NODES: 1
+    CHECK: on_submission

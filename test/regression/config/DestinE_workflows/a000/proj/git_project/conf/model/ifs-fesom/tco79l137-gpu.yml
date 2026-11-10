@@ -1,0 +1,30 @@
+CONFIGURATION:
+  IFS:
+    GTYPE: tco
+    RESOL: 79
+    LEVELS: 137
+    LABEL: LWDA
+    IO_TASKS: 4
+  FESOM:
+    IO_TASKS: 4
+
+PLATFORMS: 
+  LUMI:
+    TYPE: slurm
+    PARTITION: "standard-g"
+    MAX_WALLCLOCK: "00:30"
+    NODES: 2
+    TASKS: 8
+    THREADS: 7
+    PROCESSORS_PER_NODE: 64
+    EXCLUSIVE: "True"
+    CUSTOM_DIRECTIVES: "['#SBATCH --gpus-per-node=8', '#SBATCH --hint=nomultithread', '#SBATCH --mem=0']"
+
+JOBS:
+  DQC_BASIC:
+    WALLCLOCK: "00:30"
+
+
+REQUEST:
+  RESOLUTION: standard
+

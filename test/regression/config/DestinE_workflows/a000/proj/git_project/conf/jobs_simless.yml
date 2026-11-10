@@ -1,0 +1,20 @@
+JOBS:
+  LOCAL_SETUP:
+    FILE: templates/local_setup.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+    CHECK: on_submission
+  REMOTE_SETUP:
+    DEPENDENCIES: SYNCHRONIZE
+    FILE: templates/remote_setup.sh,templates/fdb/confignative.yaml,templates/fdb/configlatlon.yaml,templates/fdb/config.yaml
+    PLATFORM: '%DEFAULT.HPCARCH%-login'
+    RUNNING: once
+    WALLCLOCK: 02:00
+    CHECK: on_submission
+  SYNCHRONIZE:
+    DEPENDENCIES: LOCAL_SETUP
+    FILE: templates/synchronize.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+    CHECK: on_submission
+

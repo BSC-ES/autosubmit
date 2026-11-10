@@ -1,0 +1,292 @@
+---
+### Bundle
+
+name    : ifs-bundle
+version : 47.3.0.1    # IFS: CY47R3   DEPS: v1
+cmake   : >
+    ECBUILD_2_COMPAT=ON
+    ECBUILD_2_COMPAT_DEPRECATE=OFF
+    ENABLE_PKGCONFIG=OFF
+    INSTALL_LIB_DIR=lib
+    ECBUILD_INSTALL_LIBRARY_HEADERS=OFF
+    ECBUILD_INSTALL_FORTRAN_MODULES=OFF
+    CMAKE_LINK_DEPENDS_NO_SHARED=ON
+    CMAKE_EXPORT_COMPILE_COMMANDS=ON
+    BUILD_magics=OFF
+    BUILD_ifs_dp=OFF
+    BUILD_ifs_sp=ON
+    ENABLE_OMP=ON
+    ENABLE_SINGLE_PRECISION=OFF
+    FFTW_ENABLE_MKL=OFF
+    ENABLE_SCMEC=OFF
+    FORECAST_ONLY=ON
+    ENABLE_OCEANMODEL=OFF
+    BUILD_fesom=OFF
+
+projects :
+
+    - ecbuild :
+        git     : https://github.com/ecmwf/ecbuild
+        version : 3.8.1
+        bundle  : false
+
+    - eccodes :
+        git     : https://github.com/ecmwf/eccodes
+        version : 2.32.5
+        cmake   : >
+            ENABLE_ECCODES_THREADS=ON
+            ECCODES_ENABLE_NETCDF=OFF
+            ECCODES_ENABLE_FORTRAN=ON
+            ECCODES_ENABLE_MEMFS=ON
+            ECCODES_INSTALL_EXTRA_TOOLS=ON
+            ECCODES_ENABLE_PYTHON2=OFF
+            ECCODES_ENABLE_AEC=ON
+
+    - bufrdc_tables :
+        git     : ${BITBUCKET}/de/bufrdc_tables
+        version : '000419'
+
+    - bufrdc_emoslib :
+        git     : ${BITBUCKET}/de/bufrdc_emoslib
+        version : 4.6.7
+        cmake   : BUFR_TABLES_PATH=${INSTALL_DIR}/share/bufrdc_tables/
+
+    - eckit :
+        git     : https://github.com/ecmwf/eckit
+        version : 1.24.4
+        cmake   : >
+            ECKIT_ENABLE_XXHASH=OFF
+            ECKIT_ENABLE_VIENNACL=OFF
+            ECKIT_ENABLE_EIGEN=OFF
+            ECKIT_ENABLE_ARMADILLO=OFF
+            ECKIT_ENABLE_CUDA=OFF
+            ECKIT_ENABLE_SANDBOX=OFF
+            ECKIT_ENABLE_MKL=OFF
+            ECKIT_ENABLE_LAPACK=OFF
+            ECKIT_ENABLE_MPI=ON
+            ECKIT_ENABLE_OMP=OFF
+
+    - fckit :
+        git     : https://github.com/ecmwf/fckit
+        version : 0.10.1
+        require : eckit
+        cmake   : FCKIT_ENABLE_FINAL=OFF
+
+    - metkit :
+        git     : https://github.com/ecmwf/metkit
+        version : 1.10.18
+        require : eckit
+
+    - fdb5 :
+        git     : https://github.com/ecmwf/fdb
+        version : 5.11.25
+        require : eckit metkit
+        cmake   : >
+            ENABLE_FDB_REMOTE=OFF
+            ENABLE_FDB_BUILD_TOOLS=ON
+
+    - fcm :
+        git     : https://github.com/metomi/fcm
+        version : 2019.09.0
+        bundle  : false
+
+    - fiat :
+        git     : https://github.com/ecmwf-ifs/fiat
+        version : 1.2.0
+
+    - ectrans :
+        git     : https://github.com/ecmwf-ifs/ectrans
+        version : DE_CY48R1.0_climateDT_20240126
+        require : fiat
+
+    - atlas :
+        git     : https://github.com/ecmwf/atlas
+        version : 0.35.1
+        require : eckit fckit
+        cmake   : >
+            ATLAS_ENABLE_TESSELATION=OFF
+            ATLAS_ENABLE_ECTRANS=OFF
+            ATLAS_ENABLE_CLANG_TIDY=OFF
+            ATLAS_ENABLE_GRIDTOOLS_STORAGE=OFF
+            ATLAS_ENABLE_OMP=OFF
+
+    - mir :
+        git     : https://github.com/ecmwf/mir
+        version : 1.18.1
+        require : atlas
+        cmake   : >
+            ENABLE_MIR_DOWNLOAD_MASKS=OFF
+            MIR_ENABLE_OMP=OFF
+
+    - atlas-orca :
+         git     : https://github.com/ecmwf/atlas-orca.git
+         version : 0.2.0
+         require : atlas
+         cmake   :
+             ENABLE_RETRIEVE_ORCA_DATA=ON
+             ENABLE_INSTALL_ORCA_DATA=ON
+
+    - multio :
+        git     : ${BITBUCKET}/mars/multio.git
+        version : feature/support-gsc-schema
+        cmake   : >
+            ENABLE_LEGACY_IFSIO=ON
+
+    - fesom :
+        git     : https://github.com/FESOM/fesom2.git
+        version : production_DE
+        require : multio
+        cmake   : >
+            ENABLE_IFS_INTERFACE=ON
+            OPENMP_REPRODUCIBLE=OFF
+            DISABLE_MULTITHREADING=ON
+            ENABLE_OPENMP=ON
+
+    - ifs-source :
+        git     : ${BITBUCKET}/de/ifs-source
+        version : DE_CY48R1.0_climateDT_20240215
+        bundle  : false
+        cmake   : >
+            ENABLE_MULTIO_IFS_PIPELINE=ON
+            ENABLE_MULTIO_WAM_PIPELINE=ON
+
+    - ifs_dp :
+        dir    :  ifs-source
+        cmake   : >
+            ENABLE_IFS_NETCDF=ON
+            IFS_DP_ENABLE_SINGLE_PRECISION=OFF
+            FCM_EXECUTABLE=${SOURCE_DIR}/fcm/bin/fcm
+
+    - ifs_sp :
+        dir     : ifs-source
+        cmake   : >
+            ENABLE_IFS_NETCDF=ON
+            FCM_EXECUTABLE=${SOURCE_DIR}/fcm/bin/fcm
+
+    - nemovar :
+        git : ${BITBUCKET}/de/nemovar
+        version : develop
+        bundle : false  # this is key: it won't build it here.
+
+    - raps :
+        git     : ${BITBUCKET}/de/raps
+        version : 0.1.4
+        bundle  : false
+
+options :
+
+    - without-nemo :
+        help  : Disable NEMO compilation
+        cmake : ENABLE_NEMO=OFF
+
+    - with-scmec :
+        help  : Enable SCM compilation
+        cmake : ENABLE_SCMEC=ON
+
+    - with-static-linking :
+        help  : Link with static IFS libraries
+        cmake : IFS_SHARED_LIBS=OFF
+
+    - with-single-precision :
+        help  : Add a single precision IFS build
+        cmake : BUILD_ifs_sp=ON ENABLE_SINGLE_PRECISION=ON
+
+    - without-single-precision :
+        help  : Remove single precision & add a double precision build
+        cmake : BUILD_ifs_sp=OFF BUILD_ifs_dp=ON ENABLE_SINGLE_PRECISION=OFF
+
+    - with-double-precision :
+        help  : Add a double precision IFS build
+        cmake : BUILD_ifs_dp=ON
+
+    - without-double-precision :
+        help  : Remove double precision & add a single precision build
+        cmake : BUILD_ifs_sp=ON BUILD_ifs_dp=OFF ENABLE_SINGLE_PRECISION=ON
+
+    - with-single-precision-nemo:
+        cmake : NEMO_DP_ENABLE_SINGLE_PRECISION=ON
+        help  : Build NEMO in single-precision (only needed for DP IFS builds)
+
+    - with-double-precision-nemo:
+        cmake : NEMO_SP_ENABLE_SINGLE_PRECISION=OFF
+        help  : Build NEMO in double-precision (only needed for SP IFS builds)
+
+    - init-snan :
+        help  : Initialize REAL variables with a signaling NaN
+        cmake : IFS_INIT_SNAN=ON
+
+    - no-init-snan :
+        help  : Do not initialize REAL variables with a signaling NaN
+        cmake : IFS_INIT_SNAN=OFF
+
+    - check-bounds :
+        help  : Enable run-time bounds checking
+        cmake : IFS_CHECK_BOUNDS=ON
+
+    - nemo-version :
+        help  : Version of NEMO to build
+        cmake : NEMO_VERSION={{value}}
+
+    - nemo-grid-config :
+        help  : NEMO grid configuration (e.g. ORCA025_Z75)
+        cmake : GRID_CONFIG={{value}}
+
+    - nemo-ice-config :
+        help  : NEMO ice model configuration (e.g., LIM2, NONE)
+        cmake : ICE_CONFIG={{value}}
+
+    - with-nemo-stphy :
+        help  : NEMO stopack
+        cmake : ENABLE_NEMO_STPHY=ON
+
+    - nemovar-version :
+        help  : Version of NEMOVAR to build
+        cmake : ASSIM_VERSION={{value}}
+
+    - nemovar-grid-config :
+        help  : NEMOVAR grid configuration (e.g. ORCA025_Z75)
+        cmake : NEMOVAR_GRID_CONFIG={{value}}
+
+    - with-nemovar-external :
+        help  : use external NEMOVAR repo
+        cmake : ENABLE_NEMOVAR_EXTERNAL=ON
+
+    - with-xios :
+        help  : Use the XIOS i/o server for NEMO/LIM
+        cmake : ENABLE_XIOS=ON
+
+    - xios-version :
+        help  : Version of XIOS i/o server for NEMO/LIM to build
+        cmake : XIOS_VERSION={{value}} ENABLE_XIOS_PREBUILT=OFF
+
+    - xios-prebuilt :
+        help  : Use the pre-built XIOS library/includes
+        cmake : ENABLE_XIOS_PREBUILT=ON
+
+    - xios-path :
+        help  : The path to the pre-built XIOS library/includes
+        cmake : XIOS_PATH={{value}}
+
+    - with-mkl :
+        help  : Use Intel MKL for BLAS
+        cmake : ENABLE_MKL=ON
+
+    - with-multio-for-nemo :
+        help  : Use multio-server for NEMO
+        cmake : ENABLE_MULTIO_FOR_NEMO=ON
+
+    - with-multio-for-nemo-sglexe :
+        help  : Use multio-server for NEMO
+        cmake : ENABLE_MULTIO_FOR_NEMO_SGLEXE=ON
+
+    - with-gpu :
+        help : Compile GPU version of ecTrans
+        cmake : ENABLE_GPU=ON
+
+    - with-gpu-aware-mpi :
+        help : Compile GPU version of ecTrans with GPU-aware MPI
+        cmake : ENABLE_GPU_AWARE_MPI=ON
+
+    - with-fesom:
+        help  : Build with fesom
+        cmake : BUILD_fesom=ON ENABLE_FESOM=ON ENABLE_NEMO=OFF

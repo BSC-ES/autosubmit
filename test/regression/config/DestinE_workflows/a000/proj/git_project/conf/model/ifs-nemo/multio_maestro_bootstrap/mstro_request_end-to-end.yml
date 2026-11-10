@@ -1,0 +1,26 @@
+GSVREQUEST: #raw data
+   class: d1
+   type: fc
+   expver: a193
+   stream: clte
+   levtype: "pl"
+   levelist: 1
+   date: "20200120"
+   time: "0000"
+   param: ["t"]
+
+APP:
+   other: "empty"
+
+OPAREQUEST:
+  1:
+    variable: "t"
+    stat: "mean"
+    stat_freq: "daily"
+    output_freq: "daily"
+    time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+    save: True
+    checkpoint: True
+    checkpoint_filepath: "/scratch/project_465000454/tmp/a193/LOG_a193"
+    save_filepath: "/scratch/project_465000454/tmp/a193/LOG_a193"
+

@@ -1,0 +1,38 @@
+# Splits n-to-1 example https://autosubmit.readthedocs.io/en/master/userguide/defining_workflows/index.html
+
+experiment:
+  DATELIST: 20000101 20010101
+  MEMBERS: "fc0 fc1"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '3'
+  CALENDAR: standard
+JOBS:
+    # N-to-1
+    TEST:
+      FILE: TEST.sh
+      RUNNING: once
+      SPLITS: '4'
+    TEST2:
+      FILE: TEST2.sh
+      DEPENDENCIES:
+        TEST:
+          SPLITS_FROM:
+            "[1:2]":
+              SPLITS_TO: "[1:4]*\\2"
+      RUNNING: once
+      SPLITS: '2'
+    # 1-to-N
+    TEST3:
+      FILE: TEST.sh
+      RUNNING: once
+      SPLITS: '2'
+    TEST4:
+      FILE: TEST2.sh
+      DEPENDENCIES:
+        TEST3:
+          SPLITS_FROM:
+            "[1:4]":
+              SPLITS_TO: "[1:2]*\\2"
+      RUNNING: once
+      SPLITS: '4'

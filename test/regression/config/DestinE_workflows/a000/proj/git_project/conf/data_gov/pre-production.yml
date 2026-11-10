@@ -1,0 +1,6 @@
+REQUEST:
+  EXPVER: "0001"
+  CLASS: "d1"
+  # NOTE: This must NOT match the production FDB path, and the FDB
+  # configuration must be pointing to a pre-production location.
+  FDB_HOME: "%CURRENT_FDB_DIR%/%REQUEST.EXPVER%/fdb"

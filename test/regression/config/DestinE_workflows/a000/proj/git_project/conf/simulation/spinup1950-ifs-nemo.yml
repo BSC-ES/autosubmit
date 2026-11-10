@@ -1,0 +1,19 @@
+## In this file we define the simulations that are being run as defined 
+## in M340.5.1.1) (?)
+
+experiment:
+    DATELIST: 19500101
+    MEMBERS: fc0
+    CHUNKSIZEUNIT: day
+    CHUNKSIZE: 73
+    NUMCHUNKS: 10
+    CALENDAR: standard
+
+PLATFORMS:
+   LUMI:
+        PARTITION: "standard"
+        MAX_WALLCLOCK: "24:00"
+
+JOBS:
+   SIM:
+       WALLCLOCK: "05:00"

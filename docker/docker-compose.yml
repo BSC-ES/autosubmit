@@ -1,0 +1,54 @@
+version: "3"
+services:
+  autosubmit:
+    build:
+      dockerfile: Dockerfile
+    container_name: autosubmit
+    # SSH is used for Autosubmit jobs, not for users to connect.
+    entrypoint: sudo /usr/sbin/sshd -D -e
+    # Autosubmit needs this, as otherwise the Autosubmit jobs are
+    # left as zombie/defunct processes inside the container.
+    init: true
+    volumes:
+      # Using named volumes managed by Docker.
+      - as_database:/app/autosubmit/database
+      - as_experiments:/app/autosubmit/experiments
+      # For SSH.
+      - ./authorized_keys:/home/autosubmit/.ssh/authorized_keys
+      - ./id_rsa:/home/autosubmit/.ssh/id_rsa
+      - ./id_rsa.pub:/home/autosubmit/.ssh/id_rsa.pub
+      # TODO: For GUI/X we could use something similar to (but
+      #       but there are security issues doing so...)
+      # - /tmp/.X11-unix/:/tmp/.X11-unix/
+      # TODO: We would also need to add to the service:
+      # environment:
+      #  - DISPLAY=$DISPLAY
+    ports:
+      - "22"
+    restart: unless-stopped
+    depends_on:
+      - computing_node
+  # Our computing nodes.
+  computing_node:
+    image: lscr.io/linuxserver/openssh-server:latest
+    # container_name: openssh-server
+    # hostname: node-01
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - USER_NAME=autosubmit
+      - PUBLIC_KEY_FILE=/app/id_rsa.pub
+      - SUDO_ACCESS=false
+      - PASSWORD_ACCESS=false
+      # Not documented. Not supported. But works.
+      # https://github.com/linuxserver/docker-openssh-server/issues/30#issuecomment-1538129057
+      - LISTEN_PORT=22
+    volumes:
+      - ./id_rsa.pub:/app/id_rsa.pub
+    ports:
+      - "22"
+    restart: unless-stopped
+volumes:
+  as_database: {}
+  as_experiments: {}

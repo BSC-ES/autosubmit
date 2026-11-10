@@ -1,0 +1,30 @@
+CONFIGURATION:
+  DQC_PROFILE: lowres
+  DATA_PORTFOLIO: production
+  IFS:
+    GTYPE: tco
+    RESOL: 79
+    LEVELS: 137
+    EXPVER: hz9m
+    LABEL: LWDA
+
+    IO_NODES: 1
+
+PLATFORMS:    
+  LUMI:
+    TYPE: slurm
+    PARTITION: "dev-g"
+    MEMORY: "480G"
+    MAX_WALLCLOCK: "00:30"
+    NODES: 2
+    TASKS: 8
+    THREADS: 7
+    PROCESSORS_PER_NODE: 64
+
+JOBS:
+  SIM:    
+    EXCLUSIVE: "True"
+    CUSTOM_DIRECTIVES: "['#SBATCH --gpus-per-node=8', '#SBATCH --hint=nomultithread']"
+
+REQUEST:
+  RESOLUTION: standard

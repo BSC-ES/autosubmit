@@ -1,0 +1,166 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+from datetime import datetime, timedelta
+
+import pytest
+
+from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
+from autosubmit.job.job_list import JobList
+from autosubmit.job.job_packages import (
+    JobPackageHorizontal,
+    JobPackageSimple,
+    JobPackageVertical,
+)
+from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform
+
+
+@pytest.fixture
+def setup_as_conf(autosubmit_config, tmpdir):
+    exp_data = {
+        "WRAPPERS": {
+            "WRAPPERS": {
+                "JOBS_IN_WRAPPER": "dummysection"
+            }
+        },
+        "LOCAL_ROOT_DIR": f"{tmpdir.strpath}",
+        "LOCAL_TMP_DIR": f'{tmpdir.strpath}',
+        "LOCAL_ASLOG_DIR": f"{tmpdir.strpath}",
+        "PLATFORMS": {
+            "PYTEST-UNSUPPORTED": {
+                "TYPE": "unknown",
+                "host": "",
+                "user": "",
+                "project": "",
+                "scratch_dir": "",
+                "MAX_WALLCLOCK": "",
+                "DISABLE_RECOVERY_THREADS": True
+            }
+        },
+
+    }
+    as_conf = autosubmit_config("random-id", exp_data)
+    return as_conf
+
+
+@pytest.fixture
+def new_job_list(setup_as_conf, tmpdir):
+    job_list = JobList("random-id", setup_as_conf, YAMLParserFactory())
+
+    return job_list
+
+
+@pytest.fixture
+def new_platform_mock(mocker, tmpdir):
+    dummy_platform = mocker.MagicMock(autospec=SlurmPlatform)
+    # Add here as many attributes as needed
+    dummy_platform.name = 'dummy_platform'
+    dummy_platform.max_wallclock = "02:00"
+
+    # When proc = 1, the platform used will be serial, so just nest the defined platform.
+    dummy_platform.serial_platform = dummy_platform
+    return dummy_platform
+
+
+def new_packages(as_conf, dummy_jobs):
+    packages = [
+        JobPackageSimple([dummy_jobs[0]]),
+        JobPackageVertical(dummy_jobs, configuration=as_conf),
+        JobPackageHorizontal(dummy_jobs, configuration=as_conf),
+    ]
+    for package in packages:
+        if not isinstance(package, JobPackageSimple):
+            package._name = "wrapped"
+    return packages
+
+
+def setup_jobs(dummy_jobs, new_platform_mock, as_conf):
+    for job in dummy_jobs:
+        job._platform = new_platform_mock
+        job.processors = 2
+        job.section = "dummysection"
+        job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
+        job.wallclock = "00:01"
+        start_time = datetime.now() - timedelta(minutes=1)
+        job.start_time = start_time
+        job.start_time_timestamp = start_time.strftime('%Y%m%d%H%M%S')
+
+
+
+def test_parse_time(new_platform_mock, autosubmit_config):
+    job = Job("dummy-1", 1, Status.SUBMITTED, 0)
+    as_conf = autosubmit_config("t000", {})
+    setup_jobs([job], new_platform_mock, as_conf)
+    assert job.parse_time("0000") is None
+    assert job.parse_time("00:01") == timedelta(seconds=60)
+
+
+def test_is_over_wallclock(new_platform_mock, autosubmit_config):
+    job = Job("dummy-1", 1, Status.SUBMITTED, 0)
+    as_conf = autosubmit_config("t000", {})
+    setup_jobs([job], new_platform_mock, as_conf)
+    job.wallclock = "00:01"
+    assert job.is_over_wallclock() is False
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
+    assert job.is_over_wallclock() is True
+
+
+@pytest.mark.parametrize(
+    "platform_class, platform_name",
+    [(SlurmPlatform, "Slurm"), (PsPlatform, "PS"), (PsPlatform, "PJM")],
+    ids=["SlurmPlatform", "PsPlatform", "PjmPlatform"]
+)
+def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platform_class, platform_name, mocker):
+    platform_instance = platform_class("dummy", f"{platform_name}-dummy", setup_as_conf.experiment_data)
+    job = Job("dummy-1", 1, Status.RUNNING, 0)
+    setup_jobs([job], platform_instance, setup_as_conf)
+    job.wallclock = "00:01"
+    platform_instance.get_completed_job_names = mocker.MagicMock(return_value=[])
+    job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING)
+    assert job_status == Status.RUNNING
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
+    platform_instance.get_completed_job_names = mocker.MagicMock(return_value=[])
+    job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING)
+    assert job_status == Status.FAILED
+    # check platform_instance is called
+    platform_instance.send_command = mocker.MagicMock()
+    job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
+    assert job_status == Status.FAILED
+    platform_instance.send_command.assert_called_once()
+    platform_instance.cancel_cmd = None
+    platform_instance.send_command = mocker.MagicMock()
+    platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
+    platform_instance.send_command.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "platform_class, platform_name",
+    [(SlurmPlatform, "Slurm"), (PsPlatform, "PS"), (PsPlatform, "PJM")],
+    ids=["SlurmPlatform", "PsPlatform", "PjmPlatform"]
+)
+def test_platform_job_is_over_wallclock_force_failure(setup_as_conf, new_platform_mock, platform_class, platform_name,
+                                                      mocker):
+    platform_instance = platform_class("dummy", f"{platform_name}-dummy", setup_as_conf.experiment_data)
+    job = Job("dummy-1", 1, Status.RUNNING, 0)
+    setup_jobs([job], platform_instance, setup_as_conf)
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
+    job.platform.get_completed_files = mocker.MagicMock(side_effect=Exception("Error"))
+    job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
+    assert job_status == Status.FAILED

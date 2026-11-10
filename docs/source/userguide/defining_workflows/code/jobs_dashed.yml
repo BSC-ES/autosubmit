@@ -1,0 +1,15 @@
+JOBS:
+  GET_FILES:
+    SCRIPT: 'sleep 0'
+    RUNNING: chunk
+
+  IT:
+    SCRIPT: 'sleep 0'
+    RUNNING: chunk
+    QUEUE: debug
+
+  CALC_STATS:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: IT GET_FILES ?
+    RUNNING: chunk
+    SYNCHRONIZE: member

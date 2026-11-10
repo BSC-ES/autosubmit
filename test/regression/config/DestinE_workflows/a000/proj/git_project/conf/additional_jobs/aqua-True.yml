@@ -1,0 +1,72 @@
+JOBS:
+  DN:
+    DEPENDENCIES: REMOTE_SETUP DN-1
+    RETRIALS: 3
+    DELAY_RETRY_TIME: +11
+    FILE: "templates/dn.sh,conf/mother_request.yml"
+    RUNNING: chunk
+    WALLCLOCK: '02:00'
+    SPLITS: '1'
+    PLATFORM: "%DEFAULT.HPCARCH%-login"
+    CHECK: on_submission
+  LRA_GENERATOR:
+    DEPENDENCIES: DN
+    FILE: templates/aqua/lra_generator.sh,templates/aqua/only_lra.yaml
+    NODES: 1
+    PROCESSORS: '%CURRENT_PROCESSORS_PER_NODE%'
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    TASKS: 0
+    THREADS: 1
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    EXCLUSIVE: "True"
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    FREQUENCY: 1
+    CHECK: on_submission
+  AQUA_ANALYSIS:
+    DEPENDENCIES: LRA_GENERATOR
+    FILE: templates/aqua/aqua_analysis.sh
+    NODES: 1
+    PROCESSORS: '%CURRENT_PROCESSORS_PER_NODE%'
+    TASKS: 0
+    THREADS: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    EXCLUSIVE: "True"
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    FREQUENCY: 1
+    CHECK: on_submission
+#  AQUA_PUSH:
+#    DEPENDENCIES: AQUA_ANALYSIS
+#    FILE: templates/aqua/aqua_push.sh
+#    PLATFORM: local
+#    RUNNING: chunk
+#    WALLCLOCK: 02:00
+#    FREQUENCY: 1
+  REMOTE_SETUP:
+    FILE: templates/remote_setup.sh,templates/fdb/confignative.yaml,templates/fdb/configlatlon.yaml,templates/fdb/config.yaml,templates/aqua/config_catalog.yaml
+
+AQUA:
+  CONTAINER_VERSION: "0.11.3"
+  CATALOG_NAME: mn5-phase2 # TO-DO: should be different for each platform
+  SOURCE_SFC: hourly-native-sfc
+  VARS_SFC: "['mtpr', '2t', 'skt', 'msl', 'tcc', 'lcc', 'hcc', 'mcc', 'sd', 'tciw', 'tclw', 'mer', 'msr', 'mslhf', 'msshf', 'msnswrf', 'msnlwrf', 'msdwlwrf', 'msdwswrf', 'mtnswrf', 'mtnlwrf', 'mtdwswrf', 'mntss', 'metss', 'msror']"
+  WORKERS_SFC: 16
+  SOURCE_PL: hourly-native-pl
+  VARS_PL: "['q', 't', 'u', 'v']"
+  WORKERS_PL: 6
+  SOURCE_HL: hourly-native-hl
+  VARS_HL: ""
+  WORKERS_HL: 0
+  SOURCE_O2D: daily-native-o2d
+  VARS_O2D: "['avg_tos', 'avg_sithick', 'avg_siconc', 'avg_sos', 'avg_hc700m']"
+  WORKERS_O2D: 12
+  SOURCE_O3D: daily-native-o3d
+  VARS_O3D: " ['avg_thetao', 'avg_so']"
+  WORKERS_O3D: 3
+  SOURCE_SOL: hourly-native-sol
+  VARS_SOL: ""
+  WORKERS_SOL: 0
+  ECCODES_PATH: /gpfs/scratch/bsc32/bsc032655/opt/eccodes-2.32.6/definitions
+

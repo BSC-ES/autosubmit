@@ -1,0 +1,24 @@
+JOBS:
+  DQC:
+    FILE: templates/dqc.sh
+    FOR:
+      NAME: ["BASIC", "FULL"]
+      DEPENDENCIES: ["SIM", "DQC_BASIC"]
+      # Activates/desactivates checkers
+      CHECK_STANDARD_COMPLIANCE: ["False", "True"]
+      CHECK_SPATIAL_COMPLETENESS: ["True", "True"]
+      CHECK_SPATIAL_CONSISTENCY: ["True", "True"]
+      CHECK_PHYSICAL_PLAUSIBILITY: ["True", "True"]
+    WALLCLOCK: "00:05"
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 16
+    RUNNING: chunk
+    CHECK: on_submission
+
+CONFIGURATION:
+  DQC_PROFILE_ROOT: "%HPCROOTDIR%/profiles"
+  DQC_PROFILE_PATH: "%CONFIGURATION.DQC_PROFILE_ROOT%/%MODEL.NAME%"

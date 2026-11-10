@@ -1,0 +1,248 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Integration test for ``Autosubmit._copy_code``.
+
+TODO: This test probably belongs somewhere else -- we will know once we split
+      ``autosubmit/autosubmit.py`` into smaller parts.
+"""
+
+from pathlib import Path
+from shutil import rmtree
+from subprocess import CalledProcessError
+
+import pytest
+
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.manage import create, refresh
+from autosubmit.log.log import AutosubmitCritical
+
+
+def test_copy_code_local_project_destination_is_file(autosubmit_exp):
+    """Test that Autosubmit fails to copy the project, as the destination is an existing file."""
+    existing_file = str(Path(__file__).resolve())
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit_exp(
+            experiment_data={
+                "PROJECT": {
+                    "PROJECT_TYPE": "LOCAL",
+                    "PROJECT_DESTINATION": "local_project",
+                },
+                "LOCAL": {"PROJECT_PATH": existing_file},
+            }
+        )
+
+    assert "Local project path is not a valid" in str(cm.value.message)
+    assert existing_file in str(cm.value.message)
+
+
+def test_copy_code_local_project_destination_is_not_specified(autosubmit_exp):
+    """Test that Autosubmit fails to copy the project, as the destination is an existing file."""
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit_exp(
+            experiment_data={
+                "PROJECT": {
+                    "PROJECT_TYPE": "LOCAL",
+                    "PROJECT_DESTINATION": "local_project",
+                },
+                "LOCAL": {"PROJECT_PATH": None},
+            }
+        )
+
+    assert "Empty project path! Please change this parameter to a valid one" in str(
+        cm.value.message
+    )
+
+
+def test_copy_code_local_project_destination_is_an_empty_string(autosubmit_exp):
+    """Test that Autosubmit fails to copy the project, as the destination is an existing file."""
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit_exp(
+            experiment_data={
+                "PROJECT": {
+                    "PROJECT_TYPE": "LOCAL",
+                    "PROJECT_DESTINATION": "local_project",
+                },
+                "LOCAL": {"PROJECT_PATH": ""},
+            }
+        )
+
+    assert "Empty project path!" in str(cm.value.message)
+
+
+def test_copy_code_local_project_local_destination_does_not_exist(
+    autosubmit_exp, tmp_path
+):
+    """Test that Autosubmit copies when the local destination does not exist."""
+    project_path = tmp_path / "project"
+    project_path.mkdir()
+    with project_path / "ROBOTS.txt" as f:
+        f.write_text("test")
+    exp = autosubmit_exp(
+        experiment_data={
+            "PROJECT": {
+                "PROJECT_TYPE": "LOCAL",
+                "PROJECT_DESTINATION": "local_project",
+            },
+            "LOCAL": {"PROJECT_PATH": str(project_path)},
+        }
+    )
+
+    exp_project_path = Path(
+        BasicConfig.LOCAL_ROOT_DIR,
+        exp.expid,
+        BasicConfig.LOCAL_PROJ_DIR,
+    )
+    project_destination = exp.as_conf.get_project_destination()
+    local_destination = exp_project_path / project_destination
+
+    # ``autosubmit_exp`` will call create, so we create a new file.
+    with project_path / "AGENTS.txt" as f:
+        f.write_text("noop")
+
+    assert (local_destination / "ROBOTS.txt").exists()
+    assert not (local_destination / "AGENTS.txt").exists()
+
+    rmtree(local_destination)
+
+    create(exp.expid, noplot=True, hide=True)
+
+    assert (local_destination / "AGENTS.txt").exists()
+
+
+def test_copy_code_local_project_cp_error(autosubmit_exp, tmp_path, mocker):
+    """Test that we catch errors when ``cp`` fails."""
+    project_path = tmp_path / "project"
+    project_path.mkdir()
+    with project_path / "ROBOTS.txt" as f:
+        f.write_text("test")
+
+    exp = autosubmit_exp(
+        experiment_data={
+            "PROJECT": {
+                "PROJECT_TYPE": "LOCAL",
+                "PROJECT_DESTINATION": "local_project",
+            },
+            "LOCAL": {"PROJECT_PATH": str(project_path)},
+        },
+        create=False,
+    )
+
+    mocker.patch(
+        "autosubmit.experiment.manage.subprocess.check_output",
+        side_effect=CalledProcessError(1, "test"),
+    )
+
+    with pytest.raises(AutosubmitCritical) as cm:
+        refresh(exp.expid, None, None)
+
+    assert "Cannot copy" in str(cm.value.message)
+
+    # Failing to copy the contents results in the proj folder being deleted for a fresh try.
+    proj_dir = tmp_path / exp.expid / "proj"
+    assert not proj_dir.exists()
+    assert not (proj_dir / "local_project").exists()
+
+
+def test_copy_code_local_project_local_destination_exists_force(
+    autosubmit_exp, tmp_path, mocker
+):
+    """Test that Autosubmit syncs existing directories when force is enabled."""
+    project_path = tmp_path / "project"
+    project_path.mkdir()
+    with project_path / "ROBOTS.txt" as f:
+        f.write_text("test")
+    exp = autosubmit_exp(
+        experiment_data={
+            "PROJECT": {
+                "PROJECT_TYPE": "LOCAL",
+                "PROJECT_DESTINATION": "local_project",
+            },
+            "LOCAL": {"PROJECT_PATH": str(project_path)},
+        }
+    )
+
+    exp_project_path = Path(
+        BasicConfig.LOCAL_ROOT_DIR,
+        exp.expid,
+        BasicConfig.LOCAL_PROJ_DIR,
+    )
+    project_destination = exp.as_conf.get_project_destination()
+    local_destination = exp_project_path / project_destination
+
+    # ``autosubmit_exp`` will call create, so we create a new file.
+    with project_path / "AGENTS.txt" as f:
+        f.write_text("noop")
+
+    assert (local_destination / "ROBOTS.txt").exists()
+    assert not (local_destination / "AGENTS.txt").exists()
+
+    # Create does not force the sync.
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
+    create(exp.expid, noplot=True, hide=True)
+    assert not (local_destination / "AGENTS.txt").exists()
+    # And since the folder already exists, we should have informed the user nothing was synced.
+    # There will be a few calls to ``Log.info``, but here we confirm that at least one is right.
+    assert any(
+        "will not sync" in call[0][0] for call in mocked_log.info.call_args_list
+    )
+
+    # Refresh does.
+    refresh(exp.expid, None, None)
+    assert (local_destination / "AGENTS.txt").exists()
+
+
+def test_copy_code_local_project_rsync_error(autosubmit_exp, tmp_path, mocker):
+    """Test that catch errors when ``rsync`` fails.."""
+    project_path = tmp_path / "project"
+    project_path.mkdir()
+    with project_path / "ROBOTS.txt" as f:
+        f.write_text("test")
+    exp = autosubmit_exp(
+        experiment_data={
+            "PROJECT": {
+                "PROJECT_TYPE": "LOCAL",
+                "PROJECT_DESTINATION": "local_project",
+            },
+            "LOCAL": {"PROJECT_PATH": str(project_path)},
+        }
+    )
+
+    exp_project_path = Path(
+        BasicConfig.LOCAL_ROOT_DIR,
+        exp.expid,
+        BasicConfig.LOCAL_PROJ_DIR,
+    )
+    project_destination = exp.as_conf.get_project_destination()
+    local_destination = exp_project_path / project_destination
+
+    mocker.patch(
+        "autosubmit.experiment.manage.subprocess.call",
+        side_effect=CalledProcessError(1, "test"),
+    )
+
+    with pytest.raises(AutosubmitCritical) as cm:
+        refresh(exp.expid, None, None)
+
+    assert not (local_destination / "AGENTS.txt").exists()
+    assert "Cannot rsync" in str(cm.value.message)
+
+    # Failing to rsync the contents, the proj folder is left as-is.
+    proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / exp.expid / "proj"
+    assert proj_dir.exists
+    assert (proj_dir / "local_project").exists()
+    assert (proj_dir / "local_project" / "ROBOTS.txt").exists()

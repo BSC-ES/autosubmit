@@ -1,0 +1,41 @@
+experiment:
+  DATELIST: 20000101 20000201
+  MEMBERS: "fc0 fc1"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '3'
+  CALENDAR: standard
+JOBS:
+  LOCAL_SETUP:
+    FILE: templates/local_setup.sh
+    PLATFORM: marenostrum_archive
+    RUNNING: once
+    NOTIFY_ON: COMPLETED
+  INI:
+    FILE: templates/00_ini.sh
+    DEPENDENCIES: LOCAL_SETUP
+    RUNNING: member
+    NOTIFY_ON: COMPLETED
+  SIM:
+    FILE: templates/05b_sim.sh
+    DEPENDENCIES:
+      INI:
+      SIM-1:
+    RUNNING: chunk
+    PROCESSORS: '68'
+    WALLCLOCK: 00:12
+    NOTIFY_ON: FAILED
+
+  POST:
+    FILE: templates/10_post.sh
+    DEPENDENCIES:
+      SIM:
+    RUNNING: chunk
+    NOTIFY_ON: COMPLETED
+  CLEAN:
+    FILE: templates/99_clean.sh
+    DEPENDENCIES:
+      POST:
+    RUNNING: chunk
+    NOTIFY_ON: COMPLETED
+

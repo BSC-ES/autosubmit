@@ -1,0 +1,70 @@
+# This is the Coverage.py configuration file. This is used by CI when running
+# the tests and collecting coverage
+
+[run]
+branch = True
+cover_pylib = False
+# multiprocessing is not needed here because we are using spawn, and not fork.
+# So even with multiprocessing, the patched code (from coveragepy) would not
+# be used because of the new interpreter being launched.
+concurrency = thread
+disable_warnings =
+    trace-changed
+    module-not-python
+    module-not-imported
+    no-data-collected
+    module-not-measured
+omit =
+    tests/*
+    autosubmit/job/template/common.py
+source =
+    autosubmit
+    */autosubmit
+    /home/runner/work/autosubmit/autosubmit/autosubmit
+timid = False
+sigterm = True
+parallel = True
+patch =
+  _exit
+
+[report]
+# Preferred over exclude_lines, already excludes pragma no cover and ... (ellipsis);
+# ref: https://coverage.readthedocs.io/en/7.12.0/config.html#report-exclude-also
+exclude_also =
+    # Don't complain if tests don't hit defensive assertion code:
+    raise NotImplementedError
+    raise NotImplemented
+    return NotImplemented
+
+    # Ignore type checking code:
+    if (typing\.)?TYPE_CHECKING:
+    @overload( |$)
+
+    # Ignore abstract methods
+    @(abc\.)?abstractmethod
+
+    # Ignore pass statements
+    ^\s*pass\s*$
+
+    # Main function
+    if __name__ == .__main__.:
+
+    # Protocol classes
+    class .*\bProtocol\):
+
+fail_under=0
+ignore_errors = False
+omit =
+    tests/*
+    autosubmit/job/template/common.py
+precision = 2
+show_missing = False
+skip_covered = False
+sort = Name
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml
+package_depth = 99

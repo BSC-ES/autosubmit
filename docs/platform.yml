@@ -1,0 +1,13 @@
+
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: False
+    HOST: '127.0.0.1'
+    MAX_WALLCLOCK: '01:00'
+    PROJECT: 'group'
+    QUEUE: 'gp_debug'
+    SCRATCH_DIR: '/tmp/scratch/'
+    TEMP_DIR: ''
+    TYPE: 'slurm'
+    USER: 'root'
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10

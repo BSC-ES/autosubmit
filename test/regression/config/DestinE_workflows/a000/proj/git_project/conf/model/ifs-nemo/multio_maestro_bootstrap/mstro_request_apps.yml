@@ -1,0 +1,38 @@
+GSVREQUEST: #raw data
+   domain: g
+   class: rd
+   type: fc
+   expver: hz9n
+   stream: lwda
+   anoffset: 9
+   levtype: "sfc"
+   date: "20200120"
+   time: "0000"
+   step: 0
+   param: ["2t", "100v"]
+
+APP:
+   other: "empty"
+
+OPAREQUEST:
+  1:
+    variable: "2t"
+    stat: "mean"
+    stat_freq: "daily"
+    output_freq: "daily"
+    time_step: 1440 # in minutes, 60*timestep length in hours TODO: do that automatically
+    save: True
+    checkpoint: True
+    checkpoint_filepath: "/scratch/project_465000454/tmp/a193/LOG_a193"
+    save_filepath: "/scratch/project_465000454/tmp/a193/LOG_a193"
+  2:
+    variable: "100v"
+    stat: "mean"
+    stat_freq: "daily"
+    output_freq: "daily"
+    time_step: 1440 # in minutes, 60*timestep length in hours #TODO: do it automatically
+    save: True
+    checkpoint: True
+    checkpoint_filepath: "/scratch/project_465000454/tmp/a193/LOG_a193"
+    save_filepath: "/scratch/project_465000454/tmp/a193/LOG_a193"
+

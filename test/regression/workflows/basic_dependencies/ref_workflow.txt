@@ -1,0 +1,14 @@
+## String representation of Job List [13]  ##
+a00g_LOCAL_SETUP ~ [1 child]
+|  a00g_REMOTE_SETUP ~ [1 child]
+|  |  a00g_19900101_fc0_INI ~ [1 child]
+|  |  |  a00g_19900101_fc0_1_SIM ~ [2 children]
+|  |  |  |  a00g_19900101_fc0_1_POST ~ [1 child]
+|  |  |  |  |  a00g_19900101_fc0_1_CLEAN ~ [1 child]
+|  |  |  |  |  |  a00g_19900101_fc0_3_SIM ~ [1 child]
+|  |  |  |  |  |  |  a00g_19900101_fc0_3_POST ~ [1 child]
+|  |  |  |  |  |  |  |  a00g_19900101_fc0_3_CLEAN ~ [1 child]
+|  |  |  |  |  |  |  |  |  a00g_19900101_fc0_TRANSFER
+|  |  |  |  a00g_19900101_fc0_2_SIM ~ [2 children]
+|  |  |  |  |  a00g_19900101_fc0_2_POST ~ [1 child]
+|  |  |  |  |  |  a00g_19900101_fc0_2_CLEAN ~ [1 child]

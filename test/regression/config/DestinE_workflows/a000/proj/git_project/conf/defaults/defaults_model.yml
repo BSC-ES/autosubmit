@@ -1,0 +1,10 @@
+CONFIGURATION:
+  ADDITIONAL_JOBS:
+    TRANSFER: "False"
+    BACKUP: "False"
+    WIPE: "False"
+    MEMORY_CHECKER: "False"
+    DQC: "True"
+    CLEAN: "False"
+    AQUA: "False"
+  IO_ON: "True"

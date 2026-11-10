@@ -1,0 +1,17 @@
+JOBS:
+  A:
+    FILE: 'sleep 0'
+    RUNNING: once
+    SPLITS: 4
+
+  B:
+    FILE: 'sleep 0'
+    RUNNING: once
+    SPLITS: 4
+    DEPENDENCIES:
+      A:
+        SPLITS_FROM:
+          '[2:4]':
+            SPLITS_TO: previous
+          '1':
+            SPLITS_TO: none

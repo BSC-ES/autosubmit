@@ -1,0 +1,33 @@
+## In this file we define the configurations used in the CONTROL runs (1950-1980) 
+
+experiment:
+    DATELIST: 19500101
+    MEMBERS: fc0
+    CHUNKSIZEUNIT: month
+    CHUNKSIZE: 1
+    NUMCHUNKS: 120
+    CALENDAR: standard
+
+PLATFORMS:
+   LUMI:
+        PARTITION: "standard"
+        MAX_WALLCLOCK: "24:00"
+
+JOBS:
+   SIM:
+       WALLCLOCK: "02:30"
+       RETRIALS: 5
+
+CONFIGURATION:
+        IFS:
+                MULTIO_PLANS: "control"
+        NEMO:
+                MULTIO_PLANS: "control"
+        RAPS_EXPERIMENT: "control"
+
+REQUEST:
+        EXPERIMENT: "cont"
+        ACTIVITY: "HighResMIP"
+        GENERATION: 1
+        REALIZATION: 1
+

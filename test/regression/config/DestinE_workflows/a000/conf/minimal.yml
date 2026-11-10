@@ -1,0 +1,26 @@
+CONFIG:
+  # Current version of Autosubmit.
+  AUTOSUBMIT_VERSION: "4.1.10"
+  # Total number of jobs in the workflow.
+  TOTALJOBS: 20
+  # Maximum number of jobs permitted in the waiting status.
+  MAXWAITINGJOBS: 20
+DEFAULT:
+  # Job experiment ID.
+  EXPID: "a1sr"
+  # Default HPC platform name.
+  HPCARCH: "MARENOSTRUM5"
+  #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
+  # Custom configuration location.
+  CUSTOM_CONFIG: "%PROJDIR%/conf/bootstrap/"
+PROJECT:
+  # Type of the project.
+  PROJECT_TYPE: git
+  # Folder to hold the project sources.
+  PROJECT_DESTINATION: git_project
+GIT:
+  PROJECT_ORIGIN: "https://earth.bsc.es/gitlab/digital-twins/de_340-2/workflow"
+  PROJECT_BRANCH: "main"
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: 'gsv_interface one-pass bias_adjustment energy_onshore dvc-cache-de340 data-portfolio catalog'
+  FETCH_SINGLE_BRANCH: true

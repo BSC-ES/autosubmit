@@ -39,6 +39,15 @@ def test_setstatus_logs_deleted_working_directory(autosubmit_exp, mocker):
             }
         }
     )
+    jobs_before = load_job_list(
+        experiment.expid,
+        experiment.as_conf,
+        new=False,
+        full_load=True,
+        check_failed_jobs=True,
+    ).get_job_list()
+    assert len(jobs_before) == 1
+
     log_info = mocker.patch("autosubmit.log.log.Log.info")
     traceability_os = mocker.patch("autosubmit.scripts._traceability.os")
     traceability_os.getpid.return_value = os.getpid()
@@ -50,13 +59,13 @@ def test_setstatus_logs_deleted_working_directory(autosubmit_exp, mocker):
             experiment.expid,
             "--status_final",
             "COMPLETED",
-            "--filter_status",
-            "WAITING",
+            "-fl",
+            jobs_before[0].name,
             "--save",
         ]
     )
 
-    assert result is True
+    assert result == 0
     log_info.assert_any_call("  Working directory: <deleted>")
     jobs = load_job_list(
         experiment.expid,

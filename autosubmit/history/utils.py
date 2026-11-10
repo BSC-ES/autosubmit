@@ -1,0 +1,70 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+
+import os
+from datetime import datetime, timezone
+from typing import Any
+
+from autosubmit.config.basicconfig import BasicConfig
+
+LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
+DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S%z'
+
+DEFAULT_HISTORICAL_LOGS_DIR = BasicConfig.HISTORICAL_LOG_DIR
+
+
+def calculate_queue_time_in_seconds(submit_time: float, start_time: float) -> int:
+    """Calculates queue time in seconds based on submit and start timestamps."""
+    if submit_time > 0 and start_time > 0 and (start_time - submit_time) > 0:
+        return int(start_time - submit_time)
+    return 0
+
+
+def calculate_run_time_in_seconds(start_time: float, finish_time: float) -> int:
+    """Calculates run time in seconds based on start and finish timestamps."""
+    if finish_time > 0 and start_time > 0 and (finish_time - start_time) > 0:
+        return int(finish_time - start_time)
+    return 0
+
+
+def get_current_datetime() -> str:
+    """Returns the current time in format '%Y-%m-%dT%H:%M:%S%z'."""
+    return datetime.now(LOCAL_TZ).strftime(DATETIME_FORMAT)
+
+
+def get_current_datetime_if_none(argument: Any) -> str | None:
+    """ Returns the current time in format '%Y-%m-%dT%H:%M:%S%z' if the supplied argument is None, else return argument. """
+    if argument is None:
+        return get_current_datetime()
+    else:
+        return argument
+
+
+def create_file_with_full_permissions(path: str) -> None:
+    """Create a file with full permissions."""
+    os.umask(0)
+    os.open(path, os.O_WRONLY | os.O_CREAT, 0o777)
+
+
+class SupportedStatus:
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    QUEUING = "QUEUING"
+    SUBMITTED = "SUBMITTED"
+    RUNNING = "RUNNING"
+    SUSPENDED = "SUSPENDED"

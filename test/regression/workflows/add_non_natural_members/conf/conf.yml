@@ -1,0 +1,63 @@
+CONFIG:
+  AUTOSUBMIT_VERSION: 4.1.15
+  MAXWAITINGJOBS: '30'
+  TOTALJOBS: '30'
+  SAFETYSLEEPTIME: 10
+  RETRIALS: 0
+MAIL:
+  NOTIFICATIONS: false
+  TO: ''
+COMMUNICATIONS:
+  API: paramiko
+STORAGE:
+  TYPE: pkl
+  COPY_REMOTE_LOGS: 'True'
+MIGRATE:
+  TO_USER: ''
+DEFAULT:
+  EXPID: a00h
+  HPCARCH: MARENOSTRUM5
+EXPERIMENT:
+  DATELIST: '20240102'
+  MEMBERS: fc00 fc01 fc02
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: 1
+  NUMCHUNKS: 3
+  CHUNKINI: ''
+  CALENDAR: standard
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: git_project
+SVN:
+  PROJECT_URL: ''
+  PROJECT_REVISION: ''
+LOCAL:
+  PROJECT_PATH: ''
+PROJECT_FILES:
+  FILE_PROJECT_CONF: ''
+  FILE_JOBS_CONF: ''
+  JOB_SCRIPTS_TYPE: ''
+RERUN:
+  RERUN: 'FALSE'
+  CHUNKLIST: ''
+JOBS:
+  SYNCHRONIZE:
+    FILE: templates/synchronize.tmpl.sh
+    WALLCLOCK: 01:00
+    RUNNING: once
+  CONFIG_SETUP:
+    FILE: templates/config_setup.tmpl.sh
+    DEPENDENCIES:
+      SYNCHRONIZE:
+      CONFIG_SETUP:
+        members_from:
+          all:
+            members_to: fc00
+    WALLCLOCK: 00:30
+    RUNNING: member
+  SIM:
+    FILE: templates/config_setup.tmpl.sh
+    DEPENDENCIES:
+      CONFIG_SETUP:
+    WALLCLOCK: 00:30
+    RUNNING: member

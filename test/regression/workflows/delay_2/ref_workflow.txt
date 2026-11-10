@@ -1,0 +1,17 @@
+## String representation of Job List [16]  ##
+a009_20000101_fc0_INI ~ [1 child]
+|  a009_20000101_fc0_1_SIM ~ [2 children]
+|  |  a009_20000101_fc0_1_POST
+|  |  a009_20000101_fc0_2_SIM ~ [2 children]
+|  |  |  a009_20000101_fc0_2_POST
+|  |  |  a009_20000101_fc0_3_SIM ~ [1 child]
+|  |  |  |  a009_20000101_fc0_3_ASIM ~ [1 child]
+|  |  |  |  |  a009_20000101_fc0_3_POST
+a009_20000101_fc1_INI ~ [1 child]
+|  a009_20000101_fc1_1_SIM ~ [2 children]
+|  |  a009_20000101_fc1_1_POST
+|  |  a009_20000101_fc1_2_SIM ~ [2 children]
+|  |  |  a009_20000101_fc1_2_POST
+|  |  |  a009_20000101_fc1_3_SIM ~ [1 child]
+|  |  |  |  a009_20000101_fc1_3_ASIM ~ [1 child]
+|  |  |  |  |  a009_20000101_fc1_3_POST

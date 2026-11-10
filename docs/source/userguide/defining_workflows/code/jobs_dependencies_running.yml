@@ -1,0 +1,19 @@
+JOBS:
+  INI:
+    SCRIPT: 'sleep 0'
+    RUNNING: member
+
+  SIM:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: ini sim-1
+    RUNNING: chunk
+
+  POSTPROCESS:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: sim
+    RUNNING: chunk
+
+  COMBINE:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: postprocess
+    RUNNING: member

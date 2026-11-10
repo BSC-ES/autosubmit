@@ -1,0 +1,9 @@
+## String representation of Job List [8]  ##
+a007_INI ~ [1 child]
+|  a007_SIM ~ [3 children]
+|  |  a007_1_ASIM ~ [3 children]
+|  |  |  a007_1_POST
+|  |  |  a007_2_POST
+|  |  |  a007_3_POST
+|  |  a007_2_ASIM ~ [2 children]
+|  |  a007_3_ASIM ~ [2 children]

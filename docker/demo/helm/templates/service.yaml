@@ -1,0 +1,23 @@
+# Add service
+apiVersion: v1
+kind: Service
+metadata:
+  name: autosubmit-demo-service
+  labels:
+    app: autosubmit-demo
+spec:
+  selector:
+    app: autosubmit-demo
+  ports:
+    - name: jupyterlab-port
+      protocol: TCP
+      port: 8888
+      targetPort: 8888
+    - name: api-port
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+    - name: gui-port
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

@@ -1,0 +1,53 @@
+## In this file we define the simulations that are being run as defined
+## in M340.5.1.1) (?)
+
+experiment:
+    DATELIST: 20170101
+    MEMBERS: fc0
+    CHUNKSIZEUNIT: month
+    CHUNKSIZE: 1
+    NUMCHUNKS: 84
+    CALENDAR: standard
+
+JOBS:
+    SIM:
+      WALLCLOCK: "02:30"
+
+CONFIGURATION:
+  RAPS_EXPERIMENT: "control"
+  IFS:
+    EXPVER: awi4
+    GTYPE: tco
+    RESOL: 1279
+    LEVELS: 137
+    LABEL: LWDA
+    IO_NODES: 15
+    IO_PPN: 16
+  FESOM:
+    IO_NODES: 10
+    IO_PPN: 8
+  RAPS_USER_FLAGS: "--destine-nudging-forcing=/projappl/project_465000454/ajohn/data/nudgefiles/TCO1279L137/sh/ --destine-nudging-nrlxsmax=60 --destine-nudging-xrlxdi=1.0 --fixyear=1950"
+
+WRAPPERS:
+  WRAPPER_V:
+    TYPE: "vertical"
+    JOBS_IN_WRAPPER: "SIM"
+    RETRIALS: 2
+
+
+PLATFORMS:
+  LUMI:
+    TYPE: slurm
+    PARTITION: "standard"
+    MAX_WALLCLOCK: "48:00"
+    NODES: 201
+    TASKS: 16
+    THREADS: 8
+    EXCLUSIVE: "True"
+    CUSTOM_DIRECTIVES: "['#SBATCH --hint=nomultithread', '#SBATCH --mem=0']"
+
+REQUEST:
+  ACTIVITY: story-nudging
+  EXPERIMENT: cont
+  GENERATION: 1
+  REALIZATION: 1

@@ -1,0 +1,32 @@
+CONFIGURATION:
+  DQC_PROFILE: lowres
+  DATA_PORTFOLIO: production
+  ICON:
+    ATM_GID: "0043"
+    ATM_REF: "R02B04"
+    OCE_GID: "0036"
+    OCE_REF: "R02B04"
+
+    ATM_NPROMA: 32
+    OCE_NPROMA: 8
+
+    ATM_LEVELS: 90                    
+    ATM_HALFLEVELS: 91
+    OCE_LEVELS: 40                    
+    OCE_HALFLEVELS: 41 
+
+PLATFORMS:
+  LUMI:
+    WALLCLOCK: '00:30'
+    NODES: 4
+    TASKS: 32
+    THREADS: 4 
+    PARTITION: small
+    PROCESSORS_PER_NODE: 128
+  LEVANTE:
+    WALLCLOCK: '00:55'
+    NODES: 4
+    TASKS: 32
+    THREADS: 2
+    PARTITION: compute
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL --distribution=block:cyclic']"

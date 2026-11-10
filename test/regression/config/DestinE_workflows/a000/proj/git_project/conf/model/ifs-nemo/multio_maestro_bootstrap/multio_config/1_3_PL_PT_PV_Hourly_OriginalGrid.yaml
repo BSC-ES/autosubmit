@@ -1,0 +1,35 @@
+name: 'Output pt reduced_gg fields'
+enable: '{MULTIO_NEXTGEMS_PLANS_ENABLED}'
+actions:
+  - type: select
+    match:
+      - levtype: [pl, pt, pv]
+        paramId: [60, 129, 130, 131, 132, 133, 135, 157, 246]
+        gribEdition: 2
+        gridType: reduced_gg
+
+  - type: metadata-mapping
+    mapping: '{MULTIO_RAPS_PLANS_PATH}/General_Plans/mapping-climateDT-instant-fields.yaml'
+    overwrite-existing: true
+    enforce-match: true
+
+  - type: encode
+    format: grib
+    template: '{MULTIO_RAPS_TEMPLATES_PATH}/templates.{MULTIO_RAPS_GRID_TYPE}/reduced_gg_pt_grib2.tmpl'
+    overwrite:
+      resolution: high
+
+  - type: sink
+    sinks:
+      - type: file
+        enable: '{MULTIO_ENABLE_SINK_FILE}'
+        append: false
+        per-server: true
+        path: '{MULTIO_RAPS_OUTPUT_PATH}/01-OriginalGrid/01-Hourly/PL-1Hourly-OriginalGrid.grib'
+      - type: fdb5
+        enable: '{MULTIO_ENABLE_FDB}'
+        config:
+          fdb_home: '{MULTIO_NATIVE_GRID_FDB_HOME}'
+      - type: maestro
+        ready-cdo : false
+        schema: ".maestro.gsv."

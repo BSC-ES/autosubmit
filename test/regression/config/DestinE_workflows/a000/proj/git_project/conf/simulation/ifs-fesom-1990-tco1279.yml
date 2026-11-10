@@ -1,0 +1,35 @@
+## In this file we define the configuration used in the HISTORICAL run (1990-2020)
+
+experiment:
+    DATELIST: 19900101
+    MEMBERS: fc0
+    CHUNKSIZEUNIT: month
+    CHUNKSIZE: 1
+    NUMCHUNKS: 360
+    CALENDAR: standard
+
+PLATFORMS:
+   LUMI:
+        PARTITION: "standard-g"
+        MAX_WALLCLOCK: "48:00"
+
+JOBS:
+   SIM:
+       WALLCLOCK: "05:00"
+       RETRIALS: 5
+
+       #CONFIGURATION:
+       #        IFS:
+       #                MULTIO_PLANS: "historical"
+       #        NEMO:
+       #                MULTIO_PLANS: "historical"
+
+CONFIGURATION:
+    IFS:
+      EXPVER: i2hm
+
+REQUEST: ## ?? Aina: I don't know if this is OK because it doesn't have RAPS_EXPERIMENT
+  ACTIVITY: CMIP6
+  EXPERIMENT: hist
+  GENERATION: 1
+  REALIZATION: 1

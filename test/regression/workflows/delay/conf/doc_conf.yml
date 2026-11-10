@@ -1,0 +1,58 @@
+# Delay example https://autosubmit.readthedocs.io/en/master/userguide/defining_workflows/index.html
+
+experiment:
+  DATELIST: 19800101
+  MEMBERS: "fc00"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '10'
+  CALENDAR: standard
+JOBS:
+    LOCAL_SETUP:
+        FILE: compilation.sh
+        RUNNING: once
+    SYNCHRONIZE:
+        FILE: sync.sh
+        RUNNING: once
+        DEPENDENCIES: LOCAL_SETUP
+    REMOTE_SETUP:
+        FILE: remote.sh
+        RUNNING: once
+        DEPENDENCIES: SYNCHRONIZE
+    COMPILATION:
+        FILE: compilation.sh
+        RUNNING: once
+        DEPENDENCIES: REMOTE_SETUP
+    INI:
+        FILE: INI.SH
+        RUNNING: member
+        DEPENDENCIES: COMPILATION
+    SIM:
+        FILE: templates/sim.tmpl.sh
+        DEPENDENCIES:
+            INI:
+            SIM-1:
+            POST-1:
+              CHUNKS_FROM:
+                all:
+                    chunks_to: "1"
+            CLEAN-5:
+        RUNNING: chunk
+        WALLCLOCK: 0:30
+        PROCESSORS: 768
+    post:
+        FILE:  post.sh
+        DEPENDENCIES:  sim
+        RUNNING:  chunk
+    CLEAN:
+        FILE: cleans.h
+        DEPENDENCIES:  post
+        running:  chunk
+    CLEAN_MEMBER:
+        file: cleanm.h
+        DEPENDENCIES:  CLEAN
+        running: member
+    CLEAN_EXPERIMENT:
+        file: cleane.h
+        DEPENDENCIES:  CLEAN_MEMBER
+        running: once

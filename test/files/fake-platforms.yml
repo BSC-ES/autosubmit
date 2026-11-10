@@ -1,0 +1,76 @@
+PLATFORMS:
+  ARM:
+    TYPE: pjm
+    HOST: armlogin1.bsc.es,armlogin2.bsc.es,armlogin3.bsc.es
+    PROJECT: bsc32
+    USER: bsc32070
+    SCRATCH_DIR: /scratch
+    ADD_PROJECT_TO_HOST: 'False'
+    MAX_WALLCLOCK: 48:00
+    MAX_PROCESSORS: '2400'
+    PROCESSORS_PER_NODE: '48'
+    SERIAL_QUEUE: small
+    QUEUE: small
+  MARENOSTRUM4:
+    TYPE: slurm
+    HOST: mn1.bsc.es,mn2.bsc.es,mn3.bsc.es
+    PROJECT: bsc32
+    USER: bsc32070
+    SCRATCH_DIR: /gpfs/scratch
+    ADD_PROJECT_TO_HOST: 'False'
+    MAX_WALLCLOCK: 48:00
+    MAX_PROCESSORS: '2400'
+    PROCESSORS_PER_NODE: '48'
+    SERIAL_QUEUE: debug
+    QUEUE: debug
+  MARENOSTRUM_ARCHIVE:
+    TYPE: ps
+    HOST: dt01.bsc.es
+    PROJECT: bsc32
+    USER: bsc32070
+    SCRATCH_DIR: /gpfs/scratch
+    ADD_PROJECT_TO_HOST: 'False'
+    TEST_SUITE: 'False'
+  POWER9:
+    TYPE: slurm
+    HOST: plogin1.bsc.es
+    PROJECT: bsc32
+    USER: bsc32070
+    SCRATCH_DIR: /gpfs/scratch
+    ADD_PROJECT_TO_HOST: 'False'
+    TEST_SUITE: 'False'
+    SERIAL_QUEUE: debug
+    QUEUE: debug
+  TRANSFER_NODE:
+    TYPE: ps
+    HOST: dt01.bsc.es
+    PROJECT: bsc32
+    USER: bsc32070
+    ADD_PROJECT_TO_HOST: 'false'
+    SCRATCH_DIR: /gpfs/scratch
+  TRANSFER_NODE_BSCEARTH000:
+    TYPE: ps
+    HOST: bscearth000
+    USER: dbeltran
+    PROJECT: Earth
+    ADD_PROJECT_TO_HOST: 'false'
+    QUEUE: serial
+    SCRATCH_DIR: /esarchive/scratch
+  BSCEARTH000:
+    TYPE: ps
+    HOST: bscearth000
+    PROJECT: Earth
+    USER: dbeltran
+    SCRATCH_DIR: /esarchive/scratch
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: False
+    HOST: '127.0.0.1'
+    MAX_WALLCLOCK: '01:00'
+    PROJECT: 'group'
+    QUEUE: 'gp_debug'
+    SCRATCH_DIR: '/tmp/scratch/'
+    TEMP_DIR: ''
+    TYPE: 'slurm'
+    USER: 'root'
+    MAX_PROCESSORS: 1
+    PROCESSORS_PER_NODE: 1

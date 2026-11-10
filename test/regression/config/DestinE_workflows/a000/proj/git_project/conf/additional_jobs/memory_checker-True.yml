@@ -1,0 +1,13 @@
+JOBS:
+  CHECK_MEM:
+    FILE: templates/performance/check_mem.sh
+    PLATFORM: "%DEFAULT.HPCARCH%-login"
+    DEPENDENCIES:
+        SIM:
+           STATUS: "RUNNING"
+    RUNNING: chunk
+    WALLCLOCK: '00:30'
+    CHECK: on_submission
+
+RUN:
+        MEMORY_FREQUENCY: 30

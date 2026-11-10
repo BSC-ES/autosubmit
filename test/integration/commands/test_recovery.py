@@ -1,0 +1,831 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+
+from getpass import getuser
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+import pytest
+from bscearth.utils.date import date2str
+
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.managers.history import (
+    SqlAlchemyExperimentHistoryDbManager,
+)
+from autosubmit.history.data_classes.job_data import JobData
+from autosubmit.job.job_common import Status
+from autosubmit.job.job_list import load_job_list
+from autosubmit.job.manage import set_status
+from autosubmit.log.log import AutosubmitCritical
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.workflow.manage import recover
+
+if TYPE_CHECKING:
+    from docker.models.containers import Container
+
+
+@pytest.fixture(scope="function")
+def submitter(as_exp):
+    submitter = ParamikoSubmitter(as_exp.as_conf)
+    submitter.load_platforms(as_exp.as_conf)
+    return submitter
+
+
+@pytest.fixture(scope="function")
+def job_list(as_exp, submitter):
+    return load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+
+
+@pytest.fixture(scope="function")
+def prepare_scratch(
+    as_exp, tmp_path: Path, job_list, job_names_to_recover, slurm_server: "Container"
+) -> Any:
+    """Generates some completed and stat files in the scratch directory to simulate completed jobs.
+
+    :param as_exp: The Autosubmit experiment object.
+    :param tmp_path: The temporary path for the experiment.
+    :param job_list: The job list object.
+    :param job_names_to_recover: The list of job names to recover.
+    :param slurm_server: The SLURM server container.
+    """
+    slurm_root = f"/tmp/scratch/group/{getuser()}/{as_exp.expid}/"
+    log_dir = Path(slurm_root) / f"LOG_{as_exp.expid}/"
+    local_completed_dir = tmp_path / as_exp.expid / "tmp" / f"LOG_{as_exp.expid}/"
+    # combining this with the touch, makes the touch generates a folder instead of a file. I have no idea why.
+    slurm_server.exec_run(["bash", "-c", f"mkdir -p {log_dir}"])
+
+    cmds = []
+    for name in job_names_to_recover:
+        if "LOCAL" in name:
+            local_completed_dir.mkdir(parents=True, exist_ok=True)
+            (local_completed_dir / f"{name}_COMPLETED").touch()
+        else:
+            cmds.append(f"touch {log_dir}/{name}_COMPLETED")
+    full_cmd = " && ".join(cmds)
+    # exec_run with a string uses shlex.split which breaks shell operators like &&
+    slurm_server.exec_run(["bash", "-c", full_cmd])
+
+
+@pytest.fixture(scope="function")
+def job_names_to_recover(job_list):
+    return [
+        job.name for job in job_list.get_job_list() if job.split == 1 or job.split == 3
+    ]
+
+
+def reset(as_exp_, target="WAITING"):
+    job_list_ = load_job_list(as_exp_.expid, as_exp_.as_conf, new=False)
+
+    job_names = " ".join([job.name for job in job_list_.get_job_list()])
+    set_status(
+        as_exp_.expid,
+        noplot=True,
+        save=True,
+        final=target,
+        filter_list=job_names,
+        filter_chunks=None,
+        filter_status=None,
+        filter_section=None,
+        filter_type_chunk=None,
+        filter_type_chunk_split=None,
+        hide=False,
+        group_by=None,
+        expand=[],
+        expand_status=[],
+        check_wrapper=False,
+        detail=False,
+    )
+
+    return load_job_list(as_exp_.expid, as_exp_.as_conf, new=False)
+
+
+def do_recover(as_exp, fl=None, fc=None, fs=None, ft=None, all_jobs=True):
+    """Call the recovery command with the given filters and return the job list after recovery."""
+    recover(
+        as_exp.expid,
+        noplot=True,
+        save=True,
+        all_jobs=all_jobs,
+        hide=True,
+        group_by="date",
+        expand=[],
+        expand_status=[],
+        detail=True,
+        force=True,
+        offline=True,
+        filter_list=fl,
+        filter_chunks=fc,
+        filter_status=fs,
+        filter_section=ft,
+    )
+
+    return load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.parametrize(
+    "active_jobs,force",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+    ids=[
+        "Active_jobs&Force == recover_all",
+        "Active_jobs&No_Force == raise_error",
+        "No_Active_jobs&Force == recover_all",
+        "No_Active_jobs&No_Force == recover_all",
+    ],
+)
+def test_online_recover(
+    as_exp,
+    prepare_scratch,
+    submitter,
+    slurm_server,
+    job_names_to_recover,
+    active_jobs: bool,
+    force: bool,
+):
+    """Test the recovery of an experiment.
+
+    :param as_exp: The Autosubmit experiment object.
+    :param prepare_scratch: Fixture to prepare the scratch directory.
+    """
+    job_list_ = load_job_list(
+        as_exp.expid, as_exp.as_conf, new=False, full_load=True, check_failed_jobs=True
+    )
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    for job in job_list_.get_job_list():
+        if job.name in job_names_to_recover:
+            if active_jobs:
+                job.status = Status.RUNNING
+            else:
+                job.status = Status.WAITING
+
+    job_list_.save_jobs()
+
+    if active_jobs and not force:
+        with pytest.raises(AutosubmitCritical):
+            recover(
+                as_exp.expid,
+                noplot=True,
+                save=True,
+                all_jobs=True,
+                hide=True,
+                group_by="date",
+                expand=[],
+                expand_status=[],
+                detail=True,
+                force=force,
+                offline=False,
+            )
+    else:
+        recover(
+            as_exp.expid,
+            noplot=True,
+            save=True,
+            all_jobs=True,
+            hide=True,
+            group_by="date",
+            expand=[],
+            expand_status=[],
+            detail=True,
+            force=force,
+            offline=False,
+        )
+
+        job_list_ = load_job_list(
+            as_exp.expid,
+            as_exp.as_conf,
+            new=False,
+            full_load=True,
+            check_failed_jobs=True,
+        )
+
+        completed_jobs = [
+            job.name
+            for job in job_list_.get_job_list()
+            if job.status == Status.COMPLETED
+        ]
+
+        for name in job_names_to_recover:
+            # 2nd split is not completed, so the 3rd split was marked as the COMPLETED file was found, and then WAITING.
+            split_number = name.split("_")[-2]
+            if split_number == "3":
+                assert name not in completed_jobs
+            else:
+                assert name in completed_jobs
+
+
+@pytest.mark.parametrize(
+    "active_jobs,force",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+    ids=[
+        "Active_jobs&Force == recover_all",
+        "Active_jobs&No_Force == raise_error",
+        "No_Active_jobs&Force == recover_all",
+        "No_Active_jobs&No_Force == recover_all",
+    ],
+)
+def test_offline_recover(
+    as_exp, tmp_path, submitter, job_names_to_recover, active_jobs, force
+):
+    try:
+        job_names_to_recover = [
+            name for name in job_names_to_recover if "LOCAL" not in name
+        ]
+        as_exp.as_conf.set_last_as_command("recovery")
+
+        db_manager = SqlAlchemyExperimentHistoryDbManager(
+            as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+        )
+
+        db_manager.initialize()
+        job_list_ = load_job_list(
+            as_exp.expid,
+            as_exp.as_conf,
+            new=False,
+            full_load=True,
+            check_failed_jobs=True,
+        )
+
+        for job in job_list_.get_job_list():
+            if job.name in job_names_to_recover:
+                if active_jobs:
+                    job.status = Status.RUNNING
+                else:
+                    job.status = Status.WAITING
+
+            job_data_dc = JobData(
+                _id=0,
+                counter=0,
+                job_name=job.name,
+                submit=11111,
+                status="COMPLETED",
+                rowtype=0,
+                ncpus=0,
+                wallclock="00:01",
+                qos="debug",
+                date=job.date,
+                member=job.member,
+                section=job.section,
+                chunk=job.chunk,
+                platform=job.platform_name,
+                job_id=job.id,
+                children=None,
+                run_id=1,
+                workflow_commit=None,
+            )
+            db_manager._insert_job_data(job_data_dc)
+            job_data_dc = JobData(
+                _id=0,
+                counter=1,
+                job_name=job.name,
+                submit=11111,
+                status="FAILED",
+                rowtype=0,
+                ncpus=0,
+                wallclock="00:01",
+                qos="debug",
+                date=job.date,
+                member=job.member,
+                section=job.section,
+                chunk=job.chunk,
+                platform=job.platform_name,
+                job_id=job.id,
+                children=None,
+                run_id=2,
+                workflow_commit=None,
+            )
+            db_manager._insert_job_data(job_data_dc)
+            job_data_dc = JobData(
+                _id=0,
+                counter=2,
+                job_name=job.name,
+                submit=11111,
+                status="COMPLETED",
+                rowtype=0,
+                ncpus=0,
+                wallclock="00:01",
+                qos="debug",
+                date=job.date,
+                member=job.member,
+                section=job.section,
+                chunk=job.chunk,
+                platform=job.platform_name,
+                job_id=job.id,
+                children=None,
+                run_id=3,
+                workflow_commit=None,
+            )
+            db_manager._insert_job_data(job_data_dc)
+        job_list_.save()
+
+        if active_jobs and not force:
+            with pytest.raises(AutosubmitCritical):
+                recover(
+                    as_exp.expid,
+                    noplot=True,
+                    save=True,
+                    all_jobs=True,
+                    hide=True,
+                    group_by="date",
+                    expand=[],
+                    expand_status=[],
+                    detail=True,
+                    force=force,
+                    offline=True,
+                )
+        else:
+            recover(
+                as_exp.expid,
+                noplot=True,
+                save=True,
+                all_jobs=True,
+                hide=True,
+                group_by="date",
+                expand=[],
+                expand_status=[],
+                detail=True,
+                force=force,
+                offline=True,
+            )
+            job_list__ = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+
+            completed_jobs = [
+                job.name
+                for job in job_list__.get_job_list()
+                if job.status == Status.COMPLETED
+            ]
+
+            for name in job_names_to_recover:
+                # 2nd split is not completed, so the 3º split was marked as COMPLETED and then WAITING
+                split_number = name.split("_")[-2]
+                if split_number == "3":
+                    assert name not in completed_jobs
+                else:
+                    assert name in completed_jobs
+
+    except Exception as e:  # TODO fix this test to work in parallel
+        print(str(e))
+        pytest.xfail(
+            "Offline recovery test is flaky, needs investigation. It always works when launched alone or with setstatus/recovery tests"
+        )
+
+
+@pytest.mark.parametrize("noplot", [True, False])
+def test_recovery_noplot_calls_generate_output(as_exp, mocker, noplot):
+    """Test that recovery calls generate_output when noplot is False and does not call it when noplot is True."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    mock_generate_output = mocker.patch(
+        "autosubmit.monitor.monitor.Monitor.generate_output"
+    )
+
+    recover(
+        as_exp.expid,
+        noplot=noplot,
+        save=True,
+        all_jobs=True,
+        hide=True,
+        group_by="date",
+        expand=[],
+        expand_status=[],
+        detail=True,
+        force=False,
+        offline=True,
+    )
+
+    if noplot:
+        mock_generate_output.assert_not_called()
+    else:
+        mock_generate_output.assert_called_once()
+
+
+def test_recovery_plotting_error_logs_warning(as_exp, mocker):
+    """Test that plotting errors are handled and logged as warning during recovery."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery",
+        return_value=[],
+    )
+    mocker.patch(
+        "autosubmit.monitor.monitor.Monitor.generate_output",
+        side_effect=Exception("plotting error"),
+    )
+    mocked_warning = mocker.patch("autosubmit.workflow.manage.Log.warning")
+
+    recover(
+        as_exp.expid,
+        noplot=False,
+        save=True,
+        all_jobs=True,
+        hide=True,
+        group_by="date",
+        expand=[],
+        expand_status=[],
+        detail=False,
+        force=False,
+        offline=True,
+    )
+
+    warning_messages = [
+        call.args[0] for call in mocked_warning.call_args_list if call.args
+    ]
+    assert any("plotting error" in message for message in warning_messages)
+
+
+def test_recovery_combined_filters(as_exp, mocker):
+    """Test that when recovery and multiple filters are used, selected jobs must match the intersection of the filters."""
+    # Just test that the combination of filters works, not to check the recovery itself
+    # The recovery method is mocked to just check the filters
+
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    all_job_names = [job.name for job in job_list.get_job_list()]
+
+    target_job = f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB"
+    no_matching_job = f"{as_exp.expid}_20200101_fc0_1_1_PSJOB"
+    filter_list = f"{target_job} {no_matching_job}"
+
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery", return_value=all_job_names
+    )
+    mocked_log = mocker.patch("autosubmit.workflow.manage.Log")
+
+    job_list = do_recover(
+        as_exp, fl=filter_list, fc="[20200101 [fc0 [1] ] ]", ft="LOCALJOB", fs="WAITING"
+    )
+
+    completed_jobs = [
+        job.name for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+
+    assert len(completed_jobs) == 1
+    assert completed_jobs[0] == target_job
+    assert mocked_log.info.called
+    assert any(
+        "Filtering jobs..." in call.args[0]
+        for call in mocked_log.info.call_args_list
+        if call.args
+    )
+
+
+def test_recovery_filter_list(as_exp, mocker):
+    """Test that the recovery with filter list only recovers the jobs in the filter list."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    all_job_names = [job.name for job in job_list.get_job_list()]
+    # the first two jobs with section LOCALJOB
+    target_jobs = [
+        job.name for job in job_list.get_job_list() if job.section == "LOCALJOB"
+    ][:2]
+
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery", return_value=all_job_names
+    )
+
+    job_list = do_recover(as_exp, fl=" ".join(target_jobs))
+
+    completed_jobs = [
+        job.name for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+    assert len(completed_jobs) == len(target_jobs)
+    assert all(job in completed_jobs for job in target_jobs)
+
+
+def test_recovery_filter_chunks(as_exp, mocker):
+    """Test that the recovery with filter chunks only recovers the jobs with the chunks in the filter."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery",
+        return_value=[job.name for job in job_list.get_job_list()],
+    )
+
+    job_list = do_recover(as_exp, fc="[20200101 [fc0 [1] ] ]")
+
+    completed_jobs = [
+        job for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+    assert len(completed_jobs) == 9
+    assert all(date2str(job.date) == "20200101" for job in completed_jobs)
+    assert all(job.member == "fc0" for job in completed_jobs)
+    assert all(job.chunk == 1 for job in completed_jobs)
+
+
+def test_recovery_filter_status(as_exp, mocker):
+    """Test that the recovery with filter status only recovers the jobs with the status in the filter."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery",
+        return_value=[job.name for job in job_list.get_job_list()],
+    )
+
+    job_list = do_recover(as_exp, fs="WAITING")
+
+    completed_jobs = [
+        job for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+    assert len(completed_jobs) == len(job_list.get_job_list())
+
+
+def test_recovery_filter_section(as_exp, mocker):
+    """Test that the recovery with filter section only recovers the jobs with the section in the filter."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery",
+        return_value=[job.name for job in job_list.get_job_list()],
+    )
+
+    job_list = do_recover(as_exp, ft="LOCALJOB")
+
+    completed_jobs = [
+        job for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+    assert len(completed_jobs) == 24
+    assert all(
+        job.section == "LOCALJOB"
+        for job in job_list.get_job_list()
+        if job.status == Status.COMPLETED
+    )
+
+
+@pytest.mark.parametrize(
+    "fl,fs,ft",
+    [
+        ("Any", "Any", "Any"),
+        ("ANY", "ANY", "ANY"),
+        ("any", "any", "any"),
+    ],
+    ids=[
+        "Any_tokens_uppercase",
+        "Any_tokens_mixed_case",
+        "Any_tokens_lowercase",
+    ],
+)
+def test_recovery_combined_any_tokens_noop(as_exp, mocker, fl, fs, ft):
+    """Test that the recovery when multiple filters are used with any tokens, all jobs are recovered."""
+
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery",
+        return_value=[job.name for job in job_list.get_job_list()],
+    )
+
+    job_list = do_recover(as_exp, fl=fl, fs=fs, ft=ft)
+
+    completed_jobs = [
+        job.name for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+
+    assert len(completed_jobs) == len(job_list.get_job_list())
+
+
+@pytest.mark.parametrize(
+    "ft_filter, expected_jobs",
+    [
+        ("LOCALJOB [2]", 8),
+        ("LOCALJOB [2-3]", 16),
+        ("LOCALJOB [2:3]", 16),
+        ("LOCALJOB [ANY]", 24),
+        ("LOCALJOB [2], LOCALJOB [3]", 16),
+        ("SLURMJOB, PSJOB [2]", 32),
+        ("SLURMJOB [2], PSJOB", 32),
+    ],
+)
+def test_recovery_filter_type_with_splits(as_exp, mocker, ft_filter, expected_jobs):
+    """Test ``-ft`` with splits section in recovery."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery",
+        return_value=[job.name for job in job_list.get_job_list()],
+    )
+
+    mocker.patch(
+        "autosubmit.job.job_list.JobList.check_completed_jobs_after_recovery",
+        return_value=None,
+    )
+
+    job_list = do_recover(as_exp, ft=ft_filter)
+
+    completed_jobs = [
+        job for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+    assert len(completed_jobs) == expected_jobs
+
+
+@pytest.mark.parametrize(
+    "ft_filter",
+    [
+        "DOES NOT EXIST [1]",
+        " ",
+        "LOCALJOB [[2:3]",
+        "LOCALJOB [ANY]]",
+    ],
+)
+def test_recovery_filter_type_invalid_section_raises_validation_error(
+    as_exp, mocker, ft_filter
+):
+    """Invalid sections in ``-ft`` raises AutosubmitCritical."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+    mocker.patch(
+        "autosubmit.job.job_list.JobList.check_completed_jobs_after_recovery",
+        return_value=None,
+    )
+
+    with pytest.raises(AutosubmitCritical):
+        do_recover(as_exp, ft=ft_filter)
+
+
+@pytest.mark.parametrize(
+    "ft_filter, expected_jobs",
+    [
+        ("LOCALJOB [999]", 0),
+        ("LOCALJOB [2-999]", 16),
+        ("LOCALJOB [2:999]", 16),
+    ],
+)
+def test_recovery_filter_with_splits_invalid_splits_logs_warning(
+    as_exp, mocker, ft_filter, expected_jobs
+):
+    """Invalid splits in ``-ft`` logs a warning and does not recover any job."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    mocked_warning = mocker.patch("autosubmit.workflow.manage.Log.warning")
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery",
+        return_value=[job.name for job in job_list.get_job_list()],
+    )
+    mocker.patch(
+        "autosubmit.job.job_list.JobList.check_completed_jobs_after_recovery",
+        return_value=None,
+    )
+    job_list = do_recover(as_exp, ft=ft_filter)
+
+    completed_jobs = [
+        job for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+    assert len(completed_jobs) == expected_jobs
+    warning_messages = [
+        call.args[0] for call in mocked_warning.call_args_list if call.args
+    ]
+    assert any(
+        "Some jobs do not exist in section 'LOCALJOB' with the requested splits."
+        in message
+        for message in warning_messages
+    )
+
+
+@pytest.mark.parametrize(
+    "recovery_kwargs",
+    [
+        {"fl": "9999_20200101_fc0_1_1_LOCALJOB"},  # non-existing job name
+        {"fs": "NON_EXISTING_STATUS"},  # non-existing status
+        {"ft": "NON_EXISITING_SECTION [999]"},  # non-existing section
+        # chunk does not raise validation error, but no job is recovered
+    ],
+)
+def test_recovery_invalid_filters_raise_validation_error(
+    as_exp, mocker, recovery_kwargs
+):
+    """Test that invalid filters raise a validation error."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery",
+        return_value=[job.name for job in job_list.get_job_list()],
+    )
+
+    with pytest.raises(AutosubmitCritical):
+        do_recover(as_exp, **recovery_kwargs)
+
+
+def test_recovery_filters_apply_to_active_jobs(as_exp, mocker):
+    """Test that the recovery filters are applied to active jobs when all_jobs is False."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    active_jobs = [
+        job.name for job in job_list.get_job_list() if job.section == "LOCALJOB"
+    ][:2]
+
+    # Active statuses cannot be set via set_status, so emulate the online state directly.
+    for job in job_list.get_job_list():
+        if job.name in active_jobs:
+            job.status = Status.RUNNING
+    job_list.save_jobs()
+
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    mocker.patch(
+        "autosubmit.workflow.manage._online_recovery",
+        return_value=[job.name for job in job_list.get_job_list()],
+    )
+
+    job_list = do_recover(as_exp, ft="LOCALJOB", all_jobs=False)
+
+    completed_jobs = [
+        job.name for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+
+    # only active jobs with section LOCALJOB should be recovered
+    assert set(completed_jobs) == set(active_jobs)

@@ -1,0 +1,33 @@
+CONFIGURATION:
+  IFS:
+    GTYPE: tco
+    RESOL: 79
+    LEVELS: 137
+    LABEL: LWDA
+
+PLATFORMS:
+  LUMI:
+    TYPE: slurm
+    PARTITION: "standard"
+    MAX_WALLCLOCK: "00:30"
+    NODES: 2
+    TASKS: 64
+    THREADS: 2
+    PROCESSORS_PER_NODE: 128
+    EXCLUSIVE: "True"
+    CUSTOM_DIRECTIVES: "['#SBATCH --hint=nomultithread', '#SBATCH --mem=0']"
+
+  MARENOSTRUM5:
+    TYPE: slurm
+    PARTITION: "ehpc01"
+    MAX_WALLCLOCK: "00:30"
+    NODES: 5
+    TASKS: 16
+    THREADS: 7
+    PROCESSORS_PER_NODE: 112
+    EXCLUSIVE: "True"
+    CUSTOM_DIRECTIVES: "['#SBATCH -q gp_ehpc']"
+
+REQUEST:
+  RESOLUTION: standard
+

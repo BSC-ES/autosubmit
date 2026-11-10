@@ -1,0 +1,34 @@
+# Splits example https://autosubmit.readthedocs.io/en/master/userguide/defining_workflows/index.html
+
+experiment:
+  DATELIST: 20000101 20010101
+  MEMBERS: "fc0 fc1"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '3'
+  CALENDAR: standard
+JOBS:
+    ini:
+        FILE: ini.sh
+        RUNNING: once
+
+    sim:
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: once
+
+    asim:
+        FILE: asim.sh
+        DEPENDENCIES: sim
+        RUNNING: once
+        SPLITS: 3
+
+    post:
+        FILE: post.sh
+        RUNNING: once
+        DEPENDENCIES:
+            asim:
+                SPLITS_FROM:
+                    2,3: # [2:3] is also valid
+                        splits_to: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
+        SPLITS: 3

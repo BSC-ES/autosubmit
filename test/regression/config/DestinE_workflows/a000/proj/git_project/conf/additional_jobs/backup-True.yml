@@ -1,0 +1,14 @@
+JOBS:
+  BACKUP:
+    DEPENDENCIES: SIM
+    FILE: templates/backup.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    PROCESSORS: 8
+    TASKS: 1
+    THREADS: 1
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    FREQUENCY: 10
+    CHECK: on_submission

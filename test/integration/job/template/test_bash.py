@@ -1,0 +1,174 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Integration tests for Autosubmit script templates written in Bash Shell."""
+
+import ctypes
+from multiprocessing import Process, Value
+from os import kill, killpg
+from pathlib import Path
+from signal import SIGKILL, SIGTERM
+from subprocess import PIPE, Popen, run
+from time import sleep, time
+from typing import TYPE_CHECKING
+
+from autosubmit.job.template import bash
+
+if TYPE_CHECKING:
+    # noinspection PyProtectedMember
+    from py._path.local import LocalPath  # type: ignore
+
+
+def _replace_placeholders(content: str, tmp_path: 'LocalPath'):
+    return content \
+        .replace('%CURRENT_LOGDIR%', str(tmp_path)) \
+        .replace('%JOBNAME%', 'test_job') \
+        .replace('%FAIL_COUNT%', '1') \
+        .replace('%EXTENDED_HEADER%', '') \
+        .replace('%EXTENDED_TAILER%', '')
+
+
+def test_successful_script(tmp_path: 'LocalPath'):
+    """Test a Bash script running without errors."""
+    header = _replace_placeholders(bash.as_header('', '/bin/bash'), tmp_path)
+    body = _replace_placeholders(bash.as_body('touch OK && echo "OK!"'), tmp_path)
+    footer = _replace_placeholders(bash.as_tailer(), tmp_path)
+
+    bash_script_content = '\n'.join([header, body, footer])
+    bash_script = tmp_path / 'test.sh'
+    with open(bash_script, 'w+') as f:
+        f.write(bash_script_content)
+
+    bash_script.chmod(0o755)
+
+    r = run([str(bash_script)], shell=True, capture_output=True, cwd=str(tmp_path))
+    assert b'OK!\n' in r.stdout, r.stderr
+
+    assert Path(tmp_path, 'OK').exists()
+    stat_file = Path(tmp_path, 'test_job_STAT_1')
+    assert stat_file.exists()
+    assert stat_file.read_text().strip().splitlines()[-1] == 'COMPLETED'
+    assert Path(tmp_path, 'test_job_COMPLETED').exists()
+
+
+def test_command_err_script(tmp_path: 'LocalPath'):
+    """Test a Bash script that executes a faulty command."""
+    header = _replace_placeholders(bash.as_header('', '/bin/bash'), tmp_path)
+    body = _replace_placeholders(bash.as_body('touch ERR && false'), tmp_path)
+    footer = _replace_placeholders(bash.as_tailer(), tmp_path)
+
+    bash_script_content = '\n'.join([header, body, footer])
+    bash_script = tmp_path / 'test.sh'
+    with open(bash_script, 'w+') as f:
+        f.write(bash_script_content)
+
+    bash_script.chmod(0o755)
+
+    r = run([str(bash_script)], shell=True, capture_output=True, cwd=str(tmp_path))
+    assert r.returncode == 1
+
+    assert (tmp_path / 'ERR').exists()
+    stat_file = tmp_path / 'test_job_STAT_1'
+    assert stat_file.exists()
+    assert stat_file.read_text().strip().splitlines()[-1] == 'FAILED'
+    assert not (tmp_path / 'test_job_COMPLETED').exists()
+
+
+def test_killed_script(tmp_path: 'LocalPath'):
+    """Test a Bash script killed (e.g., SIGKILL by Slurm or user)."""
+    header = _replace_placeholders(bash.as_header('', '/bin/bash'), tmp_path)
+    body = _replace_placeholders(bash.as_body('sleep 15 && touch KILLED && false'), tmp_path)
+    footer = _replace_placeholders(bash.as_tailer(), tmp_path)
+
+    bash_script_content = '\n'.join([header, body, footer])
+    bash_script = tmp_path / 'test.sh'
+    with open(bash_script, 'w+') as f:
+        f.write(bash_script_content)
+
+    bash_script.chmod(0o755)
+
+    def _run():
+        r = run([str(bash_script)], shell=True, capture_output=True, cwd=str(tmp_path))
+        assert r.returncode == 1
+
+    p = Process(target=_run)
+    p.start()
+
+    kill(p.pid, SIGKILL)
+
+    p.join(timeout=5)
+
+    assert not (tmp_path / 'KILLED').exists()
+    assert not (tmp_path / 'test_job_COMPLETED').exists()
+    assert not (tmp_path / 'test_job_STAT_1').exists()
+
+
+def test_signalled_script(tmp_path: 'LocalPath'):
+    """Test a Bash script that receives a linux signal (e.g., SIGTERM by Slurm or user)."""
+    header = _replace_placeholders(bash.as_header('', '/bin/bash'), tmp_path)
+    body = _replace_placeholders(bash.as_body("touch SIGNALLED\nsleep 10 &\n echo 'OK!'\n"), tmp_path)
+    footer = _replace_placeholders(bash.as_tailer(), tmp_path)
+
+    bash_script_content = '\n'.join([header, body, footer])
+    bash_script = tmp_path / 'test.sh'
+    with open(bash_script, 'w+') as f:
+        f.write(bash_script_content)
+
+    bash_script.chmod(0o755)
+
+    # Shared value so the child process can expose the bash script's process group ID.
+    # With start_new_session=True, proc.pid == pgid of the new session.
+    bash_pgid: Value = Value(ctypes.c_int, 0)
+
+    def _run() -> None:
+        proc = Popen(
+            [str(bash_script)],  # No shell=True: proc.pid IS the bash process (via shebang).
+            stdout=PIPE,
+            stderr=PIPE,
+            cwd=str(tmp_path),
+            start_new_session=True,  # Puts the bash script in its own process group.
+        )
+        bash_pgid.value = proc.pid
+        proc.wait()
+
+    p = Process(target=_run)
+    p.start()
+
+    # First, we ensure the SIGNALLED file was created, and the script is now
+    # sleeping for 10 seconds...
+    signalled_file = tmp_path / 'SIGNALLED'
+    must_end = time() + 30
+    while time() < must_end and not signalled_file.exists():
+        sleep(0.1)
+
+    # Ensure bash_pgid is populated (set right after Popen, so it arrives before SIGNALLED).
+    must_end = time() + 5
+    while time() < must_end and bash_pgid.value == 0:
+        sleep(0.05)
+
+    # ... and now we kill it while it's sleeping! ARGH!
+    # We send SIGTERM to the bash process group so the script's trap handler fires,
+    # writing the end time and FAILED status to the STAT file before it exits.
+    killpg(bash_pgid.value, SIGTERM)
+    p.join()
+
+    assert signalled_file.exists()
+    stat_file = tmp_path / 'test_job_STAT_1'
+    assert stat_file.exists(), "STAT file not created upon SIGTERM!"
+    assert len(stat_file.read_text().strip().splitlines()) == 4, "STAT file should contain 4 lines (submit time, start time, end time, status)!"
+    assert stat_file.read_text().strip().splitlines()[-1] == 'FAILED'
+    assert not (tmp_path / 'test_job_COMPLETED').exists()

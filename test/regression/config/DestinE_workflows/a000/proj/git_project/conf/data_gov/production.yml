@@ -1,0 +1,4 @@
+REQUEST:
+   EXPVER: "0001"
+   CLASS: "d1"
+   FDB_HOME: "%CURRENT_FDB_PROD%"

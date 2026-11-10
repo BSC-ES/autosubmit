@@ -1,0 +1,24 @@
+# SKIPPABLE example https://autosubmit.readthedocs.io/en/master/userguide/defining_workflows/index.html
+
+experiment:
+  DATELIST: "19600101 19650101 19700101"
+  MEMBERS: "fc0000 fc0001"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '4'
+  CALENDAR: standard
+JOBS:
+    SIM:
+        FILE: sim.sh
+        DEPENDENCIES: INI POST-1
+        WALLCLOCK: 00:15
+        RUNNING: chunk
+        QUEUE: debug
+        SKIPPABLE: TRUE
+
+    POST:
+        FILE: post.sh
+        DEPENDENCIES: SIM
+        WALLCLOCK: 00:05
+        RUNNING: member
+        #QUEUE: debug

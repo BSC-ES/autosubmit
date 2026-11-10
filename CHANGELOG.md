@@ -1,0 +1,609 @@
+### 4.2.0: Minor release
+
+This is a minor release of Autosubmit that introduces significant changes in the
+management of jobs and dependencies. The main highlight of this release is the
+introduction of a new database backend for the joblist using SQLAlchemy, which
+allows for better scalability in handling large workflows. This release also includes
+several bug fixes and enhancements to improve the overall user experience.
+
+> [!WARNING]
+> Downgrading experiment versions is not recommended, in general, unless really needed.
+> If you try to downgrade experiments from 4.2.0 to an older version, you will need to
+> recreate the workflow jobs (e.g., `autosubmit create -f`) as this version drops the
+> Pickle `pkl` file.
+
+**Bug fixes:**
+
+- Fix commands failing during traceability logging when the working directory has been deleted #3332
+- Fix `autosubmit.lock` not being deleted after `create` and `run`; `archive` and `delete` now acquire it too #3033 #3055
+- Fix multi-member PJM job lookup output parsing #3255 (thanks @1cbyc)
+- Remove the unrelated `--filter_status` option from `autosubmit expid` #3241 (thanks @1cbyc)
+- Fixed `DELAY_RETRY_TIME` not matching the documented `+N` and `*N` delay sequences #3138
+- Fix timeout guard is silently disabled for login/local jobs #3081
+- Fix CI ruff lint job failing on deleted files or single-commited branches #3166
+- Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
+- Add per-target `schema_version` tracking and create the `job_data(job_name)` index in the SQLAlchemy history database manager #3114
+- Align the SQLAlchemy history manager lookups and bulk updates, and remove the temporary table from `select_jobs_data` #3114
+- Use SQLAlchemy for all history and experiment status database managers, dropping the legacy SQLite-only managers #3114
+- Fix log recovery skipping historical stats when the scheduler reuses job ids across chunks #3114
+- Record `schema_version` with a dialect upsert to avoid races when databases are written concurrently #3114
+- Make the general database and experiment details use only SQLAlchemy, dropping the last raw-sqlite3 code paths and the legacy `db_version` table #3114
+- Move every database manager into `autosubmit/database` (`models/` and `managers/` subpackages) #3114
+- Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295
+- Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
+- Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
+- Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
+- Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
+- Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
+- Fixed vertical wrappers silently reporting jobs as `COMPLETED` when the inner job script was truncated. The wrapper ran the script through `bash -s` on stdin, so any command in the job body that read stdin swallowed the rest of the script. The inner script now runs as a regular file, with its stdin detached from the wrapper. jira-external#1494
+- Fixed vertical wrappers not stopping an inner job that ignored `SIGTERM`, which could let the job outlive its wallclock inside the wrapper. The per-job `timeout` now also forces a `SIGKILL` after a grace period. jira-external#1494
+- Fixed the log recovery process being silently skipped when it died, which lost the logs and stats of the affected jobs. Autosubmit now restarts it and re-queues the pending jobs #3342
+- Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name instead of platform name #3342
+- Fix job and wrapper values like `%CURRENT_CUSTOM_DIRECTIVES%` overwriting the platform value they reference #3286
+- Fix the -cw flag name and wording in the scheduler warning #3393 (thanks @bfs2021)
+- Fixed `is_current_logged_user_owner` and `is_current_real_user_owner` raising `KeyError` when the experiment
+  folder is owned by a UID with no `passwd` entry (e.g. inside containers) #3375
+- Fix job timestamps overflowing the PostgreSQL `jobs` table: `start_time_timestamp`, `submit_time_timestamp` and `finish_time_timestamp` are now `BigInteger` #3386 (thanks @Shakhtar-Sankur)
+
+**New Features:**
+
+- Allow local project paths to use `~` for the user's home directory #3296 (thanks @fatihcvs)
+- Introduced SQLAlchemy as the main database backend for joblist management, replacing the
+  previous pickle-based system. This change allows for better scalability and flexibility in
+  handling large workflows.
+- Added support for PostgreSQL as a database backend, in addition to the default SQLite.
+  This provides users with more options for database management.
+- Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
+- Allow recovery to update current running/ready jobs #1251
+- `autosubmit` Bash autocomplete #1227 #3171
+- Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
+- Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
+- Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
+- Added `RUNTIME.LOG_RECOVERY` options to configure log recovery resiliency:
+  `CONSECUTIVE_MAX_RESTARTS` (consecutive restart attempts before waiting to retry,
+  default `2`, `0` disables the limit),
+  `RETRY_DELAY` (seconds to wait after exhausting those attempts before trying to
+  start the recovery process again, default `600`) and
+  `INLINE_FALLBACK` (recover pending logs in the main process while the separate
+  process is unavailable, default `true`) #3342
+- Add `[database] backup` option to `autosubmitrc` to disable SQLite backups #3129
+
+**Migration from `job_list.pkl` to Database**
+
+- All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted
+  in significant changes to the code.
+
+**Memory and Performance Improvements**:
+
+- Significant reduction in memory usage by loading only necessary jobs and dependencies for active employment.
+- Enhanced performance during autosubmit runs and ongoing improvements to the log process management
+  through direct database interactions to reduce the communication with the main process.
+- Overall job management features have been improved to ensure better tracking and status updates,
+  removing redundant code to enhance the efficiency of a loop 
+- The recovery and set status commands have been improved for version 4.2.0 and later 4.1.16,
+  resulting in faster operations.
+- Removal of _COMPLETED files to reduce the amount of inodes generated
+- A significant rework of the wrapper building process has been implemented to address ongoing issues
+  and prevent regressions, particularly with 2D wrappers.
+- Various functions have been optimized to minimize calls to save/load operations, enhancing the
+  software's overall efficiency and responsiveness.
+
+**Enhancements**
+
+- **Database Method Enhancements**: Support for both PostgreSQL and SQLite with optimised save/load mechanisms.
+  Improved wrapper data storage and load.
+- **Testing Efforts**: Tests have been added for every rework to enhance reliability, with a particular effort
+  on integration tests.
+- Enforce connection pool usage when using PostgreSQL as database backend #2973
+- Auto-detect git default branch when `-b` flag not specified #3101
+- Removed `files` arguments from autosubmit sub-commands, and moved code to upgrade scripts out of `autosubmit.py` #2711
+- `autosubmit.py` file was deleted and its 5K lines of code were moved into separated files #973 #1046 #3171 #3172
+- `autosubmit --help` now shows better description, and lists available subcommands #3171
+- The documentation of CLI commands are synced automatically with the Sphinx docs #3171 #1344
+- Most `autosubmit` sub-commands now support the `--profiler`` to run with cProfile #1094 #3171
+- Every command now prints traceability information (AS/Python version, Linux, user name, ...) #2795 #3171
+- set_status now rejects active targets (SUBMITTED/QUEUING/RUNNING → AutosubmitCritical 7011). #3231
+- Centralized Job.apply_status / Status.ACTIVE/RE_RUNNABLE #3231
+- Stale-data recovery on set-status runs only for final targets (_FINAL_STATUSES) in job/manage.py
+  instead of the autosubmit.py monolith. #3231
+- Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly
+  (with edge-completion reconciliation), never loaded into the graph. #3231
+- Remove two-step start code, tests, and docs #3313 (thanks @CodeByPeace)
+- Optimized RO-Crate construction and ZIP generation.
+  Combined, these improvements reduced total generation time from over 36 hours to approximately
+  5 minutes in tests with an operational experiment containing over 500,000 files.
+  ZIP archives are now written without compression. #3307
+- Removed `PRESUBMISSION` from documentation, removed in 4.x #3320 (thanks @vansh-nagar)
+- The ``AutosubmitConfig`` instances are now centralised in a registry, to avoid re-loading the YAML files
+  multiple times, partially addressing #3326. #3327
+- Updating the Autosubmit version of an experiment (e.g., `create -v`) now creates the `db` folder #3293
+- Added a development Docker Compose setup for Autosubmit and Postgres #3363
+- Updated project coverage replacing pass statements by ... #2585 (thanks @Vietpr)
+
+### 4.1.17.2: Bug fixes and enhancements (port of #3309)
+
+**Bug fixes:**
+
+- Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
+
+**Enhancements:**
+
+- Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
+
+### 4.1.17.1: Bug fixes and enhancements (#3181)
+
+**Bug fixes:**
+
+- Fewer "key-exchange timed out" errors on busy cluster login servers. Autosubmit now waits longer and recovers by itself.
+- `recovery` no longer stops when a platform can't say which jobs finished; offline it falls back to its own records.
+- The `updated_list_<EXPID>.txt` status file is now friendlier: bad lines are skipped with a warning, job names and statuses are case-insensitive, and it can't break your run.
+- Autosubmit no longer gets stuck on logs of jobs whose info was lost after an interrupted run.
+- Relaunching a finished job from the `updated_list` file now correctly resets some variables used to download the logs
+- The default for IO_SAFE_WAIT is set back to 60 seconds
+
+**Enhancements:**
+
+- New `CLEAR_TO_SEND_TIMEOUT` platform setting: how long to wait for a busy login server. Default: 180 seconds.
+- When you change the status of a job that is still running, Autosubmit stops it on the cluster first and then applies the change. No more accidental duplicate runs.
+- `setstatus` and `updated_list` no longer let you put a job into an in-progress state like submitted, queuing, or running. Autosubmit manages those states on its own.
+- QOL: `updated_list` and `setstatus` now call the same functions to manage status.
+- Improved provenance documentation, describing the inputs, outputs, how options are merged, etc. #3232
+
+### 4.1.17: Bug fixes and enhancements
+
+**Bug fixes:**
+
+- Fixed `%CHUNK%` always resolving to 1 for jobs with `SYNCHRONIZE: date` #3087
+- Fixed wrapper deadlock false positive when non-wrapped jobs are still
+  active or could become ready later #3084
+- Fixed leftover wrapper batch stuck on MIN_WRAPPED when remaining
+  jobs are blocked by the same package #3084
+- Fixed autosubmit describe warning about non-experiment directories (e.g. logs, archive folders) by enumerating experiments from the database instead of scanning the root directory #1110
+- Fixed generate_output and generate_output_txt in Monitor to include seconds in the output filename timestamp, preventing files from being overwritten when generated within the same minute #1159 #1368
+- Fix for energy data that was not being stored for the last job of the batch #2657 #2418
+- Reduce the frequency with which energy data was not being stored for the last job of the batch #2657 #2418
+- Fixed issue with experiments running on LOCAL platform without a defined LOCAL entry in platforms.yml config file #1131
+- Fixed an issue with the ECMWF platform not working with the new online recovery
+- Changed logic in Slurm submission to look for submitted messaged (hotfix) #2886
+- Calendar splits: last split boundaries #2866, last split not exported #2099 and splitsize not working at experiment level #2016.
+- Accept local/intranet email addresses in validation #1471
+- Set PROJECT_TYPE, PROJECT_DESTINATION and CUSTOM_CONFIG for experiments without minimal configuration #2864
+- Added priority and retro-compatibility for etc/autosubmitrc over etc/.autosubmitrc #2312
+- Updated Slurm wallclock truncation, allowing users to use e.g., 01:00:00 correctly #2059
+- Fixed exception trace in AutosubmitCritical and AutosubmitError not being displayed to the user #2109
+- Fix `Jobs.running` to case-insensitive #2916
+- Fixed the wallclock validation error message to display the platform's wallclock time instead of the job time twice #2492
+- Fixes chunkini setting not working correctly #2712
+- Fixed recovery and setstatus for experiments with more than > 32k jobs #2894
+- Removed invalid message about the template script showing the error with a difference of ~5 lines #2962
+- Fix queuing time for the first vertical job
+- Fixes Split-dependencies #2958
+- Fixes an issue with `setstatus` calling to hardcoded platform code #2919
+- Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
+- Fixed `autosubmit stats` command that was not considering parameters defined in the platform, like NODES, TASKS, etc. #2978
+- Fixed infinite loop in experiments using wrappers on MN5 #2985
+- Fixed wrapper deadlock when minimum limits are not reached #2469
+- Fixes 1-N grouped split dependencies #2958
+- Fixed inconsistent log paths in status txt output #3040
+- Follow-up fix for #3007: recover job times that were lost when an experiment was interrupted.
+- Fixed `num_max_spits` unit conversion to months when `split_unit` is "month" #2944
+- Fixed migration of pre-v4.1.17 historical databases missing columns (split, fail_count, out, err) #3062
+- Fixed infinite loop when STAT file stays on RUNNING, now falls back to scheduler status after IO_SAFE_WAIT #3059
+- Fixed `HETSIZE` whenever it had values bigger than 0 without a `CURRENT_QUEUE` or skipping the order of info #2660
+- Fixed `CPU per task` for new version of autosubmit #2897
+- Fixed issue overwriting expid config variables with the ones from the github repo #2877
+- Fixed inspect infinite loop when PLATFORMS.TOTALJOBS or PLATFORMS.MAX_WAITING_JOBS is set to 0 #2749
+- Fixed wrappers on Lumi platform #3059 
+- Fixed HPC2020 platform #3059
+- Fixed submission of jobs for PJM platform #2977
+
+**Enhancements:**
+
+- Added ``CHUNK_END_DATE_LAST`` and ``LDATE`` template variables exposing the experiment's terminal dates to date-aware jobs #2430
+- Autosubmit describe now works on archived experiments, falling back to the last details snapshot stored in the database when the experiment files are not available #2717
+- Moved Autosubmit directory creation from `autosubmit configure` to `autosubmit install` #2640
+- Replaced redundant `list(dict.keys())` and `.keys()` patterns with direct dictionary iteration and membership checks #2477
+- Added txt report generation using autosubmit create -o txt, similar to autosubmit monitor -o txt #2264"
+- Replaced `print` statements with `Log.warning` calls in `job_list.py` and `diagram.py` #2372
+- Fix characters escaped in regexes #2526
+- Fixed RO-Crate validation issues with the latest `rocrate-validator`,
+  now Autosubmit crates conform to RO-Crate 1.1, process 0.5, workflow run
+  crate 0.5, and workflow ro crate 1.0. A new integration test has been
+  added to check that we produce valid crates with the `rocrate-validator` #2816
+- Changed Yaml load mode from 'safe' to 'rt' #2851
+- Add issues URL to error message #2888
+- Allow multiple filters in `setstatus` command #1250
+- Allow filtering by section and split in the `ft` command #2910
+- Improved profiler adding tracing and stopping capabilities  #2933
+- Commands `setstatus, create and recovery` do not display the plot by default #1347
+- Improved submission readability, performance and logic flow #2939
+- Improved profiler adding tracing and stopping capabilities #2933
+- Creation and modification dates are now timezone-aware in the `job_data` table #2943
+- Added `DEFAULT.DESCRIPTION` from the database into the list of job parameters #2857
+- Every YAML file loaded is now printed in the debug log (use -lc DEBUG in the
+  command line if you want this) #2879
+- Allow to set AS variables as lowercase/uppercase (,,/^^) #2504
+- Slurm tests in CICD are using a new container by @giovtorres #2871
+- Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
+- Updated `Defining the workflow` documentation section #2954
+- Improving the handling of leakages that were happening when dealing with queues and processes #2900
+- Added batch canceling to the `setstatus` command #2919
+- verbosity adjusted #2976
+- Implement filters for `recovery` command #2923
+- Enchanced previous to accept previous-N #2971
+- Enchanced splits_to previous keyword to accept previous-N #2958
+- Add detection of inneficiencies for key CPMIP metrics #3022
+- Allow multiple filters in the `monitor` command #3020
+- Allow multiple filters in the `inspect` command #3029
+- Wrappers reworked with SQLAlchemy-backed persistence and structured tables, fixing wrapper lifecycle management across platforms #3007
+- Added STAT file validation #3007
+- Wrapper databases migrated from pickle to SQLAlchemy, with upsert operations and chunked batch inserts for SQLite compatibility #3007
+- Jobs now validated individually via STAT files in check_jobs to confirm completion or failure, for both wrapped and non-wrapped jobs #3007
+- Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
+- Changed JOBS_IN_WRAPPER unknown job from critical error to warning #3006
+- Added ``ECACCESS_RETRIES`` platform config key to configure SSL retries for ecaccess platforms. Defaults to 100 #3059
+
+### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
+
+This release adds support to Postgres using SQLAlchemy, without removing the
+SQLite support. By default, Autosubmit will use SQLite. Postgres support is
+experimental and not recommended for production yet.
+
+Autosubmit Config Parser code has been merged back into this code base. LOCAL
+platform does not support wrappers anymore (it was used for testing).
+
+The `--notransitive` argument has been deprecated in all commands. You may still
+use it without a failure, but there will be a warning displayed asking you to
+update your command line. This argument will be completely removed on a later
+release.
+
+**Bug fixes:**
+
+- Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
+- Fixed error when cleaning projects that use Git #2524
+- Fixed bug that occurred when copying experiments with different HPC platforms, where the incorrect platform was used
+  instead of the user-specified platform #2650
+- Fixed bug that occurred when having "CUSTOM_" placeholders in the header section of a wrapper #2669
+- Fixes an issue with multi-day applications dependencies bug #2631
+- Fixes an issue with all-filter #2565
+- Fixes an issue when setting a dependency to a different date or member # 2466 ( #2518 partially)
+- Fixes an issue with recovery not being able to cancel active jobs #2695
+- Fixes an issue with SQLAlchemy not working correctly with the historical job_data.db #2695
+- Fixes an issue with infinite loop when additional files are not found #2468
+- Fixes an issue with sections ignoring the MAX_WAITING_JOBS parameter #2613
+- Fixed bug where an RO-Crate file would include itself in the archive, as well as other zip files.
+  Now Autosubmit uses the pattern $expid-crate-$date-$time-$millisecond.zip, and ignores any ZIP files
+  in the tmp/ASLOGS that start with $expid-crate and end with .zip #2692
+- Fixed 'NoneType' object has no attribute 'set' that would have set a 'NoneType' instead of a 'EventType' #2611 #2583
+- Standardized the inner_job submission for non-vertical wrappers #1474
+- Fixed an issue with some placeholders not being replaced in templates #2426
+- Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
+- Could* fix an issue with the HPC* missing variables in the templates #2432
+- Fixed "Unexpected error: 'list' object has no attribute 'status'" when running experiments #2463
+- Tentative *fix for an issue with the HPC* missing variables in the templates #2432
+- Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
+- Fixed an issue with additional files not being sent to the remote platform when using wrappers #1484
+- Removing the generation of SLURM HEADERS with --cpus-per-task when 1, 0 or none is set #2380
+- The `migrate` command was removed as it had been broken since the release of
+  AS 4. This command will be reintroduced in the future with updated syntax and
+  with new tests and documentation.
+- Replaced regex by YAML parsing/writing when copying experiments to avoid edge
+  cases when replacing values (e.g. NOTIFY.TO, CHUNKS_TO) #2665
+- Fix experiment not being copied when running `testcase` command #2799
+- Fixed bug where placeholder variables were not removed when they referenced
+  `HPC*` variables (e.g. `%HPC_DN_SERVER%` of a user platform) #2574
+- Used a Shell trap-function to detect when an Autosubmit job is signalled to stop
+  and to handle non-zero exit codes writing the `_STAT` files (for GUI/metrics) #2788 #2807
+- Fixed an issue with MIXED and STRICT wrapper policies raising the error prematurely #2770
+- Do not print warning if an experiment has been successfully deleted #2334 #2793
+- Fixed an issue with undefined variables inside a list #2773
+- Fixed an issue with --minimal flag of `autosubmit expid` not working correctly #2845
+
+**Enhancements:**
+
+- autosubmit/autosubmit container now includes the `$USER` environment variable
+  via its entrypoint #2359
+- Adding a Slurm Container to the CI/CD and creating tests to increase the
+  coverage of the Platforms #977
+- Execute scripts to generate the documentation and standardize expid on documentation #1160
+- Added new Autosubmit users GANANA, ESiWACE HPCW, and TerraDT #2445
+- The autosubmit-config-parser GitHub project has been archived and its code moved
+  to Autosubmit repository, merging the projects again #2052
+- Documentation about `FOR.NAME` with values that are not strings #2515
+- Improvement of the error messages for YAML files #2488 and for RO-CRATE #2572
+- Added `--force` flag to `autosubmit pklfix` command, and `--yes` flag to `autosubmit stop` to
+  automatically answer yes to prompts #2569
+- Improvement of error message when `LOCAL` project location is a file, not a directory #1972 #1254
+- Removed the code for wrappers with local platform that were create only for tests #2522
+- Added SQLAlchemy as the main database entrypoint, enabling backends of Sqlite (default) and Postgres (new) #2187
+- Added mypy and ruff to the CI for the files touched by a change granting a
+  higher quality and preservation of the code #2626 #2621
+- Updated base images of micromamba and debian for security update #2610
+- Added "CUSTOM_" directives support in the wrapper configuration #2669
+- Added a platform option to compress log files of the job's output during log recovery #2555
+- Added automated citation instructions to the website landing page #2480
+- Improving the error message handling for incorrect YAML syntax (too cryptic) #2651
+- Added a platform option to remove remote log files of the job's output after log recovery #2655
+- COMPLETED files are now fetch instead of downloaded. #2695, #2559
+- Improved recovery command performance. _COMPLETED files are now fetched in a single call. related to #2695, #2570, #2563
+- Added --offline flag to the recovery command to turn off retrieval of logs when the remote platform is not reachable. related to #2695
+- Improved the performance of setstatus #2695
+- Improved the validation code of the setstatus -fc, -ftc and -ftcs filters and unified them related to #1250
+- Deprecated `--notransitive` argument as that was not used anymore #2577
+- docstrings were made more uniform across several functions (should reflect in sphinx docs),
+  fixed several ruff and mypy warnings, and did minor refactorings in the code like removing the
+  `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
+- Improved submission time for slurm and pjm jobs #2742
+- Added documentation regarding in-line script definition.
+- Fixes an issue with general wrapper parameters crashing during runtime when defined. #2743
+- Added a new configuration parameter to list a safe-list of placeholders that can be used in templates as they are, example: "%CUSTOM_MYVAR%" -> "%CUSTOM_MYVAR%".
+- Fix intermittent failures of unit tests, and enable print of AS exceptions.
+  Changes and improvements to fixtures and pytest organisation and setup #2745
+- Removed broken migrate command #2617
+- Allow users to delete multiple experiments #1216 #2793
+- Copying git session of an experiment #2828
+
+### 4.1.15: Bug fixes, enhancements, and new features
+
+The filter `-fp` of the command `autosubmit stats` changed in this release.
+Previously, a `-fp 0` would not raise any errors, and would bring all the
+jobs, just like when no filter is provided. Now both negative numbers and
+`0` (zero) raise an error, and only values greater than `0` are used to compute
+the filter the jobs. Not using any value for `-fp` still returns all jobs.
+
+**Bug fixes:**
+
+- Corrected the logic for handling `ZombieProcess` errors in `psutil` calls done in `autosubmit stop`, which
+  prevented the command from working correctly if the experiment process appeared after a zombie in the list #2394
+- Fixed an issue with Autosubmit's CITATION.cff that prevented Zenodo from automatically
+  adding new deposits via its webhook #2401
+- Deleted command `autosubmit test` that was not working in Autosubmit 4 #2386
+- Removed PBS and SGE platforms as they are not working in AS4 #2349
+- Log levels in the command line now accept `ERROR` #2412
+- Fix setstatus command to work in all cases #2381
+- Fix PS platform to work with the local machine #2374
+- Fixed a `ZeroDivisionError` when using RO-Crate or `stats`, and also an issue
+  where the message said `None` could not be iterable. #2389
+- Fixed a bug that produces an infinite loop when it is not possible to create log files #2618
+
+**Enhancements:**
+
+- EDITO Autosubmit-Demo container updated to install API in different environment #2398
+- Update portalocker requirement from <=3.1.1 to <=3.2.0 #2423
+- Additional files are now generated upon using the `autosubmit inspect` command #2323
+- Operational runs now require no pending commits, ensuring a cleaner workflow. [#2220](https://github.com/BSC-ES/autosubmit/issues/2220), [PR](https://github.com/BSC-ES/autosubmit/pull/2293)
+
+### 4.1.14: Bug fixes, enhancements, and new features
+
+**Bug fixes:**
+- Fixed an issue with X11 calls causing errors. [#2324](https://github.com/BSC-ES/autosubmit/issues/2324)
+- Resolved a problem where the Autosubmit monitor failed for non-owners of experiments. [#2272](https://github.com/BSC-ES/autosubmit/issues/2272)
+- Corrected an issue where `experiment_data` was not saved when using a shared account. [PR](https://github.com/BSC-ES/autosubmit-config-parser/pull/82)
+- Fixed timestamp-related issues in logs and processes. [#2275](https://github.com/BSC-ES/autosubmit/issues/2275), [PR](https://github.com/BSC-ES/autosubmit/pull/2284), [PR](https://github.com/BSC-ES/autosubmit/pull/2329)
+- Reintroduced the `%SCRATCH_DIR%` variable and fixed problems with date variables. [#2248](https://github.com/BSC-ES/autosubmit/issues/2248), [PR](https://github.com/BSC-ES/autosubmit/pull/2292)
+- Resolved an authentication issue related to user mapping. [PR #2333](https://github.com/BSC-ES/autosubmit/pull/2333)
+- Fixed issues with wrapper not updating status correctly. [#2274](https://github.com/BSC-ES/autosubmit/issues/2274) [PR](https://github.com/BSC-ES/autosubmit/pull/2327)
+
+**Enhancements:**
+- Improved validation for the `expid` flag. [PR](https://github.com/BSC-ES/autosubmit/pull/2309)
+- Made the details database more consistent and reliable. [PR](https://github.com/BSC-ES/autosubmit/pull/2296)
+- Enhanced the flexibility of workflows, allowing for more adaptable configurations. [#2276](https://github.com/BSC-ES/autosubmit/issues/2276)
+- Improved the log recovery logs. [PR](https://github.com/BSC-ES/autosubmit/pull/2341)
+
+**New features:**
+- Added support for `%^%` variables to improve template customization. [PR](https://github.com/BSC-ES/autosubmit/pull/2288), [Docs](https://autosubmit.readthedocs.io/en/latest/userguide/templates.html#sustitute-placeholders-after-all-files-have-been-loaded)
+
+### 4.1.13: Dependencies bug fixes, regression tests
+
+- Fixed issues with dependencies not being correctly set or not being pruned. [#2184](https://github.com/BSC-ES/autosubmit/issues/2184) [PR](https://github.com/BSC-ES/autosubmit/pull/2241)
+- Added dependencies regression test [PR](https://github.com/BSC-ES/autosubmit/pull/2241)
+
+### 4.1.12: Logs, Memory, DB fixes. Enhancements, new features, and overall bug fixes.
+
+**Mem fixes:** [PR](https://github.com/BSC-ES/autosubmit/pull/2130)
+- Memory problems when running Autosubmit experiments on ClimateDT VM [#2122](https://github.com/BSC-ES/autosubmit/issues/2122)
+  - Reduced job\_list, imports, log processors memory usage.
+  - Memory leaks. [#2160](https://github.com/BSC-ES/autosubmit/issues/2160)
+
+**Logs and db fixes:**
+- Revive log process while Autosubmit is running [#2097](https://github.com/BSC-ES/autosubmit/pull/2097)
+- CPU consumption fix [#1472](https://github.com/BSC-ES/autosubmit/issues/1472)
+- Platforms don't recover logs and process exit prematurely [#1470](https://github.com/BSC-ES/autosubmit/issues/1470)
+- Autosubmit remote log processes orphans [#1390](https://github.com/BSC-ES/autosubmit/issues/1390), [#1381](https://github.com/BSC-ES/autosubmit/issues/1381)
+- Improve the log from log recovery processors [#2035](https://github.com/BSC-ES/autosubmit/issues/2035)
+
+**Enhancements and new features:**
+- Better log output on crash showing the command args and expid. [#2083](https://github.com/BSC-ES/autosubmit/issues/2083)
+- Mail notifier now has the path to the logs and, optionally, the log attached [#1434](https://github.com/BSC-ES/autosubmit/issues/1434)
+- Changed pip installation method from setup.py to pyproject.toml [#2180](https://github.com/BSC-ES/autosubmit/issues/2180), [#1384](https://github.com/BSC-ES/autosubmit/issues/1384)
+- Autosubmit has a new entry point: autosubmit/scripts/autosubmit.py [#2182](https://github.com/BSC-ES/autosubmit/issues/2182)
+- Fix typos in messages shown to users [#1469](https://github.com/BSC-ES/autosubmit/issues/1469)
+- Each workflow change is tracked as long as it is committed and pushed. [#2213](https://github.com/BSC-ES/autosubmit/pull/2213), [#2179](https://github.com/BSC-ES/autosubmit/issues/2179)
+- User mapping aka running under one robot account [#2009](https://github.com/BSC-ES/autosubmit/pull/2009)
+- Allow pipeline commands by correcting the Autosubmit commands return values [#2124](https://github.com/BSC-ES/autosubmit/issues/2124)
+- Allow users to create RO-Crate archives without archiving experiments [#1412](https://github.com/BSC-ES/autosubmit/issues/1412)
+
+**Bug fixes:**
+- autosubmit stop reworked to work with long names [#2104](https://github.com/BSC-ES/autosubmit/issues/2104)
+- e-mail notification not working [#1483](https://github.com/BSC-ES/autosubmit/issues/1483)
+- Weak dependencies in splits [#2067](https://github.com/BSC-ES/autosubmit/issues/2067)
+- Current variables [#2004](https://github.com/BSC-ES/autosubmit/issues/2004)
+- Recovery command issues [#1480](https://github.com/BSC-ES/autosubmit/issues/1480)
+- Pip installation fixes [#1460](https://github.com/BSC-ES/autosubmit/issues/1460)
+- Variable parsing fixes [#1466](https://github.com/BSC-ES/autosubmit/issues/1466), [#2065](https://github.com/BSC-ES/autosubmit/issues/2065)
+- Splits="auto" fixes. [#1464](https://github.com/BSC-ES/autosubmit/issues/1464)
+- Fugaku Header fixes [#1459](https://github.com/BSC-ES/autosubmit/issues/1459)
+- Custom directives [#1457](https://github.com/BSC-ES/autosubmit/issues/1457)
+- Job submission error handle changed from Critical -> Error [#2102](https://github.com/BSC-ES/autosubmit/issues/2102)
+- Wrapper deadlock fixes.
+- Fixed an issue with Autosubmit expid -y \$expid not copying 3.1X experiments. [#2073](https://github.com/BSC-ES/autosubmit/issues/2073)
+
+**Autosubmit tests:**
+- Multiple pull requests for unit tests, lint, vulture, and coverage improvements.
+- Added integration tests for DB, logs, and autosubmit run.
+- Improved the performance of the tests.
+
+**Autosubmit config parser:**
+- Updated ruamel.yaml to 0.18.8.
+- Track workflow commits [#74](https://github.com/BSC-ES/autosubmit-config-parser/pull/74)
+- Optimized the memory usage of the autosubmit config parser. [#70](https://github.com/BSC-ES/autosubmit-config-parser/pull/70)
+- Export hpcarch parameters for the templates. [function](https://github.com/BSC-ES/autosubmit-config-parser/blob/fbd1f388ce57bd5d17f76bccea2aa02b0e2ab09a/autosubmitconfigparser/config/configcommon.py#L1876)
+- Wallclock normalization and max\_wallclock > job wallclock error. [#67](https://github.com/BSC-ES/autosubmit-config-parser/pull/67)
+- Added support for environment variables. These must be named as "AS\_ENV\_<VAR>" [#54](https://github.com/BSC-ES/autosubmit-config-parser/pull/54)
+- Notify\_on, dependencies, "current\_" variables fixes. [#58](https://github.com/BSC-ES/autosubmit-config-parser/pull/58), [#53](https://github.com/BSC-ES/autosubmit-config-parser/pull/53), [#59](https://github.com/BSC-ES/autosubmit-config-parser/pull/59)
+
+**Others:**
+- All autosubmit projects moved to Github.
+- Added GitHub actions for CI/CD.
+
+4.1.11 - Enhancements, New Features, Documentation, and Bug Fixes
+=================================================================
+
+Enhancements and new features:
+
+- #1444: Additional files now support YAML format.
+- #1397: Use `tini` as entrypoint in our Docker image.
+- #1207: Add experiment path in `autosubmit describe`.
+- #1130: Now `autosubmit refresh` can clone without submodules.
+- #1320: Pytest added to the CI/CD.
+- #945: Fix portalocker releasing the lock when a portalocker exception
+  is raised. Now it prints the warnings but only releases the lock when
+  the command finishes (successfully or not).
+- #1428: Use natural sort order for graph entries (adapted from Cylc),
+  enable doctests to be executed with pytest.
+- #1408: Updated our Docker image to work with Kubernetes.
+  Included sample helm charts (tested with minikube).
+- #1338: Stats can now be visualized in a PDF format.
+- #1337: Autosubmit inspect, and other commands, are now faster.
+
+Documentation and log improvements:
+- #1274: A traceability section has been added.
+- #1273: Improved AS logs by removing deprecated messages.
+- #1394: Added Easybuild recipes for Autosubmit.
+- #1439: Autosubmitconfigparser and ruamel.yaml updated.
+- #1400: Fixes an issue with monitor and check experiment RTD section.
+- #1382: Improved AS logs, removing paramiko warnings. (Updated paramiko version)
+- #1373: Update installation instructions with `rsync`, and fix
+  our `Dockerfile` by adding `rsync` and `subversion`.
+- #1242: Improved warnings when using extended header/tailer.
+- #1431: Updated the YAML files to use marenostrum5 instead of marenostrum4.
+
+Bug fixes:
+- #1423, #1421, and #1419: Fixes different issues with the split feature.
+- #1407: Solves an issue when using one node.
+- #1406: Autosubmit monitor is now able to monitor non-owned experiments again.
+- #1317: Autosubmit delete now deletes the metadata and database entries.
+- #1105: Autosubmit configure now admits paths that end with "/".
+- #1045: Autosubmit now admits placeholders set in lists.
+- #1417, #1398, #1287, and #1386: Fixes and improves the wrapper deadlock detection.
+- #1436: Dependencies with Status=Running not working properly.
+- (also enhancement) #1426: Fixes an issue with as_checkpoints.
+- #1393: Better support for boolean YAML configurations.
+- #1129: (Custom config) Platforms can now be defined under $expid/conf.
+- #1443: Fixes an issue with additional files under bscearth000.
+
+Others:
+
+- #1427: Readthedocs works again.
+- #1376: Autosubmit 4.1.9 was published to DockerHub.
+- #1327: LSF platform has been removed.
+- #1322: Autosubmit now has a DockerHub organization.
+- #1123: Profiler can now be stopped.
+
+4.1.10 - Hotfix
+===============
+- Fixed an issue with the performance of the log retrieval.
+
+4.1.9 - Zombies, splits, tests and bug fixes
+=====================================
+- Splits calendar: Added a complete example to the documentation.
+- Splits calendar: Fixed some issues with the split=" auto."
+- Added two regression tests to check the .cmd with the default parameters.
+- Fixed the command inspect without the -f.
+- Yet another fix for zombie processors.
+- Fixed the describe command when a user disappears from the system.
+- Fixes an issue with dependency not being linked.
+- Docs improved.
+
+4.1.8 - Bug fixes.
+==================
+- Fixed an issue with a socket connection left open.
+- Fixed an issue with log recovery being disabled by default.
+- Added exclusive parameter
+- Fixed some X11 routines called by default
+
+4.1.7 - X11, Migrate, script and Bug fixes
+==========================================
+- Migrate added, a feature to change the ownership of the experiments (/scratch and autosubmit_data paths)
+- X11 added ( If you have to use an older version, after using this one. Autosubmit will complain until you perform create -f and recovery)
+- Multiple QoL and bug fixes for wrappers and fixed horizontal ones.
+- Added a new parameter `SCRIPT` that allows to write templates in the yaml config.
+- Fixed an issue with STAT file.
+- Fixed all issues related to zombie processors.
+
+4.1.6 - Bug fixes
+=====================
+- Fixed issues with additional files and dates
+- Fixed issues with calendar splits
+- Fixed issues with log processors
+- Fixed issues with expid regex on --copy
+- Added Autosubmit stop command
+
+4.1.5 - PJS - Fugaku - Support
+=====================
+- Added Fugaku support.
+- Enhanced the support for PJS.
+- Added wrapper support for PJS scheduler
+- Fixed issues with log traceback.
+
+4.1.4 - Docs and Log Rework
+=====================
+- Log retrieval has been fully reworked, improving it is performance, FD, and memory usage.
+- Fixed several issues with logs not being retrieved sometimes.
+- Fixed several issues with job_data not being written correctly.
+- Fixed some issues with retrials squashing stats/ logs.
+- Added Marenostrum5 support.
+- Fixed some issues with jobs inside a wrapper not having their parameters updated in realtime.
+- Features a complete design rework of the autosubmit readthedocs
+- Fixed an issue with create without -f causing some jobs not having parent dependencies
+
+4.1.3 - Bug fixes
+=================
+- Added Leonardo support.
+- Improved inspect command.
+- Added a new option to inspect.
+- Wrapper now admits placeholders.
+- Reworked the wrapper deadlock code and total _jobs code. And fixed issues with "on_submission" jobs and wrappers.
+- Fixed issues with create without -f and splits.
+- Improved error clarity.
+- Added RO-Crate.
+- Added Calendar for splits.
+
+4.1.2 - Bug fixes
+=================
+- Fixed issues with version.
+- Fixed issues with the duplication of jobs when using the heterogeneous option.
+- Fixed some error messages.
+- Fixed issues with monitoring non-owned experiments.
+
+4.1.1 - Workflow optimizations and bug fixes
+==========================================
+
+Autosubmit supports much larger workflows in this version and has improved performance and memory usage. We have also fixed several bugs and added new features.
+
+- Improved the performance and memory usage of the workflow generation process.
+    -  Improved the performance and memory usage of the jobs generation process.
+    -  Improved the performance and memory usage of the dependency generation process.
+- Improved the performance and memory usage of the workflow visualization process.
+- Added a new filter to setstatus ( -ftcs ) to filter by split.
+- Added -no-requeue to avoid requeueing jobs.
+- A mechanism was added to detect duplicate jobs.
+- Fixed multiple issues with the splits usage.
+- Fixed multiple issues with Totaljobs.
+- Reworked the deadlock detection mechanism.
+- Changed multiple debug messages to make them more straightforward.
+- Changed the load/save pkl procedure
+- Fixed issues with check command and additional files regex.
+- Added the previous keyword.
+- Fixed an issue with the historical db.
+- Fixed an issue with historical db logs.

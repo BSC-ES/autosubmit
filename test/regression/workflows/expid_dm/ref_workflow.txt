@@ -1,0 +1,9 @@
+## String representation of Job List [8]  ##
+a00m_LOCAL_SETUP ~ [1 child]
+|  a00m_REMOTE_SETUP ~ [1 child]
+|  |  a00m_20000101_fc0_INI ~ [1 child]
+|  |  |  a00m_20000101_fc0_1_SIM ~ [1 child]
+|  |  |  |  a00m_20000101_fc0_2_SIM ~ [1 child]
+|  |  |  |  |  a00m_POST ~ [1 child]
+|  |  |  |  |  |  a00m_CLEAN ~ [1 child]
+|  |  |  |  |  |  |  a00m_20000101_fc0_TRANSFER

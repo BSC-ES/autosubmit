@@ -1,0 +1,37 @@
+## In this file we define the configuration used in the HISTORICAL run (1990-2020)
+
+EXPERIMENT:
+   DATELIST: 20200101 #Startdate
+   MEMBERS: fc0
+   CHUNKSIZEUNIT: day
+   CHUNKSIZE: 15
+   NUMCHUNKS: 488
+   CALENDAR: standard
+
+PLATFORMS:
+   LUMI:
+        PARTITION: "standard"
+        MAX_WALLCLOCK: "24:00"
+
+JOBS:
+   SIM:
+       WALLCLOCK: "06:00"
+       RETRIALS: 5
+
+CONFIGURATION:
+        RAPS_USER_FLAGS: "--hugepages --nemorwdist --nemodistdir=/flash/project_465000454/models/IFS/inputs/inputs_de_48r1/dists/parinter_eORCA12_Z75_3216_-1x-1  --cbmf_reduced --no-ozone --sicoupl=1 --stacksize=200 --nwamproma=32"
+        ICMCL: "biweekly"
+        RAPS_EXPERIMENT: "SSP370"
+        IFS:
+                EXPVER: i9t5
+                IO_NODES: 7
+                IO_PPN: 16
+        NEMO:
+                IO_NODES: 4
+                IO_PPN: 4
+
+REQUEST:
+        EXPERIMENT: "SSP3-7.0"
+        ACTIVITY: "ScenarioMIP"
+        GENERATION: 1
+        REALIZATION: 1

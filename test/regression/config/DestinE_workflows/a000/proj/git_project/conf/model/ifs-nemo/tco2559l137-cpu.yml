@@ -1,0 +1,21 @@
+CONFIGURATION:
+  DQC_PROFILE: production
+  DATA_PORTFOLIO: production
+  IFS:
+    GTYPE: tco
+    RESOL: 2559
+    LEVELS: 137
+    EXPVER: hzfy
+    LABEL: LWDA
+
+    IO_NODES: 40
+
+PLATFORMS:
+   LUMI:
+    NODES: 256
+    TASKS: 16
+    THREADS: 8
+    PROCESSORS_PER_NODE: 128
+
+REQUEST:
+  RESOLUTION: high
