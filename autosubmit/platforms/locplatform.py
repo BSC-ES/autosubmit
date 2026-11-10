@@ -148,7 +148,7 @@ class LocalPlatform(ParamikoPlatform):
                 if first_line.startswith('[INFO] JOBID='):
                     return int(first_line.split('=', 1)[1].strip())
         except (ValueError, OSError, IndexError):
-            pass
+            ...
         return None
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:

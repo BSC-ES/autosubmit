@@ -77,7 +77,7 @@ class CancelAction(Action):
             namespace.filter_status.upper() == "SUBMITTED, QUEUING, RUNNING"
             or namespace.target.upper() == "FAILED"
         ):
-            pass
+            ...
         else:
             parser.error("-fs and -t can only be used when --cancel is provided")
 

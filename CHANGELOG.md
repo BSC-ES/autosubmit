@@ -44,6 +44,8 @@ several bug fixes and enhancements to improve the overall user experience.
   folder is owned by a UID with no `passwd` entry (e.g. inside containers) #3375
 - Fixed mail notifications crashing the experiment when `MAIL.TO` is a string #2974
 - Fix job timestamps overflowing the PostgreSQL `jobs` table: `start_time_timestamp`, `submit_time_timestamp` and `finish_time_timestamp` are now `BigInteger` #3386 (thanks @Shakhtar-Sankur)
+- Fixed `Log.set_file` failing (after retrying) when the log directory had missing parent directories or
+  when given a bare file name; the directory is now created with its parents #3240 (thanks @anyingiit)
 
 **New Features:**
 
@@ -118,6 +120,17 @@ several bug fixes and enhancements to improve the overall user experience.
   multiple times, partially addressing #3326. #3327
 - Updating the Autosubmit version of an experiment (e.g., `create -v`) now creates the `db` folder #3293
 - Added a development Docker Compose setup for Autosubmit and Postgres #3363
+- Updated project coverage replacing pass statements by ... #2585 (thanks @Vietpr)
+
+### 4.1.17.2: Bug fixes and enhancements (port of #3309)
+
+**Bug fixes:**
+
+- Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
+
+**Enhancements:**
+
+- Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 

@@ -81,18 +81,18 @@ class WrapperBuilder:
         return ""  # pragma: no cover
 
     def build_job_thread(self):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     # hybrids
     def build_joblist_thread(self, **kwargs):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     # horizontal and hybrids
     def build_nodes_list(self):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def build_machinefiles(self):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def get_machinefile_function(self):
         machinefile_function = ""
@@ -108,23 +108,23 @@ class WrapperBuilder:
         return machinefile_function
 
     def build_machinefiles_standard(self):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def build_machinefiles_components(self):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def build_machinefiles_components_alternate(self):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def build_sequential_threads_launcher(self, **kwargs):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def build_parallel_threads_launcher(self, **kwargs):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     # all should override -> abstract!
     def build_main(self):
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def _indent(self, text, amount, ch=' '):
         padding = amount * ch
@@ -230,7 +230,7 @@ class PythonWrapperBuilder(WrapperBuilder):
 
     # hybrids
     def build_joblist_thread(self):
-        pass
+        ...
 
     # horizontal and hybrids
     def build_nodes_list(self):
@@ -501,13 +501,13 @@ for i in range(len(pid_list)):
 
     # all should override -> abstract!
     def build_main(self):
-        pass
+        ...
 
     def dependency_directive(self):
-        pass
+        ...
 
     def queue_directive(self):
-        pass
+        ...
 
     def _indent(self, text, amount, ch=' '):
         padding = amount * ch
@@ -838,7 +838,7 @@ class SrunWrapperBuilder(WrapperBuilder):
 
     # hybrids
     def build_joblist_thread(self):
-        pass
+        ...
 
     def build_job_thread(self):
         return textwrap.dedent(""" """)
@@ -952,17 +952,17 @@ processors_per_node = int(jobs_resources['PROCESSORS_PER_NODE'])
         {os.linesep.ljust(13)}""")
 
     def build_srun_launcher(self, jobs_list, footer=True):
-        pass
+        ...
 
     # all should override -> abstract!
     def build_main(self):
-        pass
+        ...
 
     def dependency_directive(self):
-        pass
+        ...
 
     def queue_directive(self):
-        pass
+        ...
 
     def _indent(self, text, amount, ch=' '):
         padding = amount * ch
