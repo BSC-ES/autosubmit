@@ -21,43 +21,62 @@ import re
 from configparser import ConfigParser
 from pathlib import Path
 
-REFERENCE_PATTERN = re.compile(r"(?<!%)%(?!%)([^%]+?)(?=%(?!%))")
+REFERENCE_PATTERN = re.compile(
+    r"""
+    (?<!%)                  # not preceded by another %
+    %                       # opening delimiter
+    \^?                     # optional special prefix
+    ([a-zA-Z0-9_.-]+)       # identifier-shaped name, same class used by the engine
+    (?:\^\^|,,)?            # optional modifiers
+    %                       # closing delimiter, consumed
+    (?!%)                   # not followed by another %
+    """,
+    re.VERBOSE | re.IGNORECASE,
+)
 """This regex will be used to check and validate if the are strings in which the values are inbetween the percentage symbol"""
+
 
 class BasicConfig:
     """
     Class to manage configuration for Autosubmit path, database and default values for new experiments
     """
+
     def props(self) -> dict:
         pr = {}
         for name in dir(self):
             value = getattr(self, name)
-            if not name.startswith('__') and not inspect.ismethod(value) and not inspect.isfunction(value):
+            if (
+                not name.startswith("__")
+                and not inspect.ismethod(value)
+                and not inspect.isfunction(value)
+            ):
                 pr[name] = value
         return pr
 
     DB_DIR = str(Path("~/debug/autosubmit").expanduser())
-    STRUCTURES_DIR = str(Path("/esarchive") / "autosubmit" / "as_metadata" / "structures")
+    STRUCTURES_DIR = str(
+        Path("/esarchive") / "autosubmit" / "as_metadata" / "structures"
+    )
     GLOBAL_LOG_DIR = str(Path("/esarchive") / "autosubmit" / "Aslogs")
     DEFAULT_OUTPUT_DIR = str(Path("/esarchive") / "autosubmit" / "as_output" / "stats")
-    JOBDATA_DIR =  str(Path("/esarchive") / "autosubmit" / "as_metadata" / "data")
+    JOBDATA_DIR = str(Path("/esarchive") / "autosubmit" / "as_metadata" / "data")
     HISTORICAL_LOG_DIR = str(Path("/esarchive") / "autosubmit" / "as_metadata" / "logs")
     AUTOSUBMIT_API_URL = "http://192.168.11.91:8081"
-    DB_FILE = 'autosubmit.db'
-    AS_TIMES_DB = 'as_times.db'
+    DB_FILE = "autosubmit.db"
+    AS_TIMES_DB = "as_times.db"
     DB_PATH = str(Path(DB_DIR) / DB_FILE)
     AS_TIMES_DB_PATH = str(Path(DB_DIR) / AS_TIMES_DB)
     LOCAL_ROOT_DIR = DB_DIR
-    LOCAL_TMP_DIR = 'tmp'
-    LOCAL_ASLOG_DIR = 'ASLOGS'
-    LOCAL_PROJ_DIR = 'proj'
-    DEFAULT_PLATFORMS_CONF = ''
-    CUSTOM_PLATFORMS_PATH = ''
-    DEFAULT_JOBS_CONF = ''
-    SMTP_SERVER = ''
-    MAIL_FROM = ''
-    ALLOWED_HOSTS: str | dict = ''
-    DENIED_HOSTS: str | dict = ''
+    LOCAL_TMP_DIR = "tmp"
+    LOCAL_ASLOG_DIR = "ASLOGS"
+    LOCAL_PROJ_DIR = "proj"
+    DEFAULT_PLATFORMS_CONF = ""
+    CUSTOM_PLATFORMS_PATH = ""
+    DEFAULT_JOBS_CONF = ""
+    SMTP_SERVER = ""
+    MAIL_FROM = ""
+    ALLOWED_HOSTS: str | dict = ""
+    DENIED_HOSTS: str | dict = ""
     CONFIG_FILE_FOUND = False
     DATABASE_BACKEND = "sqlite"
     DATABASE_CONN_URL = ""
@@ -90,11 +109,11 @@ class BasicConfig:
 
     @staticmethod
     def expid_lock_file(exp_id):
-        return BasicConfig.expid_tmp_dir(exp_id).joinpath('autosubmit.lock')
+        return BasicConfig.expid_tmp_dir(exp_id).joinpath("autosubmit.lock")
 
     @staticmethod
     def expid_log_dir(exp_id):
-        return BasicConfig.expid_tmp_dir(exp_id).joinpath(f'LOG_{exp_id}')
+        return BasicConfig.expid_tmp_dir(exp_id).joinpath(f"LOG_{exp_id}")
 
     @staticmethod
     def expid_aslog_dir(exp_id):
@@ -107,7 +126,9 @@ class BasicConfig:
         """
         # Just one needed for the moment.
         BasicConfig.DB_PATH = str(Path(BasicConfig.DB_DIR) / BasicConfig.DB_FILE)
-        BasicConfig.AS_TIMES_DB_PATH = str(Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB)
+        BasicConfig.AS_TIMES_DB_PATH = str(
+            Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB
+        )
 
     @staticmethod
     def __read_file_config(file_path: Path | str):
@@ -125,87 +146,86 @@ class BasicConfig:
         parser.optionxform = str  # type: ignore[assignment]
         parser.read(file_path)
 
-        if parser.has_option('database', 'path'):
-            BasicConfig.DB_DIR = parser.get('database', 'path')
-        if parser.has_option('database', 'filename'):
-            BasicConfig.DB_FILE = parser.get('database', 'filename')
-        if parser.has_option('database', 'backend'):
-            BasicConfig.DATABASE_BACKEND = parser.get('database', 'backend')
-        if parser.has_option('database', 'connection_url'):
-            BasicConfig.DATABASE_CONN_URL = parser.get('database', 'connection_url')
-        if parser.has_option('database', 'backup'):
-            BasicConfig.DATABASE_BACKUP = parser.getboolean('database', 'backup')
-        if parser.has_option('local', 'path'):
-            BasicConfig.LOCAL_ROOT_DIR = parser.get('local', 'path')
-        if parser.has_option('conf', 'platforms'):
-            BasicConfig.DEFAULT_PLATFORMS_CONF = parser.get(
-                'conf', 'platforms')
-        if parser.has_option('conf', 'custom_platforms'):
-            BasicConfig.CUSTOM_PLATFORMS_PATH = parser.get(
-                'conf', 'custom_platforms')
-        if parser.has_option('conf', 'jobs'):
-            BasicConfig.DEFAULT_JOBS_CONF = parser.get('conf', 'jobs')
-        if parser.has_option('mail', 'smtp_server'):
-            BasicConfig.SMTP_SERVER = parser.get('mail', 'smtp_server')
-        if parser.has_option('mail', 'mail_from'):
-            BasicConfig.MAIL_FROM = parser.get('mail', 'mail_from')
-        if parser.has_option('hosts', 'authorized'):
-            list_command_allowed = parser.get('hosts', 'authorized').split('] ')
+        if parser.has_option("database", "path"):
+            BasicConfig.DB_DIR = parser.get("database", "path")
+        if parser.has_option("database", "filename"):
+            BasicConfig.DB_FILE = parser.get("database", "filename")
+        if parser.has_option("database", "backend"):
+            BasicConfig.DATABASE_BACKEND = parser.get("database", "backend")
+        if parser.has_option("database", "connection_url"):
+            BasicConfig.DATABASE_CONN_URL = parser.get("database", "connection_url")
+        if parser.has_option("database", "backup"):
+            BasicConfig.DATABASE_BACKUP = parser.getboolean("database", "backup")
+        if parser.has_option("local", "path"):
+            BasicConfig.LOCAL_ROOT_DIR = parser.get("local", "path")
+        if parser.has_option("conf", "platforms"):
+            BasicConfig.DEFAULT_PLATFORMS_CONF = parser.get("conf", "platforms")
+        if parser.has_option("conf", "custom_platforms"):
+            BasicConfig.CUSTOM_PLATFORMS_PATH = parser.get("conf", "custom_platforms")
+        if parser.has_option("conf", "jobs"):
+            BasicConfig.DEFAULT_JOBS_CONF = parser.get("conf", "jobs")
+        if parser.has_option("mail", "smtp_server"):
+            BasicConfig.SMTP_SERVER = parser.get("mail", "smtp_server")
+        if parser.has_option("mail", "mail_from"):
+            BasicConfig.MAIL_FROM = parser.get("mail", "mail_from")
+        if parser.has_option("hosts", "authorized"):
+            list_command_allowed = parser.get("hosts", "authorized").split("] ")
             i = 0
             for _ in list_command_allowed:
-                list_command_allowed[i] = list_command_allowed[i].strip('[]')
+                list_command_allowed[i] = list_command_allowed[i].strip("[]")
                 i = i + 1
             restrictions = {}
             for command_unparsed in list_command_allowed:
-                command_allowed = command_unparsed.split(' ')
-                if ',' in command_allowed[0]:
-                    for command in command_allowed[0].split(','):
-                        if ',' in command_allowed[1]:
-                            restrictions[command] = command_allowed[1].split(',')
+                command_allowed = command_unparsed.split(" ")
+                if "," in command_allowed[0]:
+                    for command in command_allowed[0].split(","):
+                        if "," in command_allowed[1]:
+                            restrictions[command] = command_allowed[1].split(",")
                         else:
                             restrictions[command] = [command_allowed[1]]
                 else:
-                    if ',' in command_allowed[1]:
-                        restrictions[command_allowed[0]] = command_allowed[1].split(',')
+                    if "," in command_allowed[1]:
+                        restrictions[command_allowed[0]] = command_allowed[1].split(",")
                     else:
                         restrictions[command_allowed[0]] = [command_allowed[1]]
             BasicConfig.ALLOWED_HOSTS = restrictions
-        if parser.has_option('hosts', 'forbidden'):
-            list_command_allowed = parser.get('hosts', 'forbidden').split('] ')
+        if parser.has_option("hosts", "forbidden"):
+            list_command_allowed = parser.get("hosts", "forbidden").split("] ")
             i = 0
             for _ in list_command_allowed:
-                list_command_allowed[i] = list_command_allowed[i].strip('[]')
+                list_command_allowed[i] = list_command_allowed[i].strip("[]")
                 i = i + 1
             restrictions = {}
             for command_unparsed in list_command_allowed:
-                command_allowed = command_unparsed.split(' ')
-                if ',' in command_allowed[0]:
-                    for command in command_allowed[0].split(','):
-                        if ',' in command_allowed[1]:
-                            restrictions[command] = command_allowed[1].split(',')
+                command_allowed = command_unparsed.split(" ")
+                if "," in command_allowed[0]:
+                    for command in command_allowed[0].split(","):
+                        if "," in command_allowed[1]:
+                            restrictions[command] = command_allowed[1].split(",")
                         else:
                             restrictions[command] = [command_allowed[1]]
                 else:
-                    if ',' in command_allowed[1]:
-                        restrictions[command_allowed[0]] = command_allowed[1].split(',')
+                    if "," in command_allowed[1]:
+                        restrictions[command_allowed[0]] = command_allowed[1].split(",")
                     else:
                         restrictions[command_allowed[0]] = [command_allowed[1]]
             BasicConfig.DENIED_HOSTS = restrictions
-        if parser.has_option('structures', 'path'):
-            BasicConfig.STRUCTURES_DIR = parser.get('structures', 'path')
-        if parser.has_option('globallogs', 'path'):
-            BasicConfig.GLOBAL_LOG_DIR = parser.get('globallogs', 'path')
-        if parser.has_option('defaultstats', 'path'):
-            BasicConfig.DEFAULT_OUTPUT_DIR = parser.get('defaultstats', 'path')
-        if parser.has_option('historicdb', 'path'):
-            BasicConfig.JOBDATA_DIR = parser.get('historicdb', 'path')
-        if parser.has_option('historiclog', 'path'):
-            BasicConfig.HISTORICAL_LOG_DIR = parser.get('historiclog', 'path')
-        if parser.has_option('autosubmitapi', 'url'):
-            BasicConfig.AUTOSUBMIT_API_URL = parser.get(
-                'autosubmitapi', 'url')
-        if parser.has_option('config', 'log_recovery_timeout'):
-            BasicConfig.LOG_RECOVERY_TIMEOUT = int(parser.get('config', 'log_recovery_timeout'))
+        if parser.has_option("structures", "path"):
+            BasicConfig.STRUCTURES_DIR = parser.get("structures", "path")
+        if parser.has_option("globallogs", "path"):
+            BasicConfig.GLOBAL_LOG_DIR = parser.get("globallogs", "path")
+        if parser.has_option("defaultstats", "path"):
+            BasicConfig.DEFAULT_OUTPUT_DIR = parser.get("defaultstats", "path")
+        if parser.has_option("historicdb", "path"):
+            BasicConfig.JOBDATA_DIR = parser.get("historicdb", "path")
+        if parser.has_option("historiclog", "path"):
+            BasicConfig.HISTORICAL_LOG_DIR = parser.get("historiclog", "path")
+        if parser.has_option("autosubmitapi", "url"):
+            BasicConfig.AUTOSUBMIT_API_URL = parser.get("autosubmitapi", "url")
+        if parser.has_option("config", "log_recovery_timeout"):
+            BasicConfig.LOG_RECOVERY_TIMEOUT = int(
+                parser.get("config", "log_recovery_timeout")
+            )
 
     @staticmethod
     def read():

@@ -286,8 +286,13 @@ def validate_dependencies(data) -> None:
         raise AutosubmitCritical(
             f"Recursion found validating the configuration files! Cycle: {chain}"
         )
-
-    if len(unresolved) > 0:
-        Log.warning(
-            f"Configuration files has variables that point to nothing! \nPlease double check the following variable(s) {unresolved}."
-        )
+    for set_value in unresolved:
+        data_value = data
+        key_value = set_value[1].split(".")
+        try:
+            for key in key_value:
+                data_value = data_value[key.upper()]
+        except (TypeError, KeyError):
+            Log.warning(
+                f"Configuration files has variables that point to nothing! \nPlease double check the following variable(s) {set_value}."
+            )

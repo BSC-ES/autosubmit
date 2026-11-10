@@ -44,7 +44,7 @@ from autosubmit.log.log import AutosubmitCritical
         },
         {
             "TEST_SLURM": {
-                "TESTS": '%"CURRENT_TESTS%/fdb-copy',
+                "FDB_COPY_BIN": '%"CURRENT_FDB_COPY_BIN%/fdb-copy',
                 "FDB_DICT_BIN": "TEST_FOLDER/%^CURRENT_FDB_DICT_BIN%/fdb-list",
             },
         },
@@ -97,16 +97,10 @@ def test_dynamic_variable_deep_add_missing_starter_conf(
     "experiment_data",
     [
         {
-            "A": {
-                "SCRIPT": "echo %% %CURRENT_SCRIPT%",
-                "CHUNK": "%CHUNK%"
-            },
+            "A": {"SCRIPT": "echo %% %CURRENT_SCRIPT%", "CHUNK": "%CHUNK%"},
         },
         {
-            "A": {
-                "SCRIPT": "echo % %CURRENT_SCRIPT%",
-                "CHUNK": "%CHUNK%"
-            },
+            "A": {"SCRIPT": "echo % %CURRENT_SCRIPT%", "CHUNK": "%CHUNK%"},
         },
     ],
     ids=[
@@ -127,10 +121,10 @@ def test_empty_dynamic_variable_deep_add_missing_starter_conf(
         as_conf.experiment_data = as_conf.deep_add_missing_starter_conf(
             general_data, as_conf.experiment_data
         )
-    if "echo % %" in experiment_data["A"]["SCRIPT"]:
-        assert "where empty dynamic variable was set" in ac.value.message
-    else:
-        assert "causing infinite recursion during evaluation of the element" in ac.value.message
+    assert (
+        "causing infinite recursion during evaluation of the element"
+        in ac.value.message
+    )
 
 
 @pytest.mark.parametrize(
@@ -170,10 +164,17 @@ def test_empty_dynamic_variable_deep_add_missing_starter_conf(
         },
         {
             "JOBS": {
-                "A": {
-                    "SCRIPT": "OK %TEST.CURRENT_TE_ME%",
-                    "CHUNK": "%CHUNK%"
-                },
+                "A": {"SCRIPT": "OK %TEST.CURRENT_TE_ME%", "CHUNK": "%CHUNK%"},
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TE_ME": "Hi %JOBS.A.SCRIPT%",
+                "CURRENT_TE_ME": "Hi %JOBS.A.SCRIPT%",
+            },
+        },
+        {
+            "JOBS": {
+                "A": {"SCRIPT": "OK %TEST.current_te_me%", "CHUNK": "%CHUNK%"},
             },
             "TEST": {
                 "NAME": "AUTOSUBMIT",
@@ -187,6 +188,7 @@ def test_empty_dynamic_variable_deep_add_missing_starter_conf(
         "Special Deeper Dynamic Variable",
         "Full Cycle Dynamic Variable",
         "Full Cycle Current Dynamic Variable",
+        "Full Cycle Current Dynamic Variable Case Insensitive",
     ],
 )
 def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, new_data):
@@ -313,9 +315,23 @@ def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, ne
         ),
         (
             {
+                "TEST_SLURM": {
+                    "QUEUE": "%PATTERN=%Y%m%d %H:%M:%S",
+                    "ANOTHER_QUEUE": "%Y%m%d %H:%M:%S",
+                },
+            },
+            {
+                "TEST_SLURM": {
+                    "ANOTHER_QUEUE": "%Y%m%d %H:%M:%S",
+                    "QUEUE": "%PATTERN=%Y%m%d %H:%M:%S",
+                }
+            },
+        ),
+        (
+            {
                 "JOBS": {
                     "LOCAL_SETUP": {
-                        "SCRIPT": "echo $(date -u -d '${startdate} + $(( numchunks * chunksize )) month' +%Y%m%d)",
+                        "SCRIPT": "echo $(%Y%m%d %H:%M:%S date -u -d '${startdate} + $(( numchunks * chunksize )) month' +%Y%m%d)",
                         "PLATFORM": "TEST_SLURM",
                         "RUNNING": "once",
                         "CHECK": "on_submission",
@@ -335,7 +351,7 @@ def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, ne
             {
                 "JOBS": {
                     "LOCAL_SETUP": {
-                        "SCRIPT": "echo $(date -u -d '${startdate} + $(( numchunks * chunksize )) month' +%Y%m%d)",
+                        "SCRIPT": "echo $(%Y%m%d %H:%M:%S date -u -d '${startdate} + $(( numchunks * chunksize )) month' +%Y%m%d)",
                         "PLATFORM": "TEST_SLURM",
                         "RUNNING": "once",
                         "CHECK": "on_submission",
@@ -391,6 +407,54 @@ def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, ne
                 },
             },
         ),
+        (
+            {
+                "TEST": {
+                    "A": "AAA",
+                    "B": "BBB",
+                },
+                "JOBS": {
+                    "LOCAL_SETUP": {
+                        "SCRIPT": "echo %TEST.A%/%TEST.B%",
+                    },
+                    "PLATFORM": "LOCAL",
+                    "RUNNING": "once",
+                },
+            },
+            {
+                "JOBS": {
+                    "LOCAL_SETUP": {"SCRIPT": "echo AAA/BBB"},
+                    "PLATFORM": "LOCAL",
+                    "RUNNING": "once",
+                },
+                "TEST": {
+                    "A": "AAA",
+                    "B": "BBB",
+                },
+            },
+        ),
+        (
+            {
+                "TEST": {"NAME": "BLA"},
+                "JOBS": {
+                    "LOCAL_SETUP": {
+                        "SCRIPT": "echo %test.name%",
+                        "PLATFORM": "LOCAL",
+                        "RUNNING": "once",
+                    },
+                },
+            },
+            {
+                "TEST": {"NAME": "BLA"},
+                "JOBS": {
+                    "LOCAL_SETUP": {
+                        "PLATFORM": "LOCAL",
+                        "RUNNING": "once",
+                        "SCRIPT": "echo BLA"
+                    },
+                },
+            },
+        )
     ],
     ids=[
         "Special Dynamic Variable",
@@ -399,9 +463,12 @@ def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, ne
         "Non special Variable % at the start",
         "Non special Variable % at the end",
         "Data Format",
+        "Data Format 2",
         "No substitution",
         "Double %% to variables",
         "Non Loop",
+        "Slash in between variables",
+        "Complex dynamic cross pointer"
     ],
 )
 def test_finite_loop_dynamic_variable_unify_conf(autosubmit_config, new_data, result):
