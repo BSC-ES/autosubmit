@@ -17,6 +17,7 @@
 
 import time
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
 
@@ -74,6 +75,7 @@ def packager(mocker):
     job_list.get_in_queue.return_value = []
     job_list.get_ready.return_value = []
     job_list.get_prepared.return_value = []
+    job_list.has_wrappers_to_reconcile.return_value = False
 
     platform = mocker.MagicMock()
     platform.name = "test_platform"
@@ -152,3 +154,67 @@ def test_is_deadlock(packager, mocker, any_simple, queue_len, jobs_config, not_w
         not_wrappeable_package_info=not_wrappable,
         built_packages_tmp=built,
     ) is expected
+
+
+def test_is_deadlock_ignores_reconciling_wrapper(packager):
+    """A retained wrapper that still reconciles an inner job is not a deadlock."""
+    packager._jobs_list.has_wrappers_to_reconcile.return_value = True
+    assert packager.is_deadlock(
+        any_simple_packages=False,
+        not_wrappeable_package_info=[1],
+        built_packages_tmp=[1],
+    ) is False
+
+
+@pytest.mark.parametrize(
+    "reconciling,expected_errors",
+    [(True, False), (False, True)],
+    ids=["reconciling", "strict-deadlock"],
+)
+def test_strict_policy_waits_for_reconciling_wrapper(
+    packager, mocker, reconciling, expected_errors
+):
+    """A retained wrapper suppresses the strict policy error until it reconciles."""
+    jobs = [Job(f"J{i}", i, Status.READY, 0) for i in range(3)]
+    for job in jobs:
+        job.wallclock = "00:10"
+    package = SimpleNamespace(jobs=jobs, wrapper_policy="strict")
+    packager.current_wrapper_section = "WRAPPER_A"
+    packager._jobs_list.has_wrappers_to_reconcile.return_value = reconciling
+    packager._jobs_list.get_jobs_by_section.return_value = []
+    packager._jobs_list.dbmanager.remaining_blocked_by_package.return_value = False
+    mocker.patch.object(
+        packager, "check_real_package_wrapper_limits", return_value=(3, 1, True)
+    )
+    wrapper_limits = {"real_min": 4, "min_v": 1, "min_h": 1, "min": 4}
+    packages_to_submit = []
+
+    packager.check_packages_respect_wrapper_policy(
+        [package],
+        packages_to_submit,
+        max_jobs_to_submit=1,
+        wrapper_limits=wrapper_limits,
+        any_simple_packages=False,
+    )
+
+    assert bool(packager.wrappers_with_error) is expected_errors
+    assert packages_to_submit == []
+
+
+def test_packager_normalizes_wrapper_type(packager, mocker):
+    """The packager normalizes TYPE before selecting the wrapper builder."""
+    as_conf = packager._as_config
+    as_conf.experiment_data["WRAPPERS"] = {
+        "WRAPPERS": {"TYPE": "HORIZONTAL", "JOBS_IN_WRAPPER": "SECTION_A"}
+    }
+    as_conf.get_wrapper_type.return_value = "HORIZONTAL"
+    as_conf.get_wrapper_policy.return_value = "strict"
+    as_conf.get_wrapper_method.return_value = "asthread"
+    as_conf.get_wrapper_jobs.side_effect = None
+    as_conf.get_wrapper_jobs.return_value = ["SECTION_A"]
+    as_conf.get_extensible_wallclock.return_value = 0
+    mocker.patch.object(JobPackager, "calculate_job_limits", return_value=None)
+
+    normalized = JobPackager(as_conf, packager._platform, packager._jobs_list)
+
+    assert normalized.wrapper_type["WRAPPERS"] == "horizontal"

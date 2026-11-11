@@ -232,6 +232,13 @@ without resubmitting the wrapper. Once the wrapper finishes, its inner jobs
 are not retried again externally by Autosubmit. 
 See :ref:`job_retries` for the standalone job retry mechanism.
 
+After a wrapper finishes, Autosubmit keeps reconciling its inner jobs until
+their STAT files settle, waiting up to the platform ``IO_SAFE_WAIT``. If the
+wrapper completed, its status wins and the inner jobs are reconciled to
+``COMPLETED``. If the wrapper failed and the STAT does not confirm, inner jobs
+left in ``QUEUING``, ``SUBMITTED``, ``SUSPENDED``, or ``UNKNOWN`` are reset to
+``WAITING`` so they can be retried. ``HELD`` is deprecated and is not reset.
+
 .. tab-set-code::
 
     .. code-block:: yaml
@@ -280,7 +287,8 @@ Check_time_wrapper
 ^^^^^^^^^^^^^^^^^^
 
 The CHECK_TIME_WRAPPER parameter defines the frequency, in seconds, on which Autosubmit will check the remote platform
-status of all the wrapper tasks. This affects all wrappers.
+status of all the wrapper tasks. This affects all wrappers. It also throttles the reconciliation of wrappers that
+already finished but still have inner jobs to reconcile.
 
 .. tab-set-code::
 

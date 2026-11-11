@@ -590,6 +590,10 @@ class JobPackageVertical(JobPackageThread):
         platform maximum wallclock for jobs without one), optionally extends the wrapper wallclock,
         and delegates the script generation to the wrapper factory.
 
+        The wrapper builder reads each inner job's fail count from this package so a
+        rebuilt wrapper continues from the real attempt instead of overwriting
+        ``_STAT_0`` and ``.out.0``/``.err.0``.
+
         :return: The wrapper script content.
         """
         if self.jobs[0].wrapper_type == "vertical":

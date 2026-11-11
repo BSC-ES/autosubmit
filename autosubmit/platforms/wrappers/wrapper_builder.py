@@ -62,6 +62,7 @@ class WrapperBuilder:
         self.machinefiles_indent = 0
         self.exit_thread = ''
         self.fail_count = kwargs.get('fail_count', 0)
+        self.wrapper_data = kwargs.get('wrapper_data')
 
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
@@ -520,25 +521,29 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
         """
         Builds a part of the vertical wrapper cmd launcher script.
         This script writes the start and finish time of each inner_job.
+        Each inner job starts at its current fail count so the STAT file and
+        log suffixes continue from the real attempt.
 
         :param jobs_list: List of job scripts.
-        :type jobs_list: List[str]
         :param thread: inner_job to be executed.
-        :type thread: str
         :param footer: If True, includes the footer in the script. Defaults to True.
-        :type footer: bool
         :return: Part of the final vertical wrapper script.
-        :rtype: str
         """
+        start_fail_counts: dict[str, int] = {}
+        if self.wrapper_data:
+            start_fail_counts = {
+                f"{job.name}.cmd": job.fail_count for job in self.wrapper_data.jobs
+            }
         sequential_threads_launcher = textwrap.dedent(f"""
         failed_wrapper = os.path.join(os.getcwd(),wrapper_id)
         retrials = {self.retrials}
         total_steps = 0
         print("JOB.ID:" + AS_JOB_ID)
+        fail_counts = {start_fail_counts}
         for i in range(len({jobs_list})):
             job_retrials = retrials
             completed = False
-            fail_count = 0
+            fail_count = fail_counts.get({jobs_list}[i], 0) if isinstance({jobs_list}[i], str) else 0
             while fail_count <= job_retrials and not completed:
                 current = {thread}
                 current.start()

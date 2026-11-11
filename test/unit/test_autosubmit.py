@@ -39,7 +39,7 @@ from autosubmit.job.job_utils import (
     wrapper_notify,
 )
 from autosubmit.log.log import AutosubmitCritical
-from autosubmit.scheduler import Scheduler, submit_ready_jobs
+from autosubmit.scheduler import Scheduler, check_deadlock, submit_ready_jobs
 
 # noinspection PyProtectedMember
 from autosubmit.workflow.manage import _finish_current_experiment_run, _signal_handler
@@ -250,6 +250,7 @@ def test_check_wrappers_pops_terminal_wrappers(
     wrapper_job.new_status = wrapper_status
     wrapper_job.name = "wrapper_1"
     wrapper_job.id = 100
+    wrapper_job.has_inner_jobs_to_reconcile.return_value = False
 
     fake_job_list.job_package_map[100] = wrapper_job
     fake_job_list.packages_dict["wrapper_1"] = [inner_job]
@@ -336,6 +337,47 @@ def test_manage_wrapper_job_check_logic(mocker, status, elapsed, should_check):
         wrapper_job.check_and_update_status.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "elapsed,should_reconcile",
+    [(5, True), (1, False)],
+    ids=["after-check-time", "within-check-time"],
+)
+def test_manage_finished_wrapper_throttle(mocker, elapsed, should_reconcile):
+    """A finished wrapper is only reconciled after CHECK_TIME_WRAPPER elapses."""
+    as_conf = mocker.MagicMock()
+    as_conf.get_wrapper_check_time.return_value = 3
+    as_conf.get_notifications.return_value = "false"
+
+    wrapper_job = mocker.MagicMock()
+    wrapper_job.status = Status.COMPLETED
+    wrapper_job.checked_time = datetime.datetime.now() - datetime.timedelta(
+        seconds=elapsed
+    )
+    wrapper_job.has_inner_jobs_to_reconcile.return_value = True
+    wrapper_job.reconcile_finished_wrapper.return_value = False
+
+    _manage_wrapper_job(as_conf, mocker.MagicMock(), wrapper_job)
+
+    if should_reconcile:
+        wrapper_job.reconcile_finished_wrapper.assert_called_once_with(as_conf)
+    else:
+        wrapper_job.reconcile_finished_wrapper.assert_not_called()
+
+
+@pytest.mark.parametrize("reconciling", [True, False], ids=["reconciling", "deadlock"])
+def test_check_deadlock_respects_reconciling_wrapper(reconciling, mocker):
+    """A retained wrapper suppresses the deadlock; otherwise 7014 still raises."""
+    job_list = mocker.MagicMock()
+    job_list.get_in_queue.return_value = []
+    job_list.has_wrappers_to_reconcile.return_value = reconciling
+
+    if reconciling:
+        check_deadlock({"wrapper_1": ["job"]}, False, job_list)
+    else:
+        with pytest.raises(AutosubmitCritical):
+            check_deadlock({"wrapper_1": ["job"]}, False, job_list)
+
+
 def test_manage_wrapper_job_saves_on_change(mocker):
     """manage_wrapper_job: saves job_list when check_and_update_status returns True."""
     as_conf = mocker.MagicMock()
@@ -360,13 +402,36 @@ def test_check_non_wrapped_jobs_empty_platform_jobs(
 ):
     """check_non_wrapped_jobs: skips platform when no non-wrapped jobs exist."""
     as_conf = mocker.MagicMock()
-    fake_job_list.job_package_map = {10: "wrapper"}
+    wrapper_job = mocker.MagicMock()
+    wrapper_job.has_inner_jobs_to_reconcile.return_value = False
+    wrapper_job.job_list = []
+    fake_job_list.job_package_map = {10: wrapper_job}
     mocker.patch.object(fake_job_list, "get_wrappers_id_from_db", return_value=[10])
     job = Job("a000_20000101_fc0_1_SIM", 10, Status.RUNNING, 0)
     job.platform = fake_platform
     fake_job_list.add_job(job)
 
     check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")  # type: ignore
+
+    fake_platform.check_all_jobs.assert_not_called()
+
+
+def test_check_non_wrapped_jobs_skips_retained_wrapper_inner_jobs(
+    mocker, fake_job_list, fake_platform
+):
+    """Inner jobs of a wrapper pending reconciliation are not checked as non-wrapped."""
+    as_conf = mocker.MagicMock()
+    inner = Job("a000_20000101_fc0_1_SIM", 10, Status.RUNNING, 0)
+    inner.platform = fake_platform
+    wrapper_job = mocker.MagicMock()
+    wrapper_job.status = Status.COMPLETED
+    wrapper_job.has_inner_jobs_to_reconcile.return_value = True
+    wrapper_job.job_list = [inner]
+    fake_job_list.job_package_map = {10: wrapper_job}
+    fake_job_list.get_in_queue = mocker.MagicMock(return_value=[inner])
+    mocker.patch.object(fake_job_list, "get_wrappers_id_from_db", return_value=[])
+
+    check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")
 
     fake_platform.check_all_jobs.assert_not_called()
 

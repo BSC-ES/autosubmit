@@ -30,6 +30,7 @@ from autosubmit.database.db_common import (
     get_experiment_description,
     update_experiment_description_version,
 )
+from autosubmit.database.managers.job_list import JobsDbManager
 from autosubmit.experiment.manage import create
 from autosubmit.helpers.version import get_version
 from autosubmit.install import install
@@ -581,6 +582,30 @@ def test_prepare_run_returns_tuple_with_recover(autosubmit_exp):
     assert submitter is not None
     assert exp_history is None
     assert recover is True
+
+
+def test_prepare_run_without_run_id_skips_wrappers(autosubmit_exp, mocker):
+    """Wrappers are not reloaded without a run id, and the skip is reported.
+
+    ``get_last_run_id`` is mocked to ``None`` so the wrapper branch of
+    ``_prepare_run`` has no run id to scope the load by. ``load_wrappers``
+    must then start with an empty wrapper state and report the skip, instead
+    of loading wrapper rows from other runs. A later history step may create
+    the current run, but the wrapper state stays empty.
+    """
+    exp = autosubmit_exp(include_jobs=True, experiment_data={"WRAPPERS": {}})
+    mocker.patch("autosubmit.workflow.manage.get_last_run_id", return_value=None)
+    warning = mocker.patch("autosubmit.job.job_list.Log.warning")
+    db_load_spy = mocker.spy(JobsDbManager, "load_wrappers")
+
+    job_list, *_ = _prepare_run(exp.expid, check_scripts=False)
+
+    assert job_list.job_package_map == {}
+    assert job_list.packages_dict == {}
+    db_load_spy.assert_not_called()
+    assert any(
+        "run id" in str(call.args[0]).lower() for call in warning.call_args_list
+    )
 
 
 def test_stop_sets_exit_flag(autosubmit_exp, mocker):
