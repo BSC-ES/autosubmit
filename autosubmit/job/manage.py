@@ -238,12 +238,24 @@ def set_status(
             Log.info(f"JobList saved in {end - start:.2f} seconds.")
             exp_history = ExperimentHistory(expid)
             exp_history.initialize_database()
-            exp_history.process_status_changes(
-                job_list.get_job_list(),
-                chunk_unit=as_conf.get_chunk_size_unit(),
-                chunk_size=as_conf.get_chunk_size(),
-                current_config=as_conf.get_full_config_as_json(),
-            )
+            try:
+                current_run = exp_history.manager.get_experiment_run_dc_with_max_id_or_none()
+            except Exception as exp:
+                Log.debug(f"set_status: could not read the current run: {exp}")
+                current_run = None
+            if current_run is not None and not current_run.pending_create:
+                exp_history.process_status_changes(
+                    job_list.get_job_list(),
+                    chunk_unit=as_conf.get_chunk_size_unit(),
+                    chunk_size=as_conf.get_chunk_size(),
+                    current_config=as_conf.get_full_config_as_json(),
+                    status_counts=job_list.get_status_counts(),
+                )
+            else:
+                Log.debug(
+                    "set_status: no current run or pending create. "
+                    "Skipping the historical run update"
+                )
             # TODO: No more database backup? https://github.com/BSC-ES/autosubmit/issues/3179
             # Autosubmit.database_backup(expid)
         else:

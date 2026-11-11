@@ -211,10 +211,17 @@ def _prepare_run(
     except Exception as e:
         raise AutosubmitCritical("Error while checking job templates", 7014, str(e))
 
+    # Open or resume the historical run before loading wrappers, so wrappers are
+    # associated with the current run id.
+    if not recover:
+        Log.debug("Running job data structure")
+        exp_history = get_historical_database(expid, job_list, as_conf)
+
     # Check if the user wants to continue using wrappers and loads the appropriate info.
     if as_conf.experiment_data.get("WRAPPERS", None) is not None:
         try:
-            job_list.run_id = get_last_run_id(expid)
+            if recover:
+                job_list.run_id = get_last_run_id(expid)
             job_list.load_wrappers()
         except OSError as e:
             raise AutosubmitError(
@@ -239,8 +246,6 @@ def _prepare_run(
             f" will be tracked."
         )
     if not recover:
-        Log.debug("Running job data structure")
-        exp_history = get_historical_database(expid, job_list, as_conf)
         # establish the connection to all platforms
         # Restore is misleading, it is actually a "connect" function when the recover flag is not set.
         restore_platforms(job_list.submitter.platforms_object, as_conf=as_conf, fail_on_init_error=True)
@@ -1136,6 +1141,14 @@ def recover(
             job_list.recover_last_data()
             job_list.save_jobs(reset_log_counters=True)
             job_list.save_edges()
+            # A recovery of the same run must resume it: clear the
+            # pending_create marker set by ``autosubmit create``.
+            try:
+                exp_history = ExperimentHistory(expid)
+                exp_history.initialize_database()
+                exp_history.set_pending_create(0)
+            except Exception:
+                Log.warning("Couldn't access the historical database while recovering the experiment")
         else:
             Log.warning("Changes NOT saved to the jobList. Use -s option to save")
 
