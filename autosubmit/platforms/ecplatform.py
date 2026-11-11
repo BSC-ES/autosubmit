@@ -25,8 +25,6 @@ from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING
 
-from bscearth.utils.date import date2str
-
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
@@ -216,6 +214,40 @@ class EcPlatform(ParamikoPlatform):
                 f"Couldn't create {self.remote_log_dir} on {self.host}", 6004, str(e)
             )
 
+    def _available_stat_files(self) -> set[str]:
+        """Return the STAT file names available in the remote log directory.
+
+        :return: Set of remote STAT file names.
+        """
+        self.send_command(f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
+        dir_output = self.get_ssh_output()
+
+        available_stats: set[str] = set()
+        for line in dir_output.splitlines():
+            file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
+            if "_STAT_" in file_name:
+                available_stats.add(file_name)
+        return available_stats
+
+    def _download_stat_file(self, job) -> Path | None:
+        """Download one job STAT file and return its local path.
+
+        :param job: Job whose STAT file is downloaded.
+        :return: Local path, or ``None`` when the file does not exist yet.
+        """
+        stat_name = f"{job.name}_STAT_{job.fail_count}"
+        remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
+        local_path = self.tmp_path / stat_name
+        try:
+            subprocess.check_output(
+                f"{self.get_cmd} {remote_path} {local_path}",
+                shell=True,
+                stderr=subprocess.DEVNULL,
+            )
+        except subprocess.CalledProcessError:
+            return None
+        return local_path
+
     def confirm_done_jobs_via_stat(self, job_list: list) -> dict[str, "Status"]:
         """Confirm job statuses via STAT files using ecaccess commands.
 
@@ -233,97 +265,67 @@ class EcPlatform(ParamikoPlatform):
 
         result: dict[str, Status] = {}
 
-        # List files in the remote log directory
         try:
-            self.send_command(f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
-            dir_output = self.get_ssh_output()
+            available_stats = self._available_stat_files()
         except Exception:
             return result
 
-        # Build a set of available STAT file names
-        # ecaccess-file-dir output format: filename|size  NNNN
-        available_stats: set[str] = set()
-        for line in dir_output.splitlines():
-            file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
-            if "_STAT_" in file_name:
-                available_stats.add(file_name)
-
-        # Download and read each STAT file that matches a job
         for job in job_list:
             stat_name = f"{job.name}_STAT_{job.fail_count}"
             if stat_name not in available_stats:
                 continue
 
-            remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
-            local_path = self.tmp_path / stat_name
-
-            # The job may still be queuing and not yet running, in that case the
-            # STAT file won't exist on the remote side and the download will fail.
-            try:
-                subprocess.check_output(
-                    f"{self.get_cmd} {remote_path} {local_path}",
-                    shell=True,
-                    stderr=subprocess.DEVNULL,
-                )
-            except subprocess.CalledProcessError:
+            local_path = self._download_stat_file(job)
+            if local_path is None:
                 continue
-            content = local_path.read_text().strip()
-            if content:
-                lines = content.splitlines()
-                if len(lines) == 1 and lines[-1].isdigit():
-                    result[job.name] = Status.QUEUING
-                else:
-                    result[job.name] = self._resolve_status(lines[-1])
-            local_path.unlink(missing_ok=True)
+            try:
+                content = local_path.read_text().strip()
+                if content:
+                    lines = content.splitlines()
+                    if len(lines) == 1 and lines[-1].isdigit():
+                        result[job.name] = Status.QUEUING
+                    else:
+                        result[job.name] = self._resolve_status(lines[-1])
+            finally:
+                local_path.unlink(missing_ok=True)
 
         return result
 
     def set_start_time_from_remote_stat_file(self, job_list: list) -> None:
         """Set ``start_time_timestamp`` from line 1 (second line) of each remote STAT file.
 
-        Reads line 1 (not line 0) because L0 is now submit_time.
+        Reads line 1 (not line 0) because L0 is now submit_time. The downloaded
+        STAT file is removed after it is read.
 
         :param job_list: Jobs whose start times should be filled from remote STAT files.
         """
         if not job_list:
             return
 
-        # List files in the remote log directory
-        self.send_command(f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
-        dir_output = self.get_ssh_output()
-
-        # ecaccess-file-dir output format: filename|size  NNNN
-        available_stats: set[str] = set()
-        for line in dir_output.splitlines():
-            file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
-            if "_STAT_" in file_name:
-                available_stats.add(file_name)
+        available_stats = self._available_stat_files()
 
         for job in job_list:
             stat_name = f"{job.name}_STAT_{job.fail_count}"
             if stat_name not in available_stats:
                 continue
 
-            remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
-            local_path = self.tmp_path / stat_name
-
+            local_path = self._download_stat_file(job)
+            if local_path is None:
+                continue
             try:
-                subprocess.check_output(
-                    f"{self.get_cmd} {remote_path} {local_path}",
-                    shell=True,
-                    stderr=subprocess.DEVNULL,
-                )
                 content = local_path.read_text().strip()
                 if content:
                     lines = content.splitlines()
-                    start_epoch = float(lines[1]) if len(lines) >= 2 else float(lines[0])
-                    job.start_time_timestamp = datetime.datetime.fromtimestamp(start_epoch).strftime("%Y%m%d%H%M%S")
+                    start_epoch = float(lines[1]) if len(lines) >= 2 else None
+                    if start_epoch is not None:
+                        job.start_time_timestamp = datetime.datetime.fromtimestamp(start_epoch).strftime("%Y%m%d%H%M%S")
             except Exception:
                 Log.warning(
                     f"Could not parse start time from STAT file for job {job.name}. "
-                    f"Using current datetime."
+                    f"Leaving start time unset."
                 )
-                job.start_time_timestamp = date2str(datetime.datetime.now(), 'S')
+            finally:
+                local_path.unlink(missing_ok=True)
 
     def get_mkdir_cmd(self):
         return self.mkdir_cmd

@@ -215,7 +215,8 @@ def _prepare_run(
     if as_conf.experiment_data.get("WRAPPERS", None) is not None:
         try:
             job_list.run_id = get_last_run_id(expid)
-            job_list.load_wrappers()
+            if job_list.run_id is not None:
+                job_list.load_wrappers()
         except OSError as e:
             raise AutosubmitError(
                 "wrappers not found in job_list database", 6016, str(e)
@@ -709,7 +710,7 @@ def run(
                 platform.try_respawn_log_recovery_process(as_conf)
 
             # Check wrappers status and inner jobs
-            _, _wrapper_job_changes = check_wrappers(as_conf, job_list, expid)
+            check_wrappers(as_conf, job_list, expid)
             # Check non-wrapped jobs
             check_non_wrapped_jobs(platforms_to_test, job_list, as_conf, expid)
             # Safe spot to store changes

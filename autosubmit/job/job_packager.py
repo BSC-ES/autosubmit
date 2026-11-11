@@ -81,7 +81,12 @@ class JobPackager:
         # Wrapper building starts here
         for wrapper_section, wrapper_data in self._as_config.experiment_data.get("WRAPPERS", {}).items():
             if isinstance(wrapper_data, collections.abc.Mapping):
-                self.wrapper_type[wrapper_section] = self._as_config.get_wrapper_type(wrapper_data)
+                wrapper_type = self._as_config.get_wrapper_type(wrapper_data)
+                self.wrapper_type[wrapper_section] = (
+                    wrapper_type.strip().lower()
+                    if isinstance(wrapper_type, str)
+                    else wrapper_type
+                )
                 self.wrapper_policy[wrapper_section] = self._as_config.get_wrapper_policy(wrapper_data)
                 if self._as_config.get_wrapper_method(wrapper_data) is None:
                     self.wrapper_method[wrapper_section] = "asthread"
@@ -341,12 +346,13 @@ class JobPackager:
         A deadlock is declared when ALL of these hold:
         1. No non-wrapped jobs are READY in this iteration (``any_simple_packages``).
         2. No jobs are in the scheduler queue (submitted, running, queuing, held).
-        3. No non-wrapped jobs exist that *could* still progress
+        3. No finished wrapper is still reconciling its inner jobs.
+        4. No non-wrapped jobs exist that *could* still progress
            (``_has_blocking_non_wrapped_jobs``). This catches active non-wrapped chains
            even when they have no READY jobs *right now*.
-        4. All built packages in this iteration are unwrappable.
+        5. All built packages in this iteration are unwrappable.
 
-        Conditions 2 and 3 together provide a global view: a non-wrapped chain
+        Conditions 2, 3, and 4 together provide a global view: a non-wrapped chain
         may have a split RUNNING (in queue) while the next split is WAITING (detected
         by ``_has_blocking_non_wrapped_jobs``). Either is enough to suppress the deadlock
         and let the wrapper sections accumulate more jobs over successive iterations.
@@ -359,6 +365,8 @@ class JobPackager:
         if any_simple_packages:
             return False
         if len(self._jobs_list.get_in_queue()) > 0:
+            return False
+        if self._jobs_list.has_wrappers_to_reconcile():
             return False
         if len(not_wrappeable_package_info) != len(built_packages_tmp):
             return False

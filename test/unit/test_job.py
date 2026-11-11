@@ -34,10 +34,10 @@ from autosubmit.config.configcommon import (
     BasicConfig,
     YAMLParserFactory,
 )
-from autosubmit.job.job import Job, WrapperJob
+from autosubmit.job.job import Job, WrapperJob, _InnerJobState
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_utils import SubJob, SubJobManager
+from autosubmit.job.job_utils import SubJob, SubJobManager, check_wrappers
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
@@ -2548,25 +2548,6 @@ def test_restore_previous_state():
     assert job.id == "1"
 
 
-@pytest.mark.parametrize("status,parent_status,expected", [
-    (Status.COMPLETED, None, True),
-    (Status.FAILED, None, True),
-    (Status.WAITING, Status.FAILED, True),
-    (Status.WAITING, Status.COMPLETED, False),
-    (Status.SUBMITTED, None, False),
-])
-def test_is_finished(status, parent_status, expected):
-    job = Job("j", 1, status, 0)
-    wrapper_set = {job}
-    if parent_status is not None:
-        parent = Job("p", 2, parent_status, 0)
-        job.parents = {parent}
-        wrapper_set.add(parent)
-    else:
-        job.parents = set()
-    assert WrapperJob._is_finished(job, wrapper_set) == expected
-
-
 @pytest.mark.parametrize("parent_statuses,expected", [
     ([Status.COMPLETED], True),
     ([Status.COMPLETED, Status.COMPLETED], True),
@@ -2688,55 +2669,91 @@ def test_update_platform_associated_parameters_no_set_attributes(mocker):
     assert result['NUMPROC'] == "1"
 
 
-def _make_wrapper_job(mocker, inner_jobs=None, new_status=Status.RUNNING):
+def _make_wrapper_job(mocker, inner_jobs=None, new_status=Status.RUNNING, wr_type=None):
     """Factory for a minimal WrapperJob with mocked platform and as_config."""
     platform = mocker.MagicMock()
     platform.IO_SAFE_WAIT = 5
     platform.serial_platform = platform  # avoid Job.platform returning a sub-mock
     as_conf = mocker.MagicMock()
+    as_conf.get_wrapper_check_time.return_value = 0
     wrapper = WrapperJob(
         name="wrapper_1", job_id=1, status=Status.RUNNING, priority=0,
         job_list=inner_jobs or [], total_wallclock="01:00",
-        num_processors=1, platform=platform, as_config=as_conf, hold=False
+        num_processors=1, platform=platform, as_config=as_conf, hold=False,
+        wr_type=wr_type,
     )
     wrapper.new_status = new_status
     return wrapper
 
 
+def _wrapper_job_list(mocker, wrapper):
+    """Build a JobList that owns a wrapper and disables DB writes."""
+    job_list = JobList("a000", mocker.MagicMock(), YAMLParserFactory(), disable_save=True)
+    job_list.job_package_map = {wrapper.id: wrapper}
+    job_list.packages_dict = {wrapper.name: wrapper.job_list}
+    mocker.patch.object(job_list, "update_db_wrappers")
+    return job_list
 
-@pytest.mark.parametrize("has_finished_time,elapsed,expected,keep_alive", [
-    (False, 2, Status.RUNNING, None),          # fresh timer, not elapsed
-    (True, 2, Status.RUNNING, None),           # existing timer, not elapsed
-    (True, 10, Status.FAILED, None),           # elapsed → timeout_to
-    (False, 2, Status.RUNNING, Status.RUNNING), # with keep_alive
-])
-def test_apply_io_safe_wait(has_finished_time, elapsed, expected, keep_alive, mocker):
+
+def _commit_new_status(mocker, keep_prev=True):
+    """Patch Job.update_status to commit new_status, optionally preserving prev_status."""
+    def _commit(self, as_conf, verify_completion=True):
+        if keep_prev:
+            self.prev_status = self.status
+        self.status = self.new_status
+
+    return mocker.patch.object(Job, "update_status", autospec=True, side_effect=_commit)
+
+
+def _start_inner_wait(wrapper, inner, started):
+    """Mark a wrapper-owned IO_SAFE_WAIT as started for an inner job."""
+    wrapper._inner_states.setdefault(inner.name, _InnerJobState()).wait_started = started
+
+
+def _inner_wait_started(wrapper, inner):
+    """Return the wrapper-owned IO_SAFE_WAIT start for an inner job, if any."""
+    state = wrapper._inner_states.get(inner.name)
+    return state.wait_started if state else None
+
+
+@pytest.mark.parametrize("has_timer,elapsed,waiting_status,expected", [
+    (False, 0, Status.RUNNING, Status.RUNNING),  # fresh timer, not elapsed
+    (True, 2, Status.RUNNING, Status.RUNNING),   # existing timer, not elapsed
+    (True, 10, Status.RUNNING, Status.FAILED),   # elapsed → timeout_to
+], ids=["fresh-timer", "within-wait", "after-wait"])
+def test_apply_io_safe_wait(has_timer, elapsed, waiting_status, expected, mocker):
     wrapper = _make_wrapper_job(mocker)
     inner = Job("inner", 2, Status.RUNNING, 0)
     base_time = 1000
-    if has_finished_time:
-        inner.finished_time = base_time
-        mocker.patch("autosubmit.job.job.time.time", return_value=base_time + elapsed)
-    else:
-        inner.finished_time = None
-        mocker.patch("autosubmit.job.job.time.time", side_effect=[base_time, base_time + elapsed])
+    if has_timer:
+        _start_inner_wait(wrapper, inner, base_time)
+    mocker.patch("autosubmit.job.job.time.time", return_value=base_time + elapsed)
 
-    result = wrapper._apply_io_safe_wait(
-        inner, Status.RUNNING, Status.FAILED,
-        keep_alive=keep_alive
-    )
+    result = wrapper._apply_io_safe_wait(inner, waiting_status, Status.FAILED)
+
     assert result == expected
 
 
+def test_apply_io_safe_wait_ignores_inner_finished_time(mocker):
+    """The wrapper wait must not reuse the platform's ``Job.finished_time`` timer."""
+    wrapper = _make_wrapper_job(mocker)
+    inner = Job("inner", 2, Status.RUNNING, 0)
+    inner.finished_time = 1000
+    mocker.patch("autosubmit.job.job.time.time", return_value=1010)
+
+    result = wrapper._apply_io_safe_wait(inner, Status.RUNNING, Status.FAILED)
+
+    assert result == Status.RUNNING
+    assert inner.finished_time == 1000
+
+
 def test_apply_io_safe_wait_queuing_timeout(mocker):
-    """QUEUING with wrapper done: elapsed < IO_SAFE_WAIT → keep_alive (RUNNING)."""
+    """QUEUING with wrapper done: elapsed < IO_SAFE_WAIT → waiting status (RUNNING)."""
     wrapper = _make_wrapper_job(mocker)
     inner = Job("inner", 2, Status.QUEUING, 0)
-    inner.finished_time = 1000
+    _start_inner_wait(wrapper, inner, 1000)
     mocker.patch("autosubmit.job.job.time.time", return_value=1002)
-    result = wrapper._apply_io_safe_wait(
-        inner, Status.QUEUING, Status.QUEUING, keep_alive=Status.RUNNING
-    )
+    result = wrapper._apply_io_safe_wait(inner, Status.RUNNING, Status.QUEUING)
     assert result == Status.RUNNING
 
 
@@ -2744,21 +2761,20 @@ def test_apply_io_safe_wait_queuing_elapsed(mocker):
     """QUEUING with wrapper done: elapsed >= IO_SAFE_WAIT → timeout_to (QUEUING)."""
     wrapper = _make_wrapper_job(mocker)
     inner = Job("inner", 2, Status.QUEUING, 0)
-    inner.finished_time = 1000
+    _start_inner_wait(wrapper, inner, 1000)
     mocker.patch("autosubmit.job.job.time.time", return_value=1010)
-    result = wrapper._apply_io_safe_wait(
-        inner, Status.QUEUING, Status.QUEUING, keep_alive=Status.RUNNING
-    )
+    result = wrapper._apply_io_safe_wait(inner, Status.RUNNING, Status.QUEUING)
     assert result == Status.QUEUING
 
 
-def test_apply_io_safe_wait_resets_finished_time(mocker):
+def test_apply_io_safe_wait_resets_wrapper_timer(mocker):
     wrapper = _make_wrapper_job(mocker)
     inner = Job("inner", 2, Status.RUNNING, 0)
-    inner.finished_time = 1000
+    _start_inner_wait(wrapper, inner, 1000)
     mocker.patch("autosubmit.job.job.time.time", return_value=1010)
     wrapper._apply_io_safe_wait(inner, Status.RUNNING, Status.FAILED)
-    assert inner.finished_time is None
+    assert _inner_wait_started(wrapper, inner) is None
+    assert wrapper._inner_states[inner.name].wait_expired_attempt == inner.fail_count
 
 
 @pytest.mark.parametrize("can_run,wrapper_done,stat_status,inner_status,expected", [
@@ -2799,38 +2815,538 @@ def test_compute_inner_job_status(can_run, wrapper_done, stat_status, inner_stat
     assert result == expected
 
 
-def test_sync_inner_job_statuses(mocker):
-    inner_changed = Job("inner_c", 2, Status.QUEUING, 0)
-    inner_changed.new_status = Status.RUNNING
-    inner_unchanged = Job("inner_u", 3, Status.COMPLETED, 0)
-    inner_unchanged.new_status = Status.COMPLETED
-    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner_changed, inner_unchanged])
-    mock_update = mocker.patch("autosubmit.job.job.Job.update_status")
+@pytest.mark.parametrize(
+    "stat_status,elapsed,expected",
+    [
+        (Status.RUNNING, 2, Status.RUNNING),
+        (Status.RUNNING, 5, Status.COMPLETED),
+        (Status.QUEUING, 2, Status.RUNNING),
+        (Status.QUEUING, 5, Status.COMPLETED),
+    ],
+    ids=["running-within", "running-after", "queuing-within", "queuing-after"],
+)
+def test_compute_inner_job_status_completed_wrapper_waits_then_reconciles(
+    stat_status, elapsed, expected, mocker
+):
+    """A completed wrapper waits IO_SAFE_WAIT before reconciling its inner jobs."""
+    wrapper = _make_wrapper_job(mocker, new_status=Status.COMPLETED)
+    inner = Job("inner", 2, Status.RUNNING, 0)
+    _start_inner_wait(wrapper, inner, 1000)
+    mocker.patch("autosubmit.job.job.time.time", return_value=1000 + elapsed)
+    mocker.patch.object(
+        WrapperJob, "_inner_job_can_run", staticmethod(lambda inner_job, job_list: True)
+    )
+
+    result = wrapper._compute_inner_job_status(
+        inner, {"inner": stat_status}, wrapper_is_done=True
+    )
+
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "elapsed,expected",
+    [
+        (2, Status.RUNNING),
+        (10, Status.FAILED),
+    ],
+    ids=["within-wait", "after-wait"],
+)
+def test_compute_inner_job_status_applies_io_safe_wait_when_wrapper_failed(elapsed, expected, mocker):
+    """A failed wrapper waits for the STAT, then times out a RUNNING inner to FAILED."""
+    wrapper = _make_wrapper_job(mocker, new_status=Status.FAILED)
+    inner = Job("inner", 2, Status.RUNNING, 0)
+    _start_inner_wait(wrapper, inner, 1000)
+    mocker.patch("autosubmit.job.job.time.time", return_value=1000 + elapsed)
+    mocker.patch.object(
+        WrapperJob, "_inner_job_can_run", staticmethod(lambda inner_job, job_list: True)
+    )
+
+    result = wrapper._compute_inner_job_status(
+        inner, {"inner": Status.RUNNING}, wrapper_is_done=True
+    )
+
+    assert result == expected
+
+
+def test_compute_inner_job_status_failed_wrapper_times_out_queuing_job(mocker):
+    """A failed wrapper leaves a QUEUING/missing inner as QUEUING after the wait."""
+    wrapper = _make_wrapper_job(mocker, new_status=Status.FAILED, wr_type="vertical")
+    inner = Job("inner", 2, Status.QUEUING, 0)
+    _start_inner_wait(wrapper, inner, 1000)
+    mocker.patch("autosubmit.job.job.time.time", return_value=1010)
+    mocker.patch.object(
+        WrapperJob, "_inner_job_can_run", staticmethod(lambda inner_job, job_list: True)
+    )
+
+    result = wrapper._compute_inner_job_status(
+        inner, {"inner": Status.QUEUING}, wrapper_is_done=True
+    )
+
+    assert result == Status.QUEUING
+
+
+def test_compute_inner_job_status_waits_before_keeping_failed_inner(mocker):
+    """A previously FAILED inner with an unknown STAT waits and stays FAILED."""
+    wrapper = _make_wrapper_job(mocker, new_status=Status.FAILED, wr_type="vertical")
+    wrapper.status = Status.FAILED
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner.retrials = 3
+    inner.fail_count = 1
+    mocker.patch.object(
+        WrapperJob, "_inner_job_can_run", staticmethod(lambda inner_job, job_list: True)
+    )
+    mocker.patch("autosubmit.job.job.time.time", return_value=1000)
+
+    assert wrapper._compute_inner_job_status(inner, {}, True) == Status.FAILED
+    assert _inner_wait_started(wrapper, inner) is not None
+    assert wrapper.has_inner_jobs_to_reconcile() is True
+
+    mocker.patch("autosubmit.job.job.time.time", return_value=1010)
+    assert wrapper._compute_inner_job_status(inner, {}, True) == Status.FAILED
+    assert _inner_wait_started(wrapper, inner) is None
+    assert wrapper.has_inner_jobs_to_reconcile() is False
+
+    assert wrapper._compute_inner_job_status(inner, {}, True) == Status.FAILED
+    assert _inner_wait_started(wrapper, inner) is None
+
+
+def test_compute_inner_job_status_completed_wrapper_ignores_blocked_parent(mocker):
+    """A completed wrapper reconciles a child even if its parent is not COMPLETED yet."""
+    wrapper = _make_wrapper_job(mocker, new_status=Status.COMPLETED)
+    inner = Job("inner", 2, Status.QUEUING, 0)
+    _start_inner_wait(wrapper, inner, 1000)
+    mocker.patch("autosubmit.job.job.time.time", return_value=1010)
+    mocker.patch.object(
+        WrapperJob, "_inner_job_can_run", staticmethod(lambda inner_job, job_list: False)
+    )
+
+    result = wrapper._compute_inner_job_status(
+        inner, {"inner": Status.QUEUING}, wrapper_is_done=True
+    )
+
+    assert result == Status.COMPLETED
+
+
+def test_sync_inner_job_statuses_keeps_reconciled_status_without_completed_file(mocker):
+    """A wrapper-reconciled status must not be downgraded by check_completion.
+
+    Inner jobs are verified from their STAT files, so the wrapper status is
+    authoritative. Before the fix, update_status re-checked the COMPLETED file
+    and turned a reconciled COMPLETED into FAILED when the marker lagged.
+    """
+    inner = Job("inner", 2, Status.RUNNING, 0)
+    inner.new_status = Status.COMPLETED
+    inner.platform = mocker.MagicMock()
+    inner.platform.get_completed_job_names.return_value = []
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
+    mocker.patch("autosubmit.job.job.get_last_run_id", return_value=None)
 
     wrapper._sync_inner_job_statuses(wrapper.as_config)
-    mock_update.assert_called_once()
-    assert mock_update.call_args.args[0] is wrapper.as_config
+
+    assert inner.status == Status.COMPLETED
 
 
-@pytest.mark.parametrize("inner_statuses,wrapper_status,expected_save", [
-    ([Status.RUNNING], Status.COMPLETED, False),
-    ([Status.QUEUING], Status.COMPLETED, True),
-    ([Status.SUBMITTED], Status.FAILED, True),
-    ([Status.COMPLETED], Status.COMPLETED, True),
-    ([Status.FAILED], Status.FAILED, True)
-])
-def test_finalize_wrapper_completion(inner_statuses, wrapper_status, expected_save, mocker):
-    inners = [Job(f"inner_{i}", i + 2, st, 0) for i, st in enumerate(inner_statuses)]
-    wrapper = _make_wrapper_job(mocker, inner_jobs=inners)
+def test_check_wrappers_reads_next_inner_stat_before_dropping_finished_wrapper(mocker):
+    """A finished wrapper stays checked until the later inner STAT is read.
+
+    The first STAT is FAILED (the retry we counted) but the wrapper is
+    COMPLETED, so the next attempt's STAT is COMPLETED. Dropping the wrapper as
+    soon as it is COMPLETED loses that last attempt and leaves the inner FAILED.
+    """
+    inner = Job("inner", 2, Status.RUNNING, 0)
+    inner.retrials = 3
+    inner._wallclock_in_seconds = 60
+    inner.prev_status = Status.RUNNING
+    wrapper = _make_wrapper_job(
+        mocker, inner_jobs=[inner], new_status=Status.COMPLETED, wr_type="vertical"
+    )
+    wrapper.status = Status.COMPLETED
+    wrapper.platform.confirm_done_jobs_via_stat.side_effect = [
+        {"inner": Status.FAILED},
+        {"inner": Status.COMPLETED},
+    ]
+    mocker.patch.object(wrapper, "_inner_job_can_run", return_value=True)
+    mocker.patch.object(wrapper, "is_over_wallclock", return_value=False)
+    _commit_new_status(mocker, keep_prev=False)
+
+    job_list = _wrapper_job_list(mocker, wrapper)
+
+    check_wrappers(wrapper.as_config, job_list, "a000")
+    check_wrappers(wrapper.as_config, job_list, "a000")
+
+    assert inner.status == Status.COMPLETED
+    assert inner.fail_count == 1
+    assert wrapper.id not in job_list.job_package_map
+
+
+@pytest.mark.parametrize(
+    "wr_type",
+    ["vertical", "Vertical", "VERTICAL", " vertical "],
+    ids=["lower", "title", "upper", "padded"],
+)
+def test_wrapper_job_exposes_wrapper_type(wr_type, mocker):
+    """WrapperJob must expose the wrapper kind through wrapper_type."""
+    wrapper = _make_wrapper_job(mocker, wr_type=wr_type)
+
+    assert wrapper.wrapper_type == "vertical"
+    assert wrapper.type == Language.BASH
+
+
+_WRAPPER_TYPES = ["vertical", "horizontal", "vertical-horizontal", "horizontal-vertical", None]
+_WRAPPER_TYPE_IDS = ["vertical", "horizontal", "vertical-horizontal", "horizontal-vertical", "none"]
+
+
+@pytest.mark.parametrize("wrapper_type", _WRAPPER_TYPES, ids=_WRAPPER_TYPE_IDS)
+def test_compute_inner_job_status_increments_fail_count_only_for_vertical(wrapper_type, mocker):
+    """Only vertical wrappers retry inner jobs inside the same wrapper."""
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner.retrials = 3
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=Status.FAILED, wr_type=wrapper_type)
+    wrapper.status = Status.FAILED
+
+    result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
+
+    assert result == Status.FAILED
+    assert inner.fail_count == (1 if wrapper_type == "vertical" else 0)
+
+
+@pytest.mark.parametrize("wrapper_type", _WRAPPER_TYPES, ids=_WRAPPER_TYPE_IDS)
+def test_has_pending_inner_attempts_only_for_vertical(wrapper_type, mocker):
+    """Only vertical wrappers may have a later internal retry STAT to read."""
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner.retrials = 3
+    inner.fail_count = 0
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], wr_type=wrapper_type)
+
+    assert wrapper.has_pending_inner_attempts() is (wrapper_type == "vertical")
+
+
+@pytest.mark.parametrize(
+    "inner_status",
+    [Status.SUSPENDED, Status.UNKNOWN],
+    ids=["suspended", "unknown"],
+)
+def test_finalize_resets_suspended_or_unknown_inner(inner_status, mocker):
+    """SUSPENDED/UNKNOWN inners are reconciled and reset to WAITING."""
+    inner = Job("inner", 2, inner_status, 0)
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], wr_type="vertical")
+    wrapper.status = Status.FAILED
+    mock_update = mocker.patch("autosubmit.job.job.Job.update_status")
+
+    assert wrapper.has_inner_jobs_to_reconcile() is True
+    assert wrapper._finalize_wrapper_completion(wrapper.as_config) is True
+    assert inner.new_status == Status.WAITING
+    mock_update.assert_called_once_with(wrapper.as_config)
+
+
+def test_held_inner_is_not_reconciled(mocker):
+    """HELD is deprecated and does not keep a finished wrapper checked."""
+    inner = Job("inner", 2, Status.HELD, 0)
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
+    mock_update = mocker.patch("autosubmit.job.job.Job.update_status")
+
+    assert wrapper.has_inner_jobs_to_reconcile() is False
+    assert wrapper._reset_pending_inner_jobs(wrapper.as_config) is False
+    mock_update.assert_not_called()
+
+
+@pytest.mark.parametrize("wrapper_type", _WRAPPER_TYPES, ids=_WRAPPER_TYPE_IDS)
+def test_check_wrappers_does_not_retain_non_vertical_wrapper_with_retries(wrapper_type, mocker):
+    """Only vertical wrappers stay checked for a later internal retry STAT."""
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner.retrials = 3
+    inner.fail_count = 0
+    inner._wallclock_in_seconds = 60
+    inner.prev_status = Status.FAILED
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=Status.FAILED, wr_type=wrapper_type)
+    wrapper.status = Status.FAILED
+    wrapper.platform.confirm_done_jobs_via_stat.return_value = {"inner": Status.FAILED}
+    mocker.patch.object(wrapper, "_inner_job_can_run", return_value=True)
+    mocker.patch.object(wrapper, "_check_inner_job_wallclock", return_value=False)
+    mocker.patch.object(wrapper, "is_over_wallclock", return_value=False)
+
+    job_list = _wrapper_job_list(mocker, wrapper)
+
+    check_wrappers(wrapper.as_config, job_list, "a000")
+
+    if wrapper_type == "vertical":
+        assert wrapper.id in job_list.job_package_map
+    else:
+        assert wrapper.id not in job_list.job_package_map
+
+
+def test_check_wrappers_does_not_promote_waiting_inner_on_finished_wrapper(mocker):
+    """A finished wrapper must not promote a never-run inner to COMPLETED."""
+    inner = Job("inner", 2, Status.WAITING, 0)
+    inner.prev_status = Status.WAITING
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=Status.COMPLETED, wr_type="vertical")
+    wrapper.status = Status.COMPLETED
+    wrapper.platform.confirm_done_jobs_via_stat.return_value = {"inner": Status.QUEUING}
+    mocker.patch.object(wrapper, "_inner_job_can_run", return_value=True)
+    mocker.patch.object(wrapper, "_check_inner_job_wallclock", return_value=False)
+    mocker.patch.object(wrapper, "is_over_wallclock", return_value=False)
+    mocker.patch("autosubmit.job.job.time.time", return_value=1010)
+    _commit_new_status(mocker, keep_prev=False)
+
+    job_list = _wrapper_job_list(mocker, wrapper)
+
+    check_wrappers(wrapper.as_config, job_list, "a000")
+
+    assert inner.status == Status.WAITING
+    assert wrapper.id not in job_list.job_package_map
+
+
+def test_reconcile_finished_wrapper_saves_when_only_fail_count_changes(mocker):
+    """A fail_count-only increment must be persisted for a finished wrapper."""
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner.retrials = 3
+    inner.fail_count = 0
+    inner.prev_status = Status.FAILED
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=Status.FAILED, wr_type="vertical")
+    wrapper.status = Status.FAILED
+    wrapper.platform.confirm_done_jobs_via_stat.return_value = {"inner": Status.FAILED}
+    mocker.patch.object(wrapper, "_inner_job_can_run", return_value=True)
+    mocker.patch.object(Job, "update_status")
+
+    save = wrapper.reconcile_finished_wrapper(wrapper.as_config)
+
+    assert inner.fail_count == 1
+    assert save is True
+
+
+@pytest.mark.parametrize(
+    "initial_timestamp",
+    [None, "20200101000000"],
+    ids=["unknown", "stale"],
+)
+def test_update_start_time_uses_zero_when_unknown(initial_timestamp, mocker):
+    """An unreadable STAT start time becomes 0, not the current or a stale time."""
+    job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job.start_time_timestamp = initial_timestamp
+    mocker.patch.object(Job, "check_start_time", return_value=0)
+
+    job.update_start_time(0)
+
+    assert job.start_time_timestamp == 0
+
+
+def test_write_start_time_uses_zero_when_unknown(mocker):
+    """Writing history without a start time leaves it at 0, not an invented datetime."""
+    job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job.start_time_timestamp = None
+    job.expid = "t000"
+    job.platform = mocker.MagicMock()
+    mocker.patch("autosubmit.job.job.ExperimentHistory")
+    mocker.patch.object(Job, "_write_time")
+
+    job.write_start_time(0)
+
+    assert job.start_time_timestamp == 0
+
+
+def test_write_submit_time_uses_zero_when_unknown(mocker):
+    """Writing history without a submit time leaves it at 0, not an invented datetime."""
+    job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job.submit_time_timestamp = None
+    job.expid = "t000"
+    job.platform = mocker.MagicMock()
+    mocker.patch("autosubmit.job.job.ExperimentHistory")
+    mocker.patch.object(Job, "_write_time")
+
+    job.write_submit_time(0)
+
+    assert job.submit_time_timestamp == 0
+
+
+@pytest.mark.parametrize(
+    "initial_timestamp",
+    [None, "20200101000000"],
+    ids=["unknown", "stale"],
+)
+def test_write_end_time_uses_zero_when_unknown(initial_timestamp, mocker):
+    """Writing history without an end time leaves it at 0, not an invented or stale datetime."""
+    job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job.finish_time_timestamp = initial_timestamp
+    job.local_logs = ("out", "err")
+    job.expid = "t000"
+    job.platform = mocker.MagicMock()
+    mocker.patch.object(Job, "check_end_time", return_value=0)
+    mocker.patch("autosubmit.job.job.ExperimentHistory")
+    mocker.patch.object(Job, "_write_time")
+
+    job.write_end_time(True, 0)
+
+    assert job.finish_time_timestamp == 0
+
+
+def test_get_from_total_stats_skips_zero(tmp_path):
+    """A 0 timestamp in TOTAL_STATS is unknown and must not be parsed."""
+    job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job._tmp_path = str(tmp_path)
+    (tmp_path / "t000_test_TOTAL_STATS").write_text(
+        "20200101000000 0 20200101000100 COMPLETED\n"
+    )
+
+    assert job._get_from_total_stats(0) == [datetime(2020, 1, 1)]
+    assert job._get_from_total_stats(1) == []
+    assert job._get_from_total_stats(2) == [datetime(2020, 1, 1, 0, 1)]
+
+
+def test_recover_last_ready_date_ignores_zero(tmp_path):
+    """A 0 ready date falls back to the file mtime instead of being stored."""
+    job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job._tmp_path = str(tmp_path)
+    job.ready_date = None
+    (tmp_path / "t000_test_TOTAL_STATS").write_text("0 0 0 COMPLETED\n")
+
+    job.recover_last_ready_date()
+
+    assert job.ready_date not in (None, "0")
+
+
+def test_job_running_check_handles_zero(tmp_path):
+    """A 0 timestamp is treated as unknown instead of raising during statistics."""
+    (tmp_path / "job_TOTAL_STATS").write_text("0 0 0 COMPLETED\n")
+
+    submit, start, finish, status = JobList._job_running_check(
+        Status.COMPLETED, "job", str(tmp_path)
+    )
+
+    assert submit == start == finish
+    assert status == "COMPLETED"
+
+
+def test_check_wrappers_stops_retaining_failed_wrapper_with_running_stat(mocker):
+    """A FAILED wrapper with a FAILED inner and a RUNNING STAT must not be retained forever."""
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner.retrials = 3
+    inner.fail_count = 0
+    inner.prev_status = Status.FAILED
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=Status.FAILED, wr_type="vertical")
+    wrapper.status = Status.FAILED
+    wrapper.platform.IO_SAFE_WAIT = 5
+    wrapper.platform.confirm_done_jobs_via_stat.side_effect = [
+        {inner.name: Status.RUNNING},
+        {inner.name: Status.RUNNING},
+    ]
+    _commit_new_status(mocker)
+    job_list = _wrapper_job_list(mocker, wrapper)
+
+    mocker.patch("autosubmit.job.job.time.time", return_value=1010)
+    check_wrappers(wrapper.as_config, job_list, "a000")
+    assert wrapper.id in job_list.job_package_map
+
+    mocker.patch("autosubmit.job.job.time.time", return_value=1015)
+    check_wrappers(wrapper.as_config, job_list, "a000")
+
+    assert wrapper.id not in job_list.job_package_map
+    assert inner.status == Status.FAILED
+
+
+@pytest.mark.parametrize(
+    "wrapper_status,expected_inner_status",
+    [
+        (Status.COMPLETED, Status.COMPLETED),
+        (Status.FAILED, Status.WAITING),
+    ],
+    ids=["completed", "failed"],
+)
+def test_check_wrappers_reconciles_final_wrapper_with_queued_inner(
+    wrapper_status, expected_inner_status, mocker
+):
+    """A queued inner of a finished wrapper is reconciled instead of dropped."""
+    inner = Job("inner", 2, Status.QUEUING, 0)
+    inner.prev_status = Status.QUEUING
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=wrapper_status, wr_type="vertical")
     wrapper.status = wrapper_status
-    mocker.patch("autosubmit.job.job.Job.update_status")
-    mock_log = mocker.patch("autosubmit.job.job.Log.warning")
+    _start_inner_wait(wrapper, inner, 1000)
+    wrapper.platform.IO_SAFE_WAIT = 5
+    wrapper.platform.confirm_done_jobs_via_stat.return_value = {inner.name: Status.QUEUING}
+    _commit_new_status(mocker)
+    job_list = _wrapper_job_list(mocker, wrapper)
+    mocker.patch("autosubmit.job.job.time.time", return_value=1010)
 
-    result = wrapper._finalize_wrapper_completion()
-    assert result == expected_save
-    if wrapper_status == Status.FAILED:
-        mock_log.assert_called_once()
-        assert "finished with status FAILED" in str(mock_log.call_args)
+    check_wrappers(wrapper.as_config, job_list, "a000")
+
+    assert inner.status == expected_inner_status
+    assert wrapper.id not in job_list.job_package_map
+
+
+def test_wrapper_status_checks_without_platform(mocker):
+    """Wrapper status checks return False instead of failing when no platform is set."""
+    inner = Job("inner", 2, Status.COMPLETED, 0)
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=Status.COMPLETED)
+    wrapper._platform = None
+
+    assert wrapper.reconcile_finished_wrapper(wrapper.as_config) is False
+    assert wrapper.check_and_update_status(wrapper.as_config) is False
+
+
+@pytest.mark.parametrize(
+    "wr_type",
+    [None, 0, "bash", Language.BASH],
+    ids=["none", "zero", "bash", "language-bash"],
+)
+def test_wrapper_job_infers_vertical_type_from_inner_jobs(wr_type, mocker):
+    """An unknown wrapper type falls back to the inner jobs' wrapper_type."""
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner.wrapper_type = "vertical"
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], wr_type=wr_type)
+
+    assert wrapper.wrapper_type == "vertical"
+
+
+def test_wrapper_job_infers_vertical_type_case_insensitive(mocker):
+    """An inner wrapper_type is normalized before inferring the wrapper kind."""
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner.wrapper_type = "VERTICAL"
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], wr_type=None)
+
+    assert wrapper.wrapper_type == "vertical"
+
+
+@pytest.mark.parametrize(
+    "wrapper_status",
+    [Status.COMPLETED, Status.FAILED],
+    ids=["completed", "failed"],
+)
+def test_check_wrappers_reads_last_retry_stat(wrapper_status, mocker):
+    """The last allowed retry STAT must be read before dropping the finished wrapper."""
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner.retrials = 1
+    inner.fail_count = 0
+    inner.prev_status = Status.FAILED
+    wrapper = _make_wrapper_job(
+        mocker, inner_jobs=[inner], new_status=wrapper_status, wr_type="vertical"
+    )
+    wrapper.status = wrapper_status
+    wrapper.platform.confirm_done_jobs_via_stat.side_effect = [
+        {inner.name: Status.FAILED},
+        {inner.name: Status.COMPLETED},
+    ]
+    _commit_new_status(mocker)
+    job_list = _wrapper_job_list(mocker, wrapper)
+
+    check_wrappers(wrapper.as_config, job_list, "a000")
+    assert wrapper.id in job_list.job_package_map
+
+    check_wrappers(wrapper.as_config, job_list, "a000")
+
+    assert wrapper.id not in job_list.job_package_map
+    assert inner.status == Status.COMPLETED
+    assert inner.fail_count == 1
+
+
+def test_compute_inner_job_status_keeps_completed_inner_for_failed_wrapper(mocker):
+    """A completed inner must not be downgraded by a stale STAT on a failed wrapper."""
+    inner = Job("inner", 2, Status.COMPLETED, 0)
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=Status.FAILED, wr_type="vertical")
+    wrapper.status = Status.FAILED
+
+    result = wrapper._compute_inner_job_status(inner, {inner.name: Status.QUEUING}, True)
+
+    assert result == Status.COMPLETED
 
 
 def test_check_and_update_status_orchestrator(mocker):
@@ -2932,6 +3448,18 @@ def test_is_over_wallclock_elapsed_exceeds(mocker, start_time_timestamp, effecti
     assert result is expected
 
 
+def test_is_over_wallclock_without_start_time_returns_false(mocker):
+    """Without a start time the wallclock cannot be checked, and it must not crash."""
+    job = Job("t000_test", 1, Status.RUNNING, 0)
+    job.start_time_timestamp = None
+    job._wallclock_in_seconds = 60
+    platform = mocker.MagicMock()
+    platform.set_start_time_from_remote_stat_file.side_effect = lambda jobs: None
+    job._platform = platform
+
+    assert job.is_over_wallclock() is False
+
+
 def test_update_platform_associated_parameters_dummy_project_warning(mocker, tmp_path):
     """update_platform_associated_parameters: warns when project is dummy but ext paths exist."""
     job = Job("t000_test", 1, Status.WAITING, 0)
@@ -3011,16 +3539,15 @@ def test_write_end_time_with_positive_end_time(mocker, tmp_path):
     assert job.finish_time_timestamp == expected
 
 
-@pytest.mark.parametrize("new_status,prev_status,expected_save,log_called", [
-    (Status.SUBMITTED, Status.RUNNING, True, True),   # status change, not COMPLETED/FAILED
-    (Status.RUNNING, Status.RUNNING, False, False),   # no status change
+@pytest.mark.parametrize("new_status,expected_save,log_called", [
+    (Status.SUBMITTED, True, True),   # status change, not COMPLETED/FAILED
+    (Status.RUNNING, False, False),   # no status change
 ])
-def test_check_and_update_status_branches(mocker, new_status, prev_status, expected_save, log_called):
+def test_check_and_update_status_branches(mocker, new_status, expected_save, log_called):
     """check_and_update_status: covers status-change and no-change branches."""
     inner = Job("inner", 2, new_status, 0)
     inner.new_status = new_status
     wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=new_status)
-    wrapper.prev_status = prev_status
     wrapper.platform.confirm_done_jobs_via_stat.return_value = {"inner": new_status}
     mocker.patch.object(wrapper, "_inner_job_can_run", return_value=True)
     mocker.patch.object(wrapper, "_check_wrapper_wallclock_and_handle", return_value=False)
@@ -3030,6 +3557,22 @@ def test_check_and_update_status_branches(mocker, new_status, prev_status, expec
     assert wrapper.status == new_status
     assert save is expected_save
     assert mock_log.called == log_called
+
+
+def test_check_and_update_status_does_not_save_unchanged_wrapper(mocker):
+    """An unchanged wrapper must not mark the wrapper dirty on every check."""
+    inner = Job("inner", 2, Status.SUBMITTED, 0)
+    inner.new_status = Status.SUBMITTED
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], new_status=Status.SUBMITTED)
+    wrapper.status = Status.SUBMITTED
+    wrapper.prev_status = Status.RUNNING
+    wrapper.platform.confirm_done_jobs_via_stat.return_value = {"inner": Status.SUBMITTED}
+    mocker.patch.object(wrapper, "_check_wrapper_wallclock_and_handle", return_value=False)
+    mocker.patch("autosubmit.job.job.Job.update_status")
+
+    assert wrapper.check_and_update_status(wrapper.as_config) is False
+    assert wrapper.prev_status == Status.SUBMITTED
+
 
 
 @pytest.mark.parametrize("vertical_wrapper,is_over,expected", [
@@ -3213,9 +3756,24 @@ def test_recover_log_updates_call_count(
 def test_compute_inner_job_status_returns_stat_when_done(mocker):
     inner = Job("inner", 2, Status.FAILED, 0)
     inner._retrials = 3
-    inner.wrapper_type = "vertical"
-    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], wr_type="vertical")
 
     result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
 
     assert result == Status.FAILED
+    assert inner.fail_count == 1
+
+
+def test_compute_inner_job_status_preserves_skipped_inner(mocker):
+    """A SKIPPED inner job keeps its status even when the wrapper is done."""
+    wrapper = _make_wrapper_job(mocker, new_status=Status.COMPLETED, wr_type="vertical")
+    inner = Job("inner", 2, Status.SKIPPED, 0)
+    mocker.patch.object(
+        WrapperJob, "_inner_job_can_run", staticmethod(lambda inner_job, job_list: True)
+    )
+
+    result = wrapper._compute_inner_job_status(
+        inner, {"inner": Status.RUNNING}, wrapper_is_done=True
+    )
+
+    assert result == Status.SKIPPED

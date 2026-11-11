@@ -57,6 +57,25 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `Log.set_file` failing (after retrying) when the log directory had missing parent directories or
   when given a bare file name; the directory is now created with its parents #3240 (thanks @anyingiit)
 - Ensure Autosubmit deletes PostgreSQL database schemas when deleting an experiment #3383
+- Fixed vertical wrappers not waiting for the inner STAT files to settle and not reconciling inner jobs after
+  the wrapper completed, which could leave them `RUNNING`/`QUEUING` and trigger a false strict-policy
+  "Wrapper couldn't be formed" deadlock (7014). Finished wrappers are now kept until the last retry STAT
+  is read.
+- Fixed vertical wrappers losing their wrapper type on reload, which disabled the retries-based wallclock
+  guard for their inner jobs #3421
+- Fixed wrapper status updates and wrapper-id lookups not being scoped to the current experiment run, so
+  wrappers from a previous run could hide the current run's inner jobs
+- Fixed a finished wrapper whose last inner STAT was still pending being dropped from the run loop or
+  triggering a false strict-policy deadlock (7014) before the STAT could be read
+- Fixed vertical wrapper retries restarting at `_STAT_0` and `.out.0`/`.err.0` instead of continuing from the
+  inner job's current fail count
+- Finished wrappers now apply `CHECK_TIME_WRAPPER` before reconciling their inner jobs, avoiding repeated
+  remote STAT reads on every monitor iteration
+- Fixed inner jobs left in `QUEUING`, `SUBMITTED`, `SUSPENDED`, or `UNKNOWN` after their wrapper finished not
+  being reset to `WAITING`, which could leave them stuck
+- Fixed `EcPlatform` leaving downloaded STAT files in the local temporary directory after reading the start time
+- Fixed jobs without a readable STAT start, submit, or end time being assigned the current time, which
+  distorted wallclock checks and metrics. Unknown timestamps are now stored as 0 until they can be read.
 
 **New Features:**
 

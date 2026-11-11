@@ -2605,6 +2605,17 @@ class JobList:
                         self.job_package_map.pop(package_id, None)
 
 
+    def has_wrappers_to_reconcile(self) -> bool:
+        """Whether a finished wrapper is still reconciling its inner jobs.
+
+        :return: True if any finished wrapper must remain under reconciliation.
+        """
+        return any(
+            wrapper_job.status in (Status.COMPLETED, Status.FAILED)
+            and wrapper_job.has_inner_jobs_to_reconcile()
+            for wrapper_job in self.job_package_map.values()
+        )
+
     def continue_run(self) -> bool:
         """Loads the next possible jobs and edges from the database.
 
@@ -2630,7 +2641,7 @@ class JobList:
         for edge in sorted(self.graph_dict, key=lambda e: (e['e_from'], e['e_to'])):
             Log.debug(f"  {edge['e_from']:50s} -> {edge['e_to']:50s} trigger={edge.get('min_trigger_status','?'):12s} completion={edge.get('completion_status','?')}")
         self.update_wrappers_references()
-        return len(self.get_active()) > 0
+        return len(self.get_active()) > 0 or self.has_wrappers_to_reconcile()
 
     def unload_finished_jobs(self):
         """Unloads finished jobs and edges from the memory."""
@@ -3310,11 +3321,11 @@ class JobList:
         job.packed = False
         if job.id and self.job_package_map and int(job.id) in self.job_package_map:
             wrapper_job = self.job_package_map[int(job.id)]
-            if wrapper_job.status not in (Status.COMPLETED, Status.FAILED):
+            if wrapper_job.status not in (Status.COMPLETED, Status.FAILED) or wrapper_job.has_inner_jobs_to_reconcile():
                 job.packed = True
                 return job.packed
         for wrapper_job in self.job_package_map.values():
-            if wrapper_job.status not in (Status.COMPLETED, Status.FAILED):
+            if wrapper_job.status not in (Status.COMPLETED, Status.FAILED) or wrapper_job.has_inner_jobs_to_reconcile():
                 for inner_job in wrapper_job.job_list:
                     if inner_job.name == job.name:
                         job.packed = True
@@ -3593,10 +3604,13 @@ class JobList:
 
     def load_wrappers(self, preview: bool = False) -> None:
         """Load wrapper jobs and their inner jobs from the database, and populate the job package map.
-        Only wrappers matching the current ``run_id`` are loaded.
+        Only wrappers matching the current ``run_id`` are loaded. The in-memory
+        wrapper maps are replaced, not extended.
 
         :param preview: If True, load wrappers in preview mode.
         """
+        self.job_package_map.clear()
+        self.packages_dict.clear()
         un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, self.job_list, run_id=self.run_id)
 
         # Build a dictionary of wrapper info indexed by wrapper name
@@ -3641,6 +3655,7 @@ class JobList:
                 num_processors=wrapper_info["num_processors"],
                 platform=wrapper_info["job_list"][0].platform,
                 as_config=self._as_conf,
+                wr_type=wrapper_info.get("type"),
             )
             wrapper_job.platform_name = wrapper_job.job_list[0].platform_name
 
@@ -3666,7 +3681,7 @@ class JobList:
             "platform_name": wrapper_job.platform.name if wrapper_job.platform else None,
             "wallclock": wrapper_job.wallclock,
             "num_processors": wrapper_job.num_processors,
-            "type": getattr(wrapper_job, "type", None),
+            "type": getattr(wrapper_job, "wrapper_type", None),
             "sections": getattr(wrapper_job, "sections", None),
             "method": getattr(wrapper_job, "method", None),
             "run_id": self.run_id,
@@ -4089,34 +4104,36 @@ class JobList:
 
             values = last_line.split()
             # print(last_line)
+
+            def _parse_value(value, fallback):
+                if value == "0":
+                    return fallback
+                return parse_date(value)
+
             try:
                 if status_code in [Status.RUNNING]:
-                    submit_time = parse_date(
-                        values[0]) if len(values) > 0 else now
-                    start_time = parse_date(values[1]) if len(
-                        values) > 1 else submit_time
+                    submit_time = _parse_value(values[0], now) if len(values) > 0 else now
+                    start_time = _parse_value(
+                        values[1], submit_time) if len(values) > 1 else submit_time
                     finish_time = now
                 elif status_code in [Status.QUEUING, Status.SUBMITTED, Status.HELD]:
-                    submit_time = parse_date(
-                        values[0]) if len(values) > 0 else now
-                    start_time = parse_date(
-                        values[1]) if len(values) > 1 and values[0] != values[1] else now
+                    submit_time = _parse_value(values[0], now) if len(values) > 0 else now
+                    start_time = _parse_value(
+                        values[1], now) if len(values) > 1 and values[0] != values[1] else now
                 elif status_code in [Status.COMPLETED]:
-                    submit_time = parse_date(
-                        values[0]) if len(values) > 0 else now
-                    start_time = parse_date(
-                        values[1]) if len(values) > 1 else submit_time
+                    submit_time = _parse_value(values[0], now) if len(values) > 0 else now
+                    start_time = _parse_value(
+                        values[1], submit_time) if len(values) > 1 else submit_time
                     if len(values) > 3:
-                        finish_time = parse_date(values[len(values) - 2])
+                        finish_time = _parse_value(values[len(values) - 2], submit_time)
                     else:
                         finish_time = submit_time
                 else:
-                    submit_time = parse_date(
-                        values[0]) if len(values) > 0 else now
-                    start_time = parse_date(values[1]) if len(
-                        values) > 1 else submit_time
-                    finish_time = parse_date(values[2]) if len(
-                        values) > 2 else start_time
+                    submit_time = _parse_value(values[0], now) if len(values) > 0 else now
+                    start_time = _parse_value(
+                        values[1], submit_time) if len(values) > 1 else submit_time
+                    finish_time = _parse_value(
+                        values[2], start_time) if len(values) > 2 else start_time
             except Exception:
                 start_time = now
                 finish_time = now
@@ -4214,14 +4231,14 @@ class JobList:
             for wrapper_job in self.job_package_map.values():
                 wrappers.append(self._wrapper_job_dict(wrapper_job)[0])
             if wrappers:
-                self.dbmanager.update_wrapper_status(wrappers)
+                self.dbmanager.update_wrapper_status(wrappers, run_id=self.run_id)
 
     def get_wrappers_id_from_db(self) -> list[int]:
         """Get a list of all wrapper job IDs from the database.
 
-        :return: List of wrapper job IDs.
+        :return: List of wrapper job IDs for the current run.
         """
-        return [id for _, id in self.dbmanager.get_wrappers_id_from_db()]
+        return self.dbmanager.get_wrappers_id_from_db(run_id=self.run_id)
 
     def get_failed_from_db(self):
         return self.dbmanager.get_failed_job_data()

@@ -858,30 +858,39 @@ class JobsDbManager(DbManager):
         self.delete_all(innerjobs_table.name)
         self.delete_all(wrapper_info_table.name)
 
-    def update_wrapper_status(self, packages: list[dict[str, Any]]) -> None:
+    def update_wrapper_status(self, packages: list[dict[str, Any]], run_id: int | None = None) -> None:
         """
         Update the status of wrapper jobs in the database.
 
         :param packages: List of wrapper job dictionaries.
+        :param run_id: Optional experiment run ID used to scope the update.
         """
         wrapper_info_table: Table = self.table_registry.get(WrapperInfoTable.name)
         self.create_table(wrapper_info_table.name)
 
         for package in packages:
             where = {'id': package['id']}
+            if run_id is not None:
+                where['run_id'] = run_id
             values = {'status': Status.VALUE_TO_KEY[int(package['status'])]}
+            if 'type' in package:
+                values['type'] = package['type']
             self.update_where(wrapper_info_table.name, values, where)
 
-    def get_wrappers_id_from_db(self) -> list[int]:
+    def get_wrappers_id_from_db(self, run_id: int | None = None) -> list[int]:
         """
         Get the IDs of all wrapper jobs in the database.
 
+        :param run_id: Optional experiment run ID used to filter the wrappers.
         :return: List of wrapper job IDs.
         """
         wrapper_info_table: Table = self.table_registry.get(WrapperInfoTable.name)
         self.create_table(wrapper_info_table.name)
-        wrappers = self.select_all_with_columns(wrapper_info_table.name)
-        return [wrapper[1] for wrapper in wrappers]
+        if run_id is not None:
+            wrappers = self.select_where_with_columns(wrapper_info_table, {'run_id': run_id})
+        else:
+            wrappers = self.select_all_with_columns(wrapper_info_table.name)
+        return [dict(wrapper)["id"] for wrapper in wrappers]
 
 
     def reset_updated_logs(self) -> None:

@@ -107,7 +107,12 @@ def check_deadlock(
     :param any_job_submitted: Boolean indicating if any job was submitted.
     :param job_list: Job list object containing the jobs.
     """
-    if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
+    if (
+        wrapper_errors
+        and not any_job_submitted
+        and len(job_list.get_in_queue()) == 0
+        and not job_list.has_wrappers_to_reconcile()
+    ):
         # Deadlock situation
         err_msg = ""
         for wrapper in wrapper_errors:

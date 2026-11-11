@@ -248,7 +248,7 @@ class ExperimentHistory:
             job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
             if not job_data_dc_last:
                 raise Exception(f"Job {job_name} has not been found in the database.")
-            job_data_dc_last.finish = finish if finish > 0 else int(time())
+            job_data_dc_last.finish = finish
             job_data_dc_last.status = status
             job_data_dc_last.job_id = job_id
             job_data_dc_last.rowstatus = Models.RowStatus.PENDING_PROCESS

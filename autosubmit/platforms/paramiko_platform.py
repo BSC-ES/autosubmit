@@ -33,7 +33,6 @@ from typing import TYPE_CHECKING
 
 import paramiko
 import Xlib.support.connect as xlib_connect
-from bscearth.utils.date import date2str
 from paramiko import ProxyCommand, SFTPError
 from paramiko.agent import Agent
 from paramiko.ssh_exception import SSHException
@@ -1369,9 +1368,8 @@ class ParamikoPlatform(Platform):
             except (ValueError, OSError):
                 Log.warning(
                     f"Could not parse start time from STAT file for job {job.name}. "
-                    f"Using current datetime."
+                    f"Leaving start time unset."
                 )
-                job.start_time_timestamp = date2str(datetime.datetime.now(), "S")
 
     def get_job_id_by_job_name(self, job_name, retries: int = 2) -> str | list[str]:
         """Get job id by job name

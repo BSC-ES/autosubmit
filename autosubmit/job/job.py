@@ -1363,7 +1363,7 @@ class Job:
                 lines = f.readlines()
                 for line in lines:
                     fields = line.split()
-                    if len(fields) >= index + 1:
+                    if len(fields) >= index + 1 and fields[index] != "0":
                         lst.append(parse_date(fields[index]))
 
         return lst
@@ -1427,7 +1427,10 @@ class Job:
                         break
                     already_completed = True
                 retrial_dates = [
-                    (parse_date(y) if y != 'COMPLETED' and y != 'FAILED' else y) for y in retrial_fields
+                    None if retrial_field == "0"
+                    else parse_date(retrial_field) if retrial_field not in ("COMPLETED", "FAILED")
+                    else retrial_field
+                    for retrial_field in retrial_fields
                 ]
                 # Inserting list [submit, start, finish] of datetime at the beginning of the list. Restores ordering.
                 retrials_list.insert(0, retrial_dates)
@@ -1510,6 +1513,8 @@ class Job:
             self.submit_time_timestamp = datetime.datetime.fromtimestamp(
                 submit_epoch
             ).strftime("%Y%m%d%H%M%S")
+        else:
+            self.submit_time_timestamp = 0
 
     def retrieve_logfiles(self) -> RecoveryReport:
         log_attempts = []
@@ -1678,22 +1683,26 @@ class Job:
         if not self.start_time_timestamp:  # Fallback, this should not happen as start_time_timestamp is set when the job is running
             Log.warning(f"Job {self.name} does not have start time timestamp, trying to set it from remote stat file")
             self.platform.set_start_time_from_remote_stat_file([self])
+        if not self.start_time_timestamp:
+            Log.warning(f"Job {self.name} has no start time timestamp, skipping wallclock check")
+            return False
         elapsed = datetime.datetime.now() - datetime.datetime.strptime(str(self.start_time_timestamp), "%Y%m%d%H%M%S")
         if int(elapsed.total_seconds()) > effective_wallclock:
             Log.warning(f"Job {self.name} is over wallclock time, Autosubmit will check if it is completed")
             return True
         return False
 
-    def update_status(self, as_conf: 'AutosubmitConfig') -> Status:
+    def update_status(self, as_conf: 'AutosubmitConfig', verify_completion: bool = True) -> Status:
         """Updates job status, checking COMPLETED file if needed.
 
         :param as_conf: Autosubmit configuration.
+        :param verify_completion: Whether to confirm COMPLETED/FAILED against the platform COMPLETED file.
         :return: The new status.
         """
         previous_status = self.status
 
         self.prev_status = previous_status
-        if self.new_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
+        if verify_completion and self.new_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
             self.check_completion(default_status=Status.FAILED if self.new_status in [Status.COMPLETED,
                                                                                       Status.FAILED] else Status.UNKNOWN)
         if self.status != self.new_status:
@@ -2923,13 +2932,19 @@ class Job:
 
     def write_submit_time(self, attempt: int) -> None:
         """Writes submit date and time to the ``TOTAL_STATS`` file."""
+        if not self.submit_time_timestamp:
+            Log.warning(
+                f"Submit time for job {self.name} not found in the STAT file, leaving it at 0."
+            )
+            self.submit_time_timestamp = 0
         self._write_time("submit")
 
         exp_history = ExperimentHistory(self.expid)
 
         status = self.status if self.status == Status.COMPLETED else Status.FAILED
         # TODO: for compatibility reasons.. convert back to EPOCH for database storage
-        exp_history.write_submit_time(self.name, submit=self._datestr_to_epoch(str(self.submit_time_timestamp)),
+        submit = self._datestr_to_epoch(str(self.submit_time_timestamp)) if self.submit_time_timestamp else 0
+        exp_history.write_submit_time(self.name, submit=submit,
                                       status=Status.VALUE_TO_KEY.get(status, "UNKNOWN"), ncpus=0,
                                       wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member,
                                       section=self.section, chunk=self.chunk,
@@ -2949,9 +2964,8 @@ class Job:
         if start_time_:
             self.start_time_timestamp = datetime.datetime.fromtimestamp(start_time_).strftime("%Y%m%d%H%M%S")
         else:
-            Log.warning(f"Start time for job {self.name} not found in the STAT file, using last known time.")
-            self.start_time_timestamp = self.start_time_timestamp if self.start_time_timestamp else date2str(
-                datetime.datetime.now(), 'S')
+            Log.warning(f"Start time for job {self.name} not found in the STAT file, leaving it at 0.")
+            self.start_time_timestamp = 0
 
     def fix_local_logs_timestamps(self, current_timestamp: str, new_timestamp: str) -> None:
         """Renames local log files to update the timestamp in their names without changing the prefix and extension.
@@ -2982,11 +2996,17 @@ class Job:
         :param attempt: The fail count to identify the correct database row.
         :return: True if successful, False otherwise
         """
+        if not self.start_time_timestamp:
+            Log.warning(
+                f"Start time for job {self.name} not found in the STAT file, leaving it at 0."
+            )
+            self.start_time_timestamp = 0
         self._write_time("start")
         exp_history = ExperimentHistory(self.expid)
         # TODO: for compatibility reasons.. convert back to EPOCH for database storage
         status = self.status if self.status == Status.COMPLETED else Status.FAILED
-        exp_history.write_start_time(self.name, start=self._datestr_to_epoch(str(self.start_time_timestamp)),
+        start = self._datestr_to_epoch(str(self.start_time_timestamp)) if self.start_time_timestamp else 0
+        exp_history.write_start_time(self.name, start=start,
                                      status=Status.VALUE_TO_KEY.get(status, "UNKNOWN"), qos=self.queue,
                                      job_id=self.id, wrapper_queue=self._wrapper_queue,
                                      wrapper_code=0 if not self.packed else 1,
@@ -3022,8 +3042,11 @@ class Job:
         end_time = self.check_end_time(attempt)
         if end_time > 0:
             self.finish_time_timestamp = datetime.datetime.fromtimestamp(end_time).strftime("%Y%m%d%H%M%S")
-        if not self.finish_time_timestamp:
-            self.finish_time_timestamp = date2str(datetime.datetime.now(), 'S')
+        else:
+            Log.warning(
+                f"End time for job {self.name} not found in the STAT file, leaving it at 0."
+            )
+            self.finish_time_timestamp = 0
         self._write_time("end")
         self._write_time("status")
 
@@ -3033,8 +3056,9 @@ class Job:
         # TODO: For compatibility reasons.. convert back to EPOCH for database storage
         status = self.status if self.status == Status.COMPLETED else Status.FAILED
         status_str = Status.VALUE_TO_KEY.get(status, "UNKNOWN")
+        finish = self._datestr_to_epoch(str(self.finish_time_timestamp)) if self.finish_time_timestamp else 0
         job_data_dc = exp_history.write_finish_time(self.name,
-                                                    finish=self._datestr_to_epoch(str(self.finish_time_timestamp)),
+                                                    finish=finish,
                                                     status=status_str,
                                                     job_id=self.id, out_file=out, err_file=err,
                                                     fail_count=attempt)
@@ -3135,7 +3159,7 @@ class Job:
                 output_by_lines = stat_file.read_text().splitlines()
                 if output_by_lines:
                     line_info = output_by_lines[-1].split(" ")
-                    if line_info and line_info[0].isdigit():
+                    if line_info and line_info[0].isdigit() and line_info[0] != "0":
                         self.ready_date = line_info[0]
                     else:
                         self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime(
@@ -3188,6 +3212,28 @@ class Job:
             self.platform = self.submitter.platforms[self.platform_name]
 
 
+_KNOWN_WRAPPER_TYPES = {"vertical", "horizontal", "vertical-horizontal", "horizontal-vertical"}
+
+
+@dataclass
+class _InnerJobState:
+    """Reconciliation state for one inner job of a wrapper."""
+
+    stat: Status | None = None
+    stat_attempt: int | None = None
+    wait_started: float | None = None
+    wait_expired_attempt: int | None = None
+
+
+_RESETTABLE_INNER_STATUSES = (
+    Status.QUEUING,
+    Status.SUBMITTED,
+    Status.SUSPENDED,
+    Status.UNKNOWN,
+)
+_RECONCILE_INNER_STATUSES = (Status.RUNNING, *_RESETTABLE_INNER_STATUSES)
+
+
 class WrapperJob(Job):
     """Defines a wrapper from a package.
 
@@ -3233,13 +3279,20 @@ class WrapperJob(Job):
         self.checked_time = datetime.datetime.now()
         self.inner_jobs_running: list = []
         self.is_wrapper = True
-        self._safe_wait = 60  # seconds to wait before considering a wrapper stuck in RUNNING when all the inner jobs are finished
-        self._finished_time = None
         self.sections = sections
-        if wr_type is not None:
-            self.type = wr_type
+        self._inner_states: dict[str, _InnerJobState] = {}
+        normalized_wrapper_type = str(wr_type).strip().lower() if wr_type else None
+        self.wrapper_type = (
+            normalized_wrapper_type
+            if normalized_wrapper_type in _KNOWN_WRAPPER_TYPES
+            else None
+        )
+        if not self.wrapper_type and any(
+            str(job.wrapper_type).strip().lower() == "vertical"
+            for job in self.job_list
+        ):
+            self.wrapper_type = "vertical"
         self.method = method
-        self.num_processors = num_processors
 
     def _queuing_reason_cancel(self, reason: str) -> bool:
         """Function return True if a job was cancelled for a listed reason.
@@ -3270,23 +3323,6 @@ class WrapperJob(Job):
             return False
 
     @staticmethod
-    def _is_finished(job: Job, wrapper_job_set) -> bool:
-        """Return True if job counts as finished within this wrapper.
-
-        A WAITING job counts as finished only when at least one of its
-        parents that also belongs to this wrapper has FAILED status.
-        """
-        if job.status in (Status.COMPLETED, Status.FAILED):
-            return True
-        if job.status == Status.WAITING:
-            return any(
-                parent.status == Status.FAILED
-                for parent in job.parents
-                if parent in wrapper_job_set
-            )
-        return False
-
-    @staticmethod
     def _inner_job_can_run(inner_job: Job, wrapper_job_set) -> bool:
         """Return True if the inner job can run within this wrapper.
 
@@ -3298,26 +3334,55 @@ class WrapperJob(Job):
             if parent in wrapper_job_set
         )
 
-    def _apply_io_safe_wait(self, inner_job: Job, current_stat: Status, timeout_to: Status,
-                            keep_alive: Status | None = None) -> Status:
-        """Track elapsed time since wrapper finished; timeout transitions to timeout_to.
+    def _apply_io_safe_wait(self, inner_job: Job, waiting_status: Status, timeout_to: Status) -> Status:
+        """Track elapsed time since the wrapper started waiting for one inner job.
+
+        The timer belongs to the wrapper. It must not share ``Job.finished_time``,
+        which the platform uses to resolve the job status from the scheduler. The
+        timeout transitions to ``timeout_to``.
 
         :param inner_job: The inner job to check.
-        :param current_stat: The current status of the inner job.
+        :param waiting_status: Status returned while the IO_SAFE_WAIT timer is active.
         :param timeout_to: The status to transition to if the IO_SAFE_WAIT time has elapsed.
-        :param keep_alive: Optional status to return if still within IO_SAFE_WAIT time.
         :return: The new status for the inner job based on the IO_SAFE_WAIT logic.
         """
-        if not inner_job.finished_time:
-            inner_job.finished_time = time.time()
-        elapsed = time.time() - inner_job.finished_time
-        if elapsed >= self.platform.IO_SAFE_WAIT:
-            inner_job.finished_time = None
+        state = self._inner_states.setdefault(inner_job.name, _InnerJobState())
+        now = time.time()
+        if state.wait_started is None:
+            state.wait_started = now
+        elapsed = now - state.wait_started
+        io_safe_wait = self.platform.IO_SAFE_WAIT
+        if elapsed >= io_safe_wait:
+            state.wait_started = None
+            state.wait_expired_attempt = inner_job.fail_count
             return timeout_to
-        return keep_alive if keep_alive is not None else current_stat
+        return waiting_status
+
+    def _clear_inner_wait(self, inner_job: Job) -> None:
+        """Forget any pending IO_SAFE_WAIT for an inner job.
+
+        :param inner_job: The inner job whose wait state is cleared.
+        """
+        state = self._inner_states.get(inner_job.name)
+        if state is None:
+            return
+        state.wait_started = None
+        state.wait_expired_attempt = None
 
     def _compute_inner_job_status(self, inner_job: Job, stat_statuses: dict, wrapper_is_done: bool) -> int:
         """Determine the new status for a single inner job.
+
+        A done wrapper waits ``IO_SAFE_WAIT`` for an inner job whose STAT is
+        still RUNNING, QUEUING, or missing. The scheduler can report the wrapper
+        as finished before the inner STAT files are flushed. If the STAT does
+        not confirm before the wait expires, the wrapper status decides:
+        COMPLETED reconciles the inner to COMPLETED, FAILED leaves it
+        FAILED/QUEUING.
+
+        A previously FAILED inner with an unknown STAT on a FAILED wrapper also
+        waits ``IO_SAFE_WAIT`` for the last retry STAT. It stays FAILED during
+        the wait so it is not resurrected as RUNNING/QUEUING and the external
+        retry decision still sees a failure.
 
         :param inner_job: The inner job to compute the status for.
         :param stat_statuses: A dictionary mapping job names to their statuses as determined by platform stat checks.
@@ -3327,15 +3392,49 @@ class WrapperJob(Job):
         fallback = Status.WAITING if wrapper_is_done else Status.SUBMITTED
 
         stat = stat_statuses.get(inner_job.name, fallback)
+        state = self._inner_states.setdefault(inner_job.name, _InnerJobState())
+        state.stat = stat
+        state.stat_attempt = inner_job.fail_count
 
-        if stat in (Status.COMPLETED, Status.FAILED, Status.RUNNING):
-            if stat == Status.FAILED and inner_job.wrapper_type == "vertical" and inner_job.fail_count < inner_job.retrials:
+        if inner_job.status in (Status.COMPLETED, Status.SKIPPED):
+            self._clear_inner_wait(inner_job)
+            return inner_job.status
+
+        wrapper_completed = wrapper_is_done and self.new_status == Status.COMPLETED
+
+        if stat == Status.COMPLETED:
+            self._clear_inner_wait(inner_job)
+            return Status.COMPLETED
+
+        if stat == Status.FAILED:
+            self._clear_inner_wait(inner_job)
+            if self.wrapper_type == "vertical" and inner_job.fail_count < inner_job.retrials:
                 inner_job.inc_fail_count()
+            return Status.FAILED
+
+        if (
+            inner_job.status == Status.FAILED
+            and wrapper_is_done
+            and not wrapper_completed
+            and stat != Status.RUNNING
+        ):
+            if state.wait_expired_attempt == inner_job.fail_count:
+                return Status.FAILED
+            return self._apply_io_safe_wait(inner_job, Status.FAILED, Status.FAILED)
+
+        if wrapper_completed:
+            return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.COMPLETED)
+
+        if stat == Status.RUNNING:
+            if wrapper_is_done:
+                return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.FAILED)
             return stat
 
-        elif stat is None or not self._inner_job_can_run(inner_job, self.job_list):
+        if not self._inner_job_can_run(inner_job, self.job_list):
             return fallback
 
+        if wrapper_is_done:
+            return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.QUEUING)
         return inner_job.status
 
     def _check_wrapper_wallclock_and_handle(self) -> bool:
@@ -3362,18 +3461,144 @@ class WrapperJob(Job):
                 inner_job.new_status = Status.WAITING
         return True
 
-    def _sync_inner_job_statuses(self, as_conf: 'AutosubmitConfig') -> None:
+    def _sync_inner_job_statuses(self, as_conf: 'AutosubmitConfig') -> bool:
         """Persist status changes for inner jobs that have transitioned.
 
         :param as_conf: Autosubmit configuration object.
+        :return: True if any inner job status changed.
         """
-        for inner_job in [inner_job for inner_job in self.job_list if inner_job.status != inner_job.new_status]:
-            inner_job.update_status(as_conf)
+        changed = False
+        for inner_job in self.job_list:
+            if inner_job.status != inner_job.new_status:
+                inner_job.update_status(as_conf, verify_completion=False)
+                changed = True
+        return changed
 
-    def _finalize_wrapper_completion(self) -> bool:
-        if any(inner_job.status == Status.RUNNING or (inner_job.status == Status.FAILED and inner_job.can_retry) for inner_job in self.job_list):
-            self.status = Status.RUNNING
+    def has_pending_inner_attempts(self) -> bool:
+        """Whether a finished wrapper may still have a later inner STAT to read."""
+        if self.wrapper_type != "vertical":
             return False
+        for inner_job in self.job_list:
+            if inner_job.status != Status.FAILED:
+                continue
+            state = self._inner_states.get(inner_job.name)
+            last_stat = state.stat if state else None
+            if last_stat not in (None, Status.FAILED):
+                continue
+            if state is not None and state.wait_expired_attempt == inner_job.fail_count:
+                continue
+            last_attempt = state.stat_attempt if state else None
+            if last_attempt is None or last_attempt < inner_job.retrials:
+                return True
+        return False
+
+    def has_inner_jobs_to_reconcile(self) -> bool:
+        """Whether a finished wrapper must stay checked to reconcile its inner jobs.
+
+        An active wrapper-owned ``IO_SAFE_WAIT`` also keeps the wrapper checked,
+        even when the inner job already has a final status.
+
+        ``HELD`` is deprecated and intentionally not treated as a pending inner
+        state.
+        """
+        return (
+            any(
+                inner_job.status in _RECONCILE_INNER_STATUSES
+                for inner_job in self.job_list
+            )
+            or self.has_pending_inner_attempts()
+            or any(
+                state.wait_started is not None
+                for state in self._inner_states.values()
+            )
+        )
+
+    def _reset_pending_inner_jobs(self, as_conf: 'AutosubmitConfig') -> bool:
+        """Reset inner jobs that never reached a final status to ``WAITING``.
+
+        ``HELD`` is deprecated and intentionally not reset.
+
+        :param as_conf: Autosubmit configuration object.
+        :return: True if any inner job was reset.
+        """
+        reset = False
+        for inner_job in self.job_list:
+            if inner_job.status in _RESETTABLE_INNER_STATUSES:
+                inner_job.new_status = Status.WAITING
+                inner_job.update_status(as_conf)
+                reset = True
+        return reset
+
+    def _refresh_inner_statuses(self, wrapper_is_done: bool) -> tuple[dict[str, int], dict[str, Any]]:
+        """Read inner STATs and compute their new statuses.
+
+        :param wrapper_is_done: Whether the wrapper is already final.
+        :return: Fail-count and start-time snapshots taken before the refresh.
+        """
+        fail_counts = {inner_job.name: inner_job.fail_count for inner_job in self.job_list}
+        start_times = {inner_job.name: inner_job.start_time_timestamp for inner_job in self.job_list}
+        stat_statuses = self.platform.confirm_done_jobs_via_stat(self.job_list)
+        for inner_job in self.job_list:
+            inner_job.new_status = self._compute_inner_job_status(
+                inner_job, stat_statuses, wrapper_is_done
+            )
+        self.platform.set_start_time_from_remote_stat_file([
+            inner_job for inner_job in self.job_list
+            if not inner_job.start_time_timestamp
+            and inner_job.new_status in [Status.RUNNING, Status.COMPLETED, Status.FAILED]
+        ])
+        return fail_counts, start_times
+
+    def _inner_state_changed(
+        self, fail_counts: dict[str, int], start_times: dict[str, Any]
+    ) -> bool:
+        """Whether fail counts or start times changed during the refresh.
+
+        :param fail_counts: Fail counts captured before the refresh.
+        :param start_times: Start times captured before the refresh.
+        :return: True if any inner job changed its fail count or start time.
+        """
+        return any(
+            inner_job.fail_count != fail_counts[inner_job.name]
+            for inner_job in self.job_list
+        ) or any(
+            inner_job.start_time_timestamp != start_times[inner_job.name]
+            for inner_job in self.job_list
+        )
+
+    def reconcile_finished_wrapper(self, as_conf: 'AutosubmitConfig') -> bool:
+        """Re-read inner STATs for a wrapper already final in the scheduler.
+
+        The wrapper stays in ``job_package_map`` until no inner job is
+        ``RUNNING`` and no inner job may still have a later STAT attempt. This
+        recovers the last retry attempt once its STAT is written.
+
+        :param as_conf: Autosubmit configuration object.
+        :return: True if any inner job status changed.
+        """
+        if not self.platform:
+            Log.warning(f"Cannot reconcile wrapper {self.name}: no platform is set.")
+            return False
+        fail_counts, start_times = self._refresh_inner_statuses(True)
+        save = self._sync_inner_job_statuses(as_conf)
+        save |= self._inner_state_changed(fail_counts, start_times)
+        save |= self._reset_pending_inner_jobs(as_conf)
+        return save
+
+    def _finalize_wrapper_completion(self, as_conf: 'AutosubmitConfig') -> bool:
+        """Finalize the wrapper once no inner job is still blocking it.
+
+        Inner jobs left in ``QUEUING`` or ``SUBMITTED`` never ran, so they are
+        reset to ``WAITING``. The wrapper keeps its scheduler status: keeping it
+        in ``job_package_map`` is handled by ``has_inner_jobs_to_reconcile``.
+
+        :param as_conf: Autosubmit configuration object.
+        :return: True if the wrapper was finalized, False if an inner job blocks it.
+        """
+        if any(inner_job.status == Status.RUNNING for inner_job in self.job_list):
+            return False
+
+        self._reset_pending_inner_jobs(as_conf)
 
         if self.status == Status.COMPLETED:
             Log.result(f"Wrapper job {self.name} and id {self.id} finished with status {self.status_str}.")
@@ -3388,41 +3613,31 @@ class WrapperJob(Job):
         :param as_conf: Autosubmit configuration object.
         :return: True if the status of the wrapper job has changed, otherwise False.
         """
+        if not self.platform:
+            Log.warning(f"Cannot check wrapper {self.name}: no platform is set.")
+            return False
         save = False
         # wrapper new_status is checked here
         self.platform.check_all_jobs([self], as_conf)
 
-        inner_jobs_stat_statuses = self.platform.confirm_done_jobs_via_stat(self.job_list)
         wrapper_is_done = self.new_status in [Status.COMPLETED, Status.FAILED]
-
-        for inner_job in self.job_list:
-            inner_job.new_status = self._compute_inner_job_status(
-                inner_job, inner_jobs_stat_statuses, wrapper_is_done
-            )
-
-
-        self.platform.set_start_time_from_remote_stat_file([
-            inner_job for inner_job in self.job_list
-            if not inner_job.start_time_timestamp and inner_job.new_status in [
-                Status.RUNNING, Status.COMPLETED, Status.FAILED
-            ]
-        ])
+        fail_counts, start_times = self._refresh_inner_statuses(wrapper_is_done)
 
         self._check_wrapper_wallclock_and_handle()
 
-        self._sync_inner_job_statuses(as_conf)
+        inner_status_changed = self._sync_inner_job_statuses(as_conf)
+        previous_status = self.status
+        self.prev_status = previous_status
         self.status = self.new_status
 
         if self.status in [Status.COMPLETED, Status.FAILED]:
-            save = self._finalize_wrapper_completion()
-        elif self.status != self.prev_status:
+            save = self._finalize_wrapper_completion(as_conf) or self.status != previous_status
+        elif self.status != previous_status:
             Log.debug(f"Wrapper job {self.name} and id {self.id} status updated to {self.status_str}.")
             save = True
 
-        for inner_job in self.job_list:
-            if inner_job.status != inner_job.prev_status:
-                save = True
-                break
+        save |= inner_status_changed
+        save |= self._inner_state_changed(fail_counts, start_times)
 
         return save
 

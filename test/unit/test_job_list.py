@@ -31,6 +31,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_packages import JobPackageThread
+from autosubmit.job.job_utils import check_wrappers
 from autosubmit.job.template import Language
 from test._oldschema import old_experiment_run_table, old_job_data_table
 from test.unit.conftest import FakePlatform
@@ -499,6 +500,33 @@ def test_unload_after_confirmed_recovery(setup_job_list):
     assert job.name not in job_list.graph.nodes
 
 
+def test_completed_wrapper_and_inner_are_removed_from_memory(fake_job_list, mocker):
+    """A finished wrapper and its inner job disappear from the in-memory maps and graph."""
+    inner = Job("inner", 100, Status.COMPLETED, 0)
+    inner.packed = False
+    wrapper = mocker.MagicMock()
+    wrapper.id = 100
+    wrapper.name = "wrapper_1"
+    wrapper.status = Status.COMPLETED
+    wrapper.has_inner_jobs_to_reconcile.return_value = False
+    wrapper.job_list = [inner]
+    fake_job_list.job_package_map[100] = wrapper
+    fake_job_list.packages_dict["wrapper_1"] = [inner]
+    fake_job_list.add_job(inner)
+    fake_job_list.dbmanager.select_edges.return_value = []
+    mocker.patch("autosubmit.job.job_utils._manage_wrapper_job", return_value=wrapper)
+
+    check_wrappers(mocker.MagicMock(), fake_job_list, "a000")
+
+    assert 100 not in fake_job_list.job_package_map
+    assert "wrapper_1" not in fake_job_list.packages_dict
+
+    fake_job_list.unload_finished_jobs()
+
+    assert inner.name not in fake_job_list.graph.nodes
+    assert inner not in fake_job_list.job_list
+
+
 def test_vertical_job_not_externally_retried(setup_job_list, as_conf):
     """Verify vertical wrapper inner jobs are not retried externally after wrapper finishes."""
     jobs, _, job_list = setup_job_list
@@ -580,8 +608,50 @@ def test_is_wrapper_still_running(
     if in_map:
         wrapper_job = mocker.MagicMock()
         wrapper_job.status = wrapper_status
+        wrapper_job.has_inner_jobs_to_reconcile.return_value = False
         fake_job_list.job_package_map[job_id] = wrapper_job
     assert fake_job_list.is_wrapper_still_running(inner_job) is expected
+
+
+def test_is_wrapper_still_running_while_reconciling_finished_wrapper(fake_job_list, mocker) -> None:
+    """A finished wrapper with pending inner reconciliation keeps its inner jobs packed."""
+    inner_job = Job('a000_20000101_fc0_1_SIM', 100, Status.FAILED, 0)
+    wrapper_job = mocker.MagicMock()
+    wrapper_job.status = Status.COMPLETED
+    wrapper_job.has_inner_jobs_to_reconcile.return_value = True
+    wrapper_job.job_list = [inner_job]
+    fake_job_list.job_package_map[100] = wrapper_job
+
+    assert fake_job_list.is_wrapper_still_running(inner_job) is True
+
+
+def test_has_wrappers_to_reconcile(fake_job_list, mocker) -> None:
+    """A finished wrapper with pending inner reconciliation keeps the run alive."""
+    wrapper_job = mocker.MagicMock()
+    wrapper_job.status = Status.COMPLETED
+    wrapper_job.has_inner_jobs_to_reconcile.return_value = True
+    fake_job_list.job_package_map[100] = wrapper_job
+
+    assert fake_job_list.has_wrappers_to_reconcile() is True
+
+    wrapper_job.status = Status.RUNNING
+    assert fake_job_list.has_wrappers_to_reconcile() is False
+
+
+def test_continue_run_keeps_reconciling_wrapper_alive(fake_job_list, mocker) -> None:
+    """continue_run must not exit while a finished wrapper is reconciling."""
+    mocker.patch.object(fake_job_list, "recover_logs")
+    mocker.patch.object(fake_job_list, "update_list", return_value=False)
+    mocker.patch.object(fake_job_list, "_load_graph")
+    mocker.patch.object(fake_job_list, "unload_finished_jobs")
+    mocker.patch.object(fake_job_list, "update_wrappers_references")
+    mocker.patch.object(fake_job_list, "get_active", return_value=[])
+    wrapper_job = mocker.MagicMock()
+    wrapper_job.status = Status.FAILED
+    wrapper_job.has_inner_jobs_to_reconcile.return_value = True
+    fake_job_list.job_package_map[100] = wrapper_job
+
+    assert fake_job_list.continue_run() is True
 
 
 def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:

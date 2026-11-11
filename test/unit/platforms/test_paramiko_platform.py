@@ -110,6 +110,21 @@ def test_paramiko_platform_constructor(paramiko_platform):
     assert len(platform.job_status) == 4
 
 
+def test_set_start_time_from_remote_stat_file_leaves_unset_on_bad_stat(mocker, paramiko_platform):
+    """A STAT without a valid start epoch must not fabricate the current time."""
+    platform = paramiko_platform
+    platform.remote_log_dir = "/tmp/logs"
+    job = Job("t000_SIM", 1, Status.RUNNING, 0)
+    job.fail_count = 0
+    job.start_time_timestamp = None
+    platform.send_command = mocker.Mock()
+    platform._ssh_output = f'/tmp/logs/{job.name}_STAT_0: "None"\n'
+
+    platform.set_start_time_from_remote_stat_file([job])
+
+    assert job.start_time_timestamp is None
+
+
 def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_platform):
     mocker.patch('autosubmit.platforms.paramiko_platform.Log')
     mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
