@@ -222,8 +222,9 @@ Contact Us
 
       Browse the code, read the changelog, or open a pull request.
 
-      +++
-      BSC-ES/autosubmit
+      .. card-footer::
+
+         BSC-ES/autosubmit
 
    .. grid-item-card:: :octicon:`issue-opened;1.1em` Report a problem
       :link: https://github.com/BSC-ES/autosubmit/issues
@@ -231,8 +232,9 @@ Contact Us
 
       Found a bug or want to request a feature? Open an issue on the tracker.
 
-      +++
-      BSC-ES/autosubmit/issues
+      .. card-footer::
+
+         BSC-ES/autosubmit/issues
 
    .. grid-item-card:: :octicon:`comment-discussion;1.5em` Discussions
       :link: https://github.com/BSC-ES/autosubmit/discussions
@@ -240,8 +242,9 @@ Contact Us
 
       Ask questions, share workflows, and see how other centres use Autosubmit.
 
-      +++
-      BSC-ES/autosubmit/discussions
+      .. card-footer::
+
+         BSC-ES/autosubmit/discussions
 
    .. grid-item-card:: :octicon:`mail;1.1em` Ask the team
       :link: mailto:support-autosubmit@bsc.es
@@ -250,8 +253,9 @@ Contact Us
       Questions about running Autosubmit at your centre, or anything the docs do
       not answer.
 
-      +++
-      support-autosubmit@bsc.es
+      .. card-footer::
+
+         support-autosubmit@bsc.es
 
 Media and Press Kit
 ===================
