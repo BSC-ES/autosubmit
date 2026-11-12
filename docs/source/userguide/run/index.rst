@@ -368,7 +368,6 @@ Options:
 .. runcmd:: autosubmit stop -h
 
 Examples:
-~~~~~~~~~
 
 .. code-block:: bash
 
@@ -396,7 +395,7 @@ To stop immediately experiment <EXPID>:
     kill -9 22835
 
 .. important:: In case you want to restart the experiment, you must follow the
-    :ref:`workflow_recovery` procedure, explained below, in order to properly resynchronize all completed jobs.
+    procedure described in :ref:`workflow_recovery`, in order to properly resynchronize all completed jobs.
 
 
 See :ref:`job_retries` for how Autosubmit retries failed jobs, and
