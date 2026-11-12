@@ -139,7 +139,7 @@ def test_recover_stale_job_data_uses_existing_platform(tmp_path, mocker):
     mock_plat.connected = True
     mock_plat.check_file_exists.return_value = False
     recover_stale_job_data("a000", mocker.MagicMock(), {"TEST": mock_plat})
-    mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
+    mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0", sleeptime=0, max_retries=1)
 
 
 def test_recover_stale_job_data_builds_when_disconnected(tmp_path, mocker):
@@ -157,7 +157,7 @@ def test_recover_stale_job_data_builds_when_disconnected(tmp_path, mocker):
     as_conf = mocker.MagicMock()
     recover_stale_job_data("a000", as_conf, {"TEST": mocker.MagicMock(connected=False)})
     mock_build.assert_called_once_with("TEST", as_conf, "a000")
-    mock_new_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
+    mock_new_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0", sleeptime=0, max_retries=1)
 
 
 def test_recover_stale_job_data_builds_new_platform(tmp_path, mocker):
@@ -175,7 +175,7 @@ def test_recover_stale_job_data_builds_new_platform(tmp_path, mocker):
     as_conf = mocker.MagicMock()
     recover_stale_job_data("a000", as_conf)
     mock_build.assert_called_once_with("TEST", as_conf, "a000")
-    mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
+    mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0", sleeptime=0, max_retries=1)
 
 
 @pytest.mark.parametrize("content,start,finish,expected_update", [
@@ -203,7 +203,7 @@ def test_recover_stale_job_data_with_stat(tmp_path, mocker, content, start, fini
     mocker.patch.object(Path, 'read_text', return_value=content)
     mocker.patch.object(ExperimentHistory, 'update_job_data_values')
     recover_stale_job_data("a000", mocker.MagicMock(), {"TEST": mock_plat})
-    mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
+    mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0", sleeptime=0, max_retries=1)
     mock_plat.get_file.assert_called_once_with("a000_j1_STAT_0", True)
     if expected_update:
         ExperimentHistory.update_job_data_values.assert_called_once_with("a000_j1", 0, start, finish)

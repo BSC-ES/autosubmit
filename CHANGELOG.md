@@ -7,6 +7,7 @@
 - Fixed the log recovery process being silently skipped when it died, which lost the logs and stats of the affected jobs. Autosubmit now restarts it and re-queues the pending jobs #3342
 - Fixed the log recovery process being reported as alive after it exited early, because the child was reaped outside `multiprocessing`. The process is now reaped through the process API, so the automatic restart works and the child does not stay as a zombie #3342
 - Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name instead of platform name #3342
+- Fixed `recover_stale_job_data` blocking for ~15 seconds per stale job when the remote STAT file was missing. The existence check no longer retries three times with a five-second sleep, so `run`, `recovery`, `create`, and `setstatus` no longer spend minutes on stale rows.
 
 **New Features:**
 

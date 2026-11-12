@@ -368,7 +368,7 @@ def _fetch_stat_timestamps(
     """
     stat = f"{job_name}_STAT_{fail_count}"
     local = exp_path / BasicConfig.LOCAL_TMP_DIR / stat
-    if plat.check_file_exists(stat):
+    if plat.check_file_exists(stat, sleeptime=0, max_retries=1):
         plat.get_file(stat, True)
         if local.exists():
             return _parse_stat_file(local)
