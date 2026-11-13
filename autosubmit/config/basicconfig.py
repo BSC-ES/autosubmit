@@ -20,10 +20,16 @@ import os
 from configparser import ConfigParser
 from pathlib import Path
 
+__all__ = ["BasicConfig"]
+
 
 class BasicConfig:
-    """
-    Class to manage configuration for Autosubmit path, database and default values for new experiments
+    """Autosubmit site configuration.
+
+    This contains configuration used by Autosubmit, before any experiment is created.
+    For instance, the paths of Autosubmit folders and database.
+
+    It also contains the default values for new experiments.
     """
     def props(self) -> dict:
         pr = {}
@@ -60,6 +66,20 @@ class BasicConfig:
     DATABASE_CONN_URL = ""
     DATABASE_BACKUP = True
     LOG_RECOVERY_TIMEOUT: int = 60 * 5
+    EXPERIMENT_LOCK_TIMEOUT: float = 1.0
+    """Default timeout used when locking an experiment access.
+    
+    Measured in seconds.
+    
+    Used when no configuration file is provided.
+    """
+    EXPERIMENT_LOCK_RETRY_INTERVAL: float = 0.25
+    """Default retry interval used when locking an experiment access.
+
+    Measured in seconds.
+    
+    Used when no configuration file is provided.
+    """
 
     # TODO: BasicConfig contains site configuration, but this function returns the experiment directory.
     #       BasicConfig.read() loads the object, and this static function is completely unrelated; it is
@@ -203,6 +223,14 @@ class BasicConfig:
                 'autosubmitapi', 'url')
         if parser.has_option('config', 'log_recovery_timeout'):
             BasicConfig.LOG_RECOVERY_TIMEOUT = int(parser.get('config', 'log_recovery_timeout'))
+        if parser.has_option("experiment_lock", "timeout"):
+            BasicConfig.EXPERIMENT_LOCK_TIMEOUT = parser.getfloat(
+                "experiment_lock", "timeout"
+            )
+        if parser.has_option("experiment_lock", "retry_interval"):
+            BasicConfig.EXPERIMENT_LOCK_RETRY_INTERVAL = parser.getfloat(
+                "experiment_lock", "retry_interval"
+            )
 
     @staticmethod
     def read():

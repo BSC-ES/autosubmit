@@ -293,12 +293,12 @@ def _autosubmit(command_line_args: list[str]) -> int:
     autosubmit_version = get_version()
     Log.info(f"Autosubmit v{autosubmit_version}\n")
 
-    # Display traceability information.
-    log_command_context(argv=argv)
-
     # This initialises the site configuration. Later, in the ``@cli_function`` decorator
     # it will create an ``AutosubmitConfig`` object that uses the ``BasicConfig``.
     BasicConfig.read()
+
+    # Display traceability information.
+    log_command_context(argv=argv)
 
     entry_point = commands[command]
     # We are passing the rest of the command-line arguments to the sub-command! Good luck!

@@ -25,6 +25,7 @@ import socket
 from collections.abc import Sequence
 from datetime import datetime
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log
 
 SENSITIVE_OPTIONS = {
@@ -97,5 +98,6 @@ def log_command_context(argv: Sequence[str]) -> None:
     Log.info(f"  Python: {platform.python_version()}")
     Log.info(f"  Platform: {platform.platform()}")
     Log.info(f"  Timezone: {timezone} (UTC{timezone_offset[:3]}:{timezone_offset[3:]})")
+    Log.info(f"  Database backend: {BasicConfig.DATABASE_BACKEND}")
     Log.info(f"  Working directory: {os.getcwd()}")
     Log.info("")

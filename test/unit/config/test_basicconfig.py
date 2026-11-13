@@ -157,3 +157,21 @@ def test_read_database_backup_option(
 
     assert BasicConfig.DATABASE_BACKUP is expected
 
+
+def test_read_experiment_lock_configuration(tmp_path, monkeypatch):
+    """Read experiment lock timeout and retry interval from autosubmitrc."""
+    config_file = tmp_path / "autosubmitrc"
+    config_file.write_text(
+        """
+        [experiment_lock]
+        timeout = 5.0
+        retry_interval = 0.5
+        """
+    )
+
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
+
+    BasicConfig.read()
+
+    assert BasicConfig.EXPERIMENT_LOCK_TIMEOUT == 5.0
+    assert BasicConfig.EXPERIMENT_LOCK_RETRY_INTERVAL == 0.5

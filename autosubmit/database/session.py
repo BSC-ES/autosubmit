@@ -15,7 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Autosubmit database session."""
+
 import threading
+from enum import Enum
 from pathlib import Path
 
 from sqlalchemy import Engine, NullPool, StaticPool
@@ -24,7 +27,7 @@ from sqlalchemy.engine import URL, make_url
 
 from autosubmit.config.basicconfig import BasicConfig
 
-__all__ = ["get_engine"]
+__all__ = ["DatabaseBackend", "_resolve_engine", "get_engine"]
 
 _SQLITE_TIMEOUT_SECONDS = 30
 """SQLite waits up to this many seconds for a lock before raising "database is locked".
@@ -46,6 +49,16 @@ PostgreSQL is keyed by connection URL and SQLite by resolved file path.
 """
 _ENGINE_CACHE_LOCK = threading.Lock()
 """Serialize creation of cached engines."""
+
+
+class DatabaseBackend(str, Enum):
+    """Enum for the database engine."""
+
+    SQLITE = "sqlite"
+    """SQLite database."""
+
+    POSTGRES = "postgres"
+    """Postgres database."""
 
 
 def _is_in_memory(url: URL) -> bool:
@@ -78,7 +91,10 @@ def _resolve_engine(connection_url: str | URL) -> Engine:
             return sqlalchemy_create_engine(
                 url,
                 poolclass=StaticPool,
-                connect_args={"check_same_thread": False, "timeout": _SQLITE_TIMEOUT_SECONDS},
+                connect_args={
+                    "check_same_thread": False,
+                    "timeout": _SQLITE_TIMEOUT_SECONDS,
+                },
             )
         return sqlalchemy_create_engine(
             url,
@@ -92,7 +108,9 @@ def _resolve_engine(connection_url: str | URL) -> Engine:
     )
 
 
-def _get_or_create_engine(cache_key: tuple[str, str], connection_url: str | URL) -> Engine:
+def _get_or_create_engine(
+    cache_key: tuple[str, str], connection_url: str | URL
+) -> Engine:
     """Return the cached engine for ``cache_key``, creating it on first use.
 
     :param cache_key: The key that identifies the target database.
