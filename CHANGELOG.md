@@ -57,6 +57,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `Log.set_file` failing (after retrying) when the log directory had missing parent directories or
   when given a bare file name; the directory is now created with its parents #3240 (thanks @anyingiit)
 - Ensure Autosubmit deletes PostgreSQL database schemas when deleting an experiment #3383
+- Fix the `experiment_run` lifecycle so only `run` opens a run: `create` marks it as pending and later runs continue it. This stops historical `structure_data` edges from being duplicated across run ids #3178.
 
 **New Features:**
 

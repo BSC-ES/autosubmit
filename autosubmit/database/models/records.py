@@ -26,7 +26,7 @@ JobDataRow = collections.namedtuple('JobDataRow', ['id', 'counter', 'job_name', 
                                                    defaults=(None, None, 0))
 
 ExperimentRunRow = collections.namedtuple('ExperimentRunRow', [
-    'run_id', 'created', 'modified', 'start', 'finish', 'chunk_unit', 'chunk_size', 'completed', 'total', 'failed', 'queuing', 'running', 'submitted', 'suspended', 'metadata'])
+    'run_id', 'created', 'modified', 'start', 'finish', 'chunk_unit', 'chunk_size', 'completed', 'total', 'failed', 'queuing', 'running', 'submitted', 'suspended', 'metadata', 'pending_create'])
 
 ExperimentStatusRow = collections.namedtuple(
     'ExperimentStatusRow', ['exp_id', 'name', 'status', 'seconds_diff', 'modified'])

@@ -357,11 +357,13 @@ class DbManager(SchemaVersionedManager):
             result = conn.execute(query)
             return [dict(row) for row in result.mappings().all()]
 
-    def select_last_with_columns(self, table_name: str, columns: list[str] | None = None) -> dict[str, Any] | None:
-        """Return the latest row from a table ordered by descending update time.
+    def select_last_with_columns(self, table_name: str, columns: list[str] | None = None,
+                                 order_by: str = "modified") -> dict[str, Any] | None:
+        """Return the latest row from a table ordered by a descending column.
 
         :param table_name: Name of the table to select from.
         :param columns: Optional list of column names to include. If None, all columns are included.
+        :param order_by: Column used to pick the latest row. Defaults to ``modified``.
         :return: Dictionary representing the latest row, or None if the table is empty.
         """
         table: Table = self.table_registry.get(table_name)
@@ -370,7 +372,7 @@ class DbManager(SchemaVersionedManager):
         col_keys = columns if columns is not None else list(table.c.keys())
         selected_cols = [table.c[col] for col in col_keys]
 
-        stmt = select(*selected_cols).order_by(desc(table.c.modified)).limit(1)
+        stmt = select(*selected_cols).order_by(desc(table.c[order_by])).limit(1)
         with self._get_engine(table_name).connect() as conn:
             row = conn.execute(stmt).fetchone()
 
