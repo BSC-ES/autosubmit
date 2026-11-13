@@ -79,6 +79,24 @@ def _format_command(argv: Sequence[str]) -> str:
     return shlex.join(_redact_arguments(argv))
 
 
+def _working_directory() -> str:
+    """Return the current working directory, or a safe fallback.
+
+    ``os.getcwd()`` raises :class:`OSError` (``FileNotFoundError``) when the
+    working directory has been removed -- for example when an Autosubmit
+    ``refresh`` deletes the ``proj`` folder while the user is inside it. The
+    command-traceability log must not crash in that case, so fall back to the
+    shell's ``$PWD`` (the path the directory had) and then to a clear
+    placeholder. See GH issue #3332.
+
+    :return: The current working directory, or a fallback string if it is gone.
+    """
+    try:
+        return os.getcwd()
+    except OSError:
+        return os.environ.get("PWD") or "(unavailable - working directory was deleted)"
+
+
 def log_command_context(argv: Sequence[str]) -> None:
     """Log information useful for tracing an Autosubmit command execution.
 
@@ -97,5 +115,5 @@ def log_command_context(argv: Sequence[str]) -> None:
     Log.info(f"  Python: {platform.python_version()}")
     Log.info(f"  Platform: {platform.platform()}")
     Log.info(f"  Timezone: {timezone} (UTC{timezone_offset[:3]}:{timezone_offset[3:]})")
-    Log.info(f"  Working directory: {os.getcwd()}")
+    Log.info(f"  Working directory: {_working_directory()}")
     Log.info("")
