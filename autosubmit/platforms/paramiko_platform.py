@@ -734,7 +734,7 @@ class ParamikoPlatform(Platform):
         file_path = local_path / filename
         if file_path.exists():
             file_path.unlink()
-        remote_path = os.path.join(self.get_files_path(), filename)
+        remote_path = str(self.get_files_path() / filename)
         try:
             self._ftpChannel.get(remote_path, str(file_path))
 
@@ -773,7 +773,7 @@ class ParamikoPlatform(Platform):
         :param filename: file name
         :return: True if successful or file does not exist
         """
-        remote_file = Path(self.get_files_path()) / filename
+        remote_file = self.get_files_path() / filename
         try:
             self._ftpChannel.remove(str(remote_file))
             return True
@@ -803,7 +803,7 @@ class ParamikoPlatform(Platform):
         """
         path_root = Path("")
         try:
-            path_root = Path(self.get_files_path())
+            path_root = self.get_files_path()
             src = str(path_root / src)
             dest = str(path_root / dest)
             try:
@@ -2004,6 +2004,7 @@ class ParamikoPlatform(Platform):
             return None
 
     def compress_file(self, file_path):
+        file_path = str(file_path)
         Log.debug(
             f"Compressing file {file_path} using {self.remote_logs_compress_type}"
         )
@@ -2118,7 +2119,7 @@ class ParamikoPlatform(Platform):
         while not file_exist and retries < max_retries:
             try:
                 # This return IOError if path does not exist
-                self._ftpChannel.stat(str(Path(self.get_files_path()) / src))
+                self._ftpChannel.stat(str(self.get_files_path() / src))
                 file_exist = True
             except OSError:  # File does not exist, retry in sleeptime
                 if not wrapper_failed:
