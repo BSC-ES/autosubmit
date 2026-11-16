@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -29,6 +29,7 @@ from autosubmit.database.models.tables import (
     ExperimentRunTable,
     ExperimentStatusTable,
     ExperimentTable,
+    JobDataTable,
     JobsTable,
     TableRegistry,
     UserMetricsTable,

@@ -35,6 +35,7 @@ def to_utc_iso(value: datetime) -> str:
     """Serialize any datetime to the canonical UTC ISO format."""
     if value.tzinfo is None:
         raise ValueError(
-            "Naive datetime is not allowed; must be timezone-aware (e.g. datetime.now(timezone.utc)"
+            f"Naive datetime is not allowed; got {value!r}. "
+            "Pass a timezone-aware datetime (e.g. datetime.now(timezone.utc))."
         )
     return value.astimezone(timezone.utc).isoformat(timespec="seconds")
