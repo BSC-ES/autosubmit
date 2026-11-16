@@ -54,6 +54,7 @@ class ExperimentDescription:
 
     user: str
     created: str
+    """Creation timestamp as ISO-8601 UTC string, e.g. ``2026-10-16T09:00:00+00:00``."""
     model: str
     branch: str
     hpc: str
