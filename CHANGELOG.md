@@ -14,6 +14,7 @@ several bug fixes and enhancements to improve the overall user experience.
 
 **Bug fixes:**
 
+- Fix `GIT.PROJECT_SUBMODULES_DEPTH` failing with a `TypeError` when set to an integer and being ignored when set to a YAML list; invalid values now fall back to the documented default -1 #3104
 - Fix `autosubmit.lock` not being deleted after `create` and `run`; `archive` and `delete` now acquire it too #3033 #3055
 - Fix multi-member PJM job lookup output parsing #3255 (thanks @1cbyc)
 - Remove the unrelated `--filter_status` option from `autosubmit expid` #3241 (thanks @1cbyc)
