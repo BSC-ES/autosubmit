@@ -694,6 +694,33 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
 
 
 @pytest.mark.parametrize(
+    "run_id,loads_from_db",
+    [(None, False), (1, True)],
+    ids=["no-run-id", "with-run-id"],
+)
+def test_load_wrappers_respects_run_id(fake_job_list, run_id, loads_from_db) -> None:
+    """load_wrappers skips the database without a run id and loads it with one.
+
+    :param fake_job_list: Minimal JobList fixture.
+    :param run_id: Run id assigned to the job list.
+    :param loads_from_db: Whether the database must be queried.
+    """
+    fake_job_list.run_id = run_id
+    fake_job_list.job_package_map = {1: object()}
+    fake_job_list.packages_dict = {"wrapper_1": object()}
+    load = fake_job_list.dbmanager.load_wrappers
+    load.return_value = ([], [])
+
+    fake_job_list.load_wrappers(preview=False)
+
+    assert load.called is loads_from_db
+    if loads_from_db:
+        assert load.call_args.kwargs["run_id"] == run_id
+    assert fake_job_list.job_package_map == {}
+    assert fake_job_list.packages_dict == {}
+
+
+@pytest.mark.parametrize(
     "parent_statuses,fail_ok,expected",
     [
         ([], False, True),

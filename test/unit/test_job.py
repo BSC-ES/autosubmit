@@ -3091,6 +3091,24 @@ def test_finalize_resets_suspended_or_unknown_inner(inner_status, mocker):
     mock_update.assert_called_once_with(wrapper.as_config)
 
 
+def test_finalize_wrapper_completion_running_inner_returns_false(mocker):
+    """A wrapper with a RUNNING inner job is not finalized yet."""
+    inner = Job("inner", 2, Status.RUNNING, 0)
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner], wr_type="vertical")
+
+    assert wrapper._finalize_wrapper_completion(wrapper.as_config) is False
+
+
+def test_clear_inner_wait_unknown_job_is_noop(mocker):
+    """Clearing the wait of an inner job without state does nothing."""
+    wrapper = _make_wrapper_job(mocker)
+    inner = Job("inner", 2, Status.RUNNING, 0)
+
+    wrapper._clear_inner_wait(inner)
+
+    assert inner.name not in wrapper._inner_states
+
+
 def test_held_inner_is_not_reconciled(mocker):
     """HELD is deprecated and does not keep a finished wrapper checked."""
     inner = Job("inner", 2, Status.HELD, 0)
@@ -3225,41 +3243,52 @@ def test_completed_wrapper_reconciles_inner_without_next_stat(mocker):
     [None, "20200101000000"],
     ids=["unknown", "stale"],
 )
-def test_update_start_time_uses_zero_when_unknown(initial_timestamp, mocker):
+def test_update_start_time_uses_zero_when_unknown(initial_timestamp, tmp_path):
     """An unreadable STAT start time becomes 0, not the current or a stale time."""
     job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job._tmp_path = str(tmp_path)
     job.start_time_timestamp = initial_timestamp
-    mocker.patch.object(Job, "check_start_time", return_value=0)
 
     job.update_start_time(0)
 
     assert job.start_time_timestamp == 0
 
 
-def test_write_start_time_uses_zero_when_unknown(mocker):
+def test_write_start_time_uses_zero_when_unknown(mocker, tmp_path):
     """Writing history without a start time leaves it at 0, not an invented datetime."""
     job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job._tmp_path = str(tmp_path)
     job.start_time_timestamp = None
     job.expid = "t000"
     job.platform = mocker.MagicMock()
     mocker.patch("autosubmit.job.job.ExperimentHistory")
-    mocker.patch.object(Job, "_write_time")
 
     job.write_start_time(0)
 
     assert job.start_time_timestamp == 0
 
 
-def test_write_submit_time_uses_zero_when_unknown(mocker):
+def test_write_submit_time_uses_zero_when_unknown(mocker, tmp_path):
     """Writing history without a submit time leaves it at 0, not an invented datetime."""
     job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job._tmp_path = str(tmp_path)
     job.submit_time_timestamp = None
     job.expid = "t000"
     job.platform = mocker.MagicMock()
     mocker.patch("autosubmit.job.job.ExperimentHistory")
-    mocker.patch.object(Job, "_write_time")
 
     job.write_submit_time(0)
+
+    assert job.submit_time_timestamp == 0
+
+
+def test_update_submit_time_from_stat_sets_zero_when_missing(tmp_path):
+    """A missing STAT submit time resets the timestamp to 0 instead of keeping a stale one."""
+    job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job._tmp_path = str(tmp_path)
+    job.submit_time_timestamp = "20200101000000"
+
+    job._update_submit_time_from_stat(0)
 
     assert job.submit_time_timestamp == 0
 
@@ -3269,16 +3298,15 @@ def test_write_submit_time_uses_zero_when_unknown(mocker):
     [None, "20200101000000"],
     ids=["unknown", "stale"],
 )
-def test_write_end_time_uses_zero_when_unknown(initial_timestamp, mocker):
+def test_write_end_time_uses_zero_when_unknown(initial_timestamp, mocker, tmp_path):
     """Writing history without an end time leaves it at 0, not an invented or stale datetime."""
     job = Job("t000_test", 1, Status.COMPLETED, 0)
+    job._tmp_path = str(tmp_path)
     job.finish_time_timestamp = initial_timestamp
     job.local_logs = ("out", "err")
     job.expid = "t000"
     job.platform = mocker.MagicMock()
-    mocker.patch.object(Job, "check_end_time", return_value=0)
     mocker.patch("autosubmit.job.job.ExperimentHistory")
-    mocker.patch.object(Job, "_write_time")
 
     job.write_end_time(True, 0)
 
@@ -3320,6 +3348,37 @@ def test_job_running_check_handles_zero(tmp_path):
 
     assert submit == start == finish
     assert status == "COMPLETED"
+
+
+@pytest.mark.parametrize(
+    "status_code,stat_line,expected_submit,expected_start,expected_finish,expected_status",
+    [
+        (Status.RUNNING, "20200101000000 20200101000100\n",
+         datetime(2020, 1, 1), datetime(2020, 1, 1, 0, 1), None, "RUNNING"),
+        (Status.QUEUING, "20200101000000 20200101000100\n",
+         datetime(2020, 1, 1), datetime(2020, 1, 1, 0, 1), None, "QUEUING"),
+        (Status.SUBMITTED, "20200101000000 20200101000100\n",
+         datetime(2020, 1, 1), datetime(2020, 1, 1, 0, 1), None, "SUBMITTED"),
+        (Status.HELD, "20200101000000 20200101000100\n",
+         datetime(2020, 1, 1), datetime(2020, 1, 1, 0, 1), None, "HELD"),
+        (Status.FAILED, "20200101000000 20200101000100 20200101000200\n",
+         datetime(2020, 1, 1), datetime(2020, 1, 1, 0, 1), datetime(2020, 1, 1, 0, 2), "FAILED"),
+    ],
+    ids=["running", "queuing", "submitted", "held", "failed"],
+)
+def test_job_running_check_parses_status_fields(
+    tmp_path, status_code, stat_line, expected_submit, expected_start, expected_finish, expected_status
+):
+    """TOTAL_STATS timestamps are parsed for every non-completed status."""
+    (tmp_path / "job_TOTAL_STATS").write_text(stat_line)
+
+    submit, start, finish, status = JobList._job_running_check(status_code, "job", str(tmp_path))
+
+    assert submit == expected_submit
+    assert start == expected_start
+    if expected_finish is not None:
+        assert finish == expected_finish
+    assert status == expected_status
 
 
 def test_check_wrappers_stops_retaining_failed_wrapper_with_running_stat(mocker):
@@ -3618,12 +3677,13 @@ def test_check_compressed_local_logs_detects_compressed(tmp_path, ext):
     assert job.local_logs == (f"out_log{ext}", "err_log")
 
 
-def test_update_start_time_with_existing_timestamp(mocker):
+def test_update_start_time_with_existing_timestamp(tmp_path):
     """update_start_time: when check_start_time returns a value, timestamp is formatted."""
     job = Job("t000_test", 1, Status.WAITING, 0)
+    job._tmp_path = str(tmp_path)
     epoch = 1700000000
-    mocker.patch("autosubmit.job.job.Job.check_start_time", return_value=epoch)
-    job.update_start_time()
+    (tmp_path / f"{job.stat_file}0").write_text(f"0\n{epoch}\n0\n")
+    job.update_start_time(0)
     expected = datetime.fromtimestamp(epoch).strftime("%Y%m%d%H%M%S")
     assert job.start_time_timestamp == expected
 
@@ -3635,8 +3695,7 @@ def test_write_end_time_with_positive_end_time(mocker, tmp_path):
     job.local_logs = ("out", "err")
     job._platform = mocker.MagicMock()
     epoch = 1700000000
-    mocker.patch("autosubmit.job.job.Job.check_end_time", return_value=epoch)
-    mocker.patch("autosubmit.job.job.Job._write_time")
+    (tmp_path / f"{job.stat_file}0").write_text(f"0\n0\n{epoch}\n")
     mocker.patch("autosubmit.job.job.ExperimentHistory")
     job.write_end_time(True, attempt=0)
     expected = datetime.fromtimestamp(epoch).strftime("%Y%m%d%H%M%S")

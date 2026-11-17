@@ -595,7 +595,7 @@ def test_prepare_run_without_run_id_skips_wrappers(autosubmit_exp, mocker):
     """
     exp = autosubmit_exp(include_jobs=True, experiment_data={"WRAPPERS": {}})
     mocker.patch("autosubmit.workflow.manage.get_last_run_id", return_value=None)
-    warning = mocker.patch("autosubmit.job.job_list.Log.warning")
+    warning = mocker.spy(Log, "warning")
     db_load_spy = mocker.spy(JobsDbManager, "load_wrappers")
 
     job_list, *_ = _prepare_run(exp.expid, check_scripts=False)
