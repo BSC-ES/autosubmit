@@ -1120,7 +1120,7 @@ class AutosubmitConfig:
                 )
             for match in matches:
                 value = self._get_substituted_value(
-                    key, match, parameters, start_long, dict_keys_type
+                    key, match, parameters, start_long, dict_keys_type, self.default_parameters
                 )
                 if value:
                     parameters = self._update_parameters(
@@ -1144,6 +1144,7 @@ class AutosubmitConfig:
         parameters: dict[str, Any],
         start_long: int,
         dict_keys_type: str,
+        default_parameters: dict,
     ) -> str | None:
         """Get the substituted value for a dynamic variable in the key.
 
@@ -1172,6 +1173,7 @@ class AutosubmitConfig:
             if "." in key_parts and dict_keys_type != "long"
             else [key_parts[start_long:-1]]
         )
+        key_parts = key_parts if match not in default_parameters else default_parameters[match]
 
         for k in key_parts:
             k = k.strip("^")
@@ -2175,8 +2177,10 @@ class AutosubmitConfig:
         self.default_parameters: dict = {
             "d": "%d%",
             "d_": "%d_%",
+            "d-": "%d-%",
             "Y": "%Y%",
             "Y_": "%Y_%",
+            "Y-": "%Y-%",
             "M": "%M%",
             "M_": "%M_%",
             "m": "%m%",
@@ -2197,7 +2201,7 @@ class AutosubmitConfig:
                 "CONFIG.SAFE_PLACEHOLDERS must be a list of placeholders names or a string."
             )
 
-        for param in user_defined:
+        for param in (p for p in user_defined if p not in self.default_parameters):
             self.default_parameters[param] = f"%{param}%"
 
     def _add_autosubmit_dict(self) -> None:

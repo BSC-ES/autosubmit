@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical
@@ -454,7 +453,27 @@ def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, ne
                     },
                 },
             },
-        )
+        ),
+        (
+            {
+                "JOBS": {
+                    "POST": {
+                        "SCRIPT": "echo $(date '+%Y-%m-%d %H:%M:%S')",
+                        "PLATFORM": "LOCAL",
+                        "RUNNING": "once",
+                    },
+                },
+            },
+            {
+                "JOBS": {
+                    "POST": {
+                        "SCRIPT": "echo $(date '+%Y-%m-%d %H:%M:%S')",
+                        "PLATFORM": "LOCAL",
+                        "RUNNING": "once",
+                    },
+                },
+            },
+        ),
     ],
     ids=[
         "Special Dynamic Variable",
@@ -468,7 +487,8 @@ def test_infinite_loop_dynamic_variable_unify_conf(autosubmit_config, mocker, ne
         "Double %% to variables",
         "Non Loop",
         "Slash in between variables",
-        "Complex dynamic cross pointer"
+        "Complex dynamic cross pointer",
+        "Date Check"
     ],
 )
 def test_finite_loop_dynamic_variable_unify_conf(autosubmit_config, new_data, result):
