@@ -514,7 +514,7 @@ def postgres_server(
         pg_random_port = get_free_port()
         conn_url = f"postgresql://{_PG_USER}:{_PG_PASSWORD}@localhost:{pg_random_port}/{_PG_USER}"
 
-        image = "postgres:17"
+        image = "postgres:18.6-bookworm"
         with PostgresContainer(
             image=image,
             port=5432,

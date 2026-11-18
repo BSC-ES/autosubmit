@@ -1,3 +1,9 @@
+<!--
+If you update the Postgres version of the docker-compose.yml, then you must:
+
+- Update the examples in this file that include the version;
+- Updated the Docker image version used in tests in test/integration/conftest.py.
+-->
 # Docker compose for Autosubmit and Postgres
 
 The Docker compose file for Autosubmit and Postgres is used
@@ -9,7 +15,7 @@ Autosubmit using Docker Compose. It runs two services:
 - Autosubmit: Builds the development image, installs Autosubmit in
   editable mode from the local source code, and initialises its required
   directories and database tables.
-- PostgreSQL: Runs PostgreSQL 16 and provides the database used by Autosubmit.
+- PostgreSQL: Runs PostgreSQL 18 and provides the database used by Autosubmit.
   The database is persisted in a Docker volume.
 
 ## Running the Environment
@@ -73,11 +79,13 @@ Docker Compose service.
 
 ```bash
 $ docker compose  exec postgres psql -U autosubmit -d autosubmit
-psql (16.15 (Debian 16.15-1.pgdg13+2))
+psql (18.6 (Debian 18.6-1.pgdg12+2))
 Type "help" for help.
 
 autosubmit=# 
 ```
+
+To inspect the database:
 
 ```bash
 autosubmit=# \conninfo
@@ -99,11 +107,69 @@ autosubmit=# \dn
 (1 row)
 
 autosubmit=# SELECT version();
-                                                       version                                                        
-----------------------------------------------------------------------------------------------------------------------
- PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+                                                          version                                                           
+----------------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
 (1 row)
 ```
+
+## Using an IDE (PyCharm, VS Code)
+
+You can also connect to the PostgreSQL database directly from PyCharm
+or another database client running on your local workstation.
+
+First, start only the PostgreSQL service, without starting Autosubmit:
+
+```bash
+$ docker compose up -d postgres
+```
+
+The database will be available on localhost:5432 (unless you have
+configured another host port). Configure your database connection with
+the following settings:
+
+| Setting  | Value        |
+|----------|--------------|
+| Host     | `localhost`  |
+| Port     | `5432`       |
+| Database | `autosubmit` |
+| User     | `autosubmit` |
+| Password | `autosubmit` |
+
+You can stop the PostgreSQL service when you are finished:
+
+```bash
+$ docker compose stop postgres
+```
+
+The database remains persisted in its Docker volume.
+
+Alternatively, you can run PostgreSQL without Docker Compose.
+This is useful when you want a standalone database for development
+or testing.
+
+Create a directory for the persistent database files:
+
+```bash
+$ mkdir -p "$HOME/autosubmit-pg/postgres-data"
+```
+
+Start the container:
+
+```bash
+$ docker run \
+    --name autosubmit-postgres \
+    --restart unless-stopped \
+    -e POSTGRES_DB=autosubmit \
+    -e POSTGRES_USER=autosubmit \
+    -e POSTGRES_PASSWORD=autosubmit \
+    -p 127.0.0.1:5432:5432 \
+    -v "$HOME/autosubmit-pg/postgres-data:/var/lib/postgresql" \
+    -d postgres:18.6-bookworm
+```
+
+The database is now available on `localhost:5432`, and you can connect
+to it using PyCharm, VS Code, or the psql client.
 
 ## Other
 

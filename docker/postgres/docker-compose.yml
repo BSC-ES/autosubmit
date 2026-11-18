@@ -45,7 +45,12 @@ services:
         exec sleep infinity
 
   postgres:
-    image: postgres:16
+    # NOTE!!
+    #
+    # When updating this version, check README.md if it needs the examples to
+    # be updated too (see the top-level comment). Also, check if the integration
+    # tests can be updated to use the same container image.
+    image: postgres:18.6-bookworm
 
     environment:
       POSTGRES_DB: autosubmit
@@ -53,7 +58,7 @@ services:
       POSTGRES_PASSWORD: autosubmit
 
     volumes:
-      - as_postgres_data:/var/lib/postgresql/data
+      - as_postgres_data:/var/lib/postgresql
 
     ports:
       # Expose PostgreSQL to the host for development tools.
