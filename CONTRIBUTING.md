@@ -36,7 +36,6 @@ non-release branch.
 - [Code quality](#code-quality)
 - [Documentation](#documentation)
 - [Submitting changes](#submitting-changes)
-- [Getting help](#getting-help)
 - [Extras](#extras)
 
 ## Before you start
@@ -465,12 +464,6 @@ fixes for contributors, do not need a changelog entry.
 GitHub Actions runs the unit, integration, regression, Slurm, documentation and
 lint jobs on every pull request. A red blocking job means the change is not
 ready to merge.
-
-## Getting help
-
-- Read the [Autosubmit documentation](https://autosubmit.readthedocs.io/).
-- Search the [existing issues](https://github.com/BSC-ES/autosubmit/issues).
-- Write to support-autosubmit@bsc.es.
 
 ## Extras
 
