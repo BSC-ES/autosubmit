@@ -431,7 +431,7 @@ class Platform(ABC):
         scripts_to_submit_by_section: dict[str, dict[str, JobPackageBase]] = {}
         x11_scripts_to_submit_by_section: dict[str, dict[str, JobPackageBase]] = {}
         for package in packages_to_submit:
-            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, as_conf)
+            self.prepare_dry_run_if_applicable(package, only_wrappers, inspect)
             if not only_wrappers:
                 package.generate_scripts(as_conf, inspect)
             if not inspect and not only_wrappers:
@@ -445,8 +445,7 @@ class Platform(ABC):
         return scripts_to_submit_by_section, x11_scripts_to_submit_by_section
 
     @staticmethod
-    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool,
-                                      inspect: bool, as_conf: 'AutosubmitConfig') -> None:
+    def prepare_dry_run_if_applicable(package: 'JobPackageBase', only_wrappers: bool, inspect: bool) -> None:
         """Dry-run preparation of a package to emulate that the package was submitted, without following the normal submission flow.
 
         :param package: Package being prepared for inspect or wrapper-only mode.

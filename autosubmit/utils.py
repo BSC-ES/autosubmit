@@ -277,7 +277,26 @@ def validate_dependencies(data) -> None:
 
     :param data: Dictionary containing the parameters to be substituted. If None, it will use self.experiment_data.
     """
-    date_parameters: set = {"d", "dd", "D", "DD", "Y", "YY", "YYYY", "M", "MM", "m", "mm"}
+    date_parameters: set = {
+        "d-",
+        "d",
+        "d_",
+        "D-",
+        "D",
+        "D_",
+        "Y-",
+        "Y",
+        "Y_",
+        "y-",
+        "y",
+        "y_",
+        "M-",
+        "M",
+        "M_",
+        "m-",
+        "m",
+        "m_",
+    }
     graph, unresolved = build_dependency_graph(data)
     unresolved = [elem for elem in unresolved if elem[1] not in date_parameters]
     if not nx.is_directed_acyclic_graph(graph):
