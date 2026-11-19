@@ -26,13 +26,11 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.registry import load_config
 from autosubmit.database.db_common import get_experiment_id
 from autosubmit.database.managers.details import ExperimentDetailsManager
+from autosubmit.helpers.datetime_utils import to_utc_iso
 
 __all__ = [
-    "LOCAL_TZ",
     "ExperimentDetails",
 ]
-
-LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
 
 
 class ExperimentDetails:
@@ -63,6 +61,7 @@ class ExperimentDetails:
             self.exp_id, self.user, self.created, self.model, self.branch, self.hpc
         )
 
+
     def get_details(self) -> dict[str, Any] | None:
         """Retrieve the last stored snapshot of the experiment's details from the database."""
         exp_id = getattr(self, "exp_id", None)
@@ -81,10 +80,15 @@ class ExperimentDetails:
 
     @property
     def created(self) -> str:
-        """Get the creation date of the experiment, from the experiment directory stat."""
-        return datetime.datetime.fromtimestamp(
-            int(self.exp_dir_stat.st_ctime), tz=LOCAL_TZ
-        ).isoformat()
+        """
+        Get the creation date of the experiment. This is obtained from the
+        experiment directory stat information.
+        """
+        return to_utc_iso(
+            datetime.datetime.fromtimestamp(
+                int(self.exp_dir_stat.st_ctime), tz=datetime.timezone.utc
+            )
+        )
 
     @property
     def model(self) -> str:

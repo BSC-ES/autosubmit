@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -17,15 +17,23 @@
 
 """Unit tests for ``autosubmit.database.models.tables``."""
 
+from datetime import datetime, timedelta
+
 import pytest
 from sqlalchemy import BigInteger, MetaData
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
 from autosubmit.database.models.tables import (
+    DetailsTable,
+    ExperimentRunTable,
+    ExperimentStatusTable,
     ExperimentTable,
+    JobDataTable,
     JobsTable,
     TableRegistry,
+    UserMetricsTable,
+    WrapperJobsTable,
     create_wrapper_tables,
     get_all_tables_by_name,
 )
@@ -189,6 +197,44 @@ def test_registry_get_all_known_tables():
         table = registry.get(name)
         assert table is not None
         assert table.name == name
+
+
+@pytest.mark.parametrize("col_name", ["created", "modified"])
+def test_jobs_table_column_default_is_iso_format(col_name):
+    """Default lambda must return a string in ISO 8601 format with timezone."""
+    value = JobsTable.c[col_name].default.arg(None)
+    assert isinstance(value, str)
+    # ISO 8601 with timezone: "YYYY-MM-DDTHH:MM:SS±HH:MM"
+    assert "T" in value, f"Expected ISO 8601 'T' separator, got: {value!r}"
+    dt = datetime.fromisoformat(value)
+    # Values must be UTC so they are comparable wherever they were written.
+    assert dt.tzinfo is not None, f"Expected timezone-aware datetime, got: {value!r}"
+    assert dt.utcoffset() == timedelta(0)
+    assert dt.microsecond == 0
+
+
+@pytest.mark.parametrize(
+    "table, col_name",
+    [
+        (DetailsTable, "created"),
+        (ExperimentStatusTable, "modified"),
+        (ExperimentRunTable, "created"),
+        (ExperimentRunTable, "modified"),
+        (JobDataTable, "created"),
+        (JobDataTable, "modified"),
+        (UserMetricsTable, "modified"),
+        (WrapperJobsTable, "timestamp"),
+    ],
+)
+def test_timestamp_columns_default_is_canonical_utc(table, col_name):
+    """Every Text timestamp column must default to canonical UTC ISO (seconds)."""
+    column_default = table.c[col_name].default
+    assert column_default is not None, f"{table.name}.{col_name} is missing a UTC default"
+    value = column_default.arg(None)
+    dt = datetime.fromisoformat(value)
+    assert dt.tzinfo is not None
+    assert dt.utcoffset() == timedelta(0)
+    assert dt.microsecond == 0
 
 
 # --- get_all_tables_by_name ---

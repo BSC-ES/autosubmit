@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -17,13 +17,10 @@
 
 
 import os
-from datetime import datetime, timezone
 from typing import Any
 
 from autosubmit.config.basicconfig import BasicConfig
-
-LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
-DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S%z'
+from autosubmit.helpers.datetime_utils import utc_now_iso
 
 DEFAULT_HISTORICAL_LOGS_DIR = BasicConfig.HISTORICAL_LOG_DIR
 
@@ -43,12 +40,12 @@ def calculate_run_time_in_seconds(start_time: float, finish_time: float) -> int:
 
 
 def get_current_datetime() -> str:
-    """Returns the current time in format '%Y-%m-%dT%H:%M:%S%z'."""
-    return datetime.now(LOCAL_TZ).strftime(DATETIME_FORMAT)
+    """Returns the current time in UTC format '%Y-%m-%dT%H:%M:%S+00:00'."""
+    return utc_now_iso()
 
 
 def get_current_datetime_if_none(argument: Any) -> str | None:
-    """ Returns the current time in format '%Y-%m-%dT%H:%M:%S%z' if the supplied argument is None, else return argument. """
+    """Return ``argument`` if provided, otherwise the current UTC datetime in ISO format."""
     if argument is None:
         return get_current_datetime()
     else:
