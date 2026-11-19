@@ -792,20 +792,13 @@ def test_run_uninterrupted_multiple_vertical_wrappers(
     successful and failing jobs, verifying database entries and recovered log files.
 
     :param autosubmit_exp: Fixture that creates and manages an Autosubmit experiment.
-    :type autosubmit_exp: AutosubmitExperimentFixture
     :param jobs_data: YAML string with the experiment jobs/wrappers configuration.
-    :type jobs_data: str
     :param expected_db_entries: Expected total number of rows in ``job_data`` table.
-    :type expected_db_entries: int
     :param final_status: Expected final experiment status (``'COMPLETED'`` or ``'FAILED'``).
-    :type final_status: str
     :param wrapper_type: Wrapper type used in this scenario (e.g. ``'vertical'``).
-    :type wrapper_type: str
     :param slurm_server: Docker container running the Slurm scheduler.
-    :type slurm_server: Container
     :param prepare_scratch: Fixture that sets up the scratch directory for the experiment.
     :param general_data: Common experiment configuration shared across tests.
-    :type general_data: dict
     """
     yaml = YAML(typ="rt")
     as_exp = autosubmit_exp(
@@ -857,20 +850,13 @@ def test_run_interrupted_multiple_vertical_wrappers(
     recovered log files after the full run completes.
 
     :param autosubmit_exp: Fixture that creates and manages an Autosubmit experiment.
-    :type autosubmit_exp: AutosubmitExperimentFixture
     :param jobs_data: YAML string with the experiment jobs/wrappers configuration.
-    :type jobs_data: str
     :param expected_db_entries: Expected total number of rows in ``job_data`` table.
-    :type expected_db_entries: int
     :param final_status: Expected final experiment status (``'COMPLETED'`` or ``'FAILED'``).
-    :type final_status: str
     :param wrapper_type: Wrapper type used in this scenario (e.g. ``'vertical'``).
-    :type wrapper_type: str
     :param slurm_server: Docker container running the Slurm scheduler.
-    :type slurm_server: Container
     :param prepare_scratch: Fixture that sets up the scratch directory for the experiment.
     :param general_data: Common experiment configuration shared across tests.
-    :type general_data: dict
     """
     yaml = YAML(typ="rt")
     as_exp = autosubmit_exp(
@@ -1496,8 +1482,7 @@ def test_run_interrupted_destine_like(
     prepare_scratch,
     general_data: dict,
 ) -> None:
-    """
-    Test ``autosubmit run`` (interrupted mid-run then resumed) with a
+    """Test ``autosubmit run`` (interrupted mid-run then resumed) with a
     scaled-down DestinE-like workflow using vertical wrappers.
     """
     yaml = YAML(typ="rt")
@@ -1546,6 +1531,23 @@ def test_run_interrupted_destine_like(
     assert len(asthread_files) == 7, (
         f"Expected 7 ASThread files, found {len(asthread_files)}"
     )
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+def test_build_and_connect_platform_slurm(autosubmit_exp, slurm_server, general_data):
+    """build_and_connect_platform creates a connected SlurmPlatform from real config."""
+    experiment_data = general_data | {
+        "EXPERIMENT": {"MEMBERS": "fc0", "NUMCHUNKS": "1"},
+    }
+    as_exp = autosubmit_exp(
+        experiment_data=experiment_data, include_jobs=False, create=True
+    )
+    plat = build_and_connect_platform("TEST_SLURM", as_exp.as_conf, as_exp.expid)
+    assert type(plat).__name__ == "SlurmPlatform"
+    assert plat.TYPE == "slurm"
+    assert plat.connected
 
 
 @pytest.mark.timeout(120)
@@ -1739,23 +1741,6 @@ def test_recover_stale_row(
                 assert int(r["finish"]) >= int(r["submit"])
                 if int(r["start"]) > 0:
                     assert int(r["finish"]) >= int(r["start"])
-
-
-@pytest.mark.docker
-@pytest.mark.slurm
-@pytest.mark.ssh
-def test_build_and_connect_platform_slurm(autosubmit_exp, slurm_server, general_data):
-    """build_and_connect_platform creates a connected SlurmPlatform from real config."""
-    experiment_data = general_data | {
-        "EXPERIMENT": {"MEMBERS": "fc0", "NUMCHUNKS": "1"},
-    }
-    as_exp = autosubmit_exp(
-        experiment_data=experiment_data, include_jobs=False, create=True
-    )
-    plat = build_and_connect_platform("TEST_SLURM", as_exp.as_conf, as_exp.expid)
-    assert type(plat).__name__ == "SlurmPlatform"
-    assert plat.TYPE == "slurm"
-    assert plat.connected
 
 
 @pytest.mark.parametrize(
