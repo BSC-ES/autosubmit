@@ -58,10 +58,7 @@ jobs:
       #       It appeared to be a bug in Python3.11, pdb, pytest-xdist.
       - name: Unit tests
         run: |
-          pytest \
-            -n $(nproc) \
-            --verbose --verbosity="2" \
-            test/unit -m "not postgres and not profile and not profilelong"
+          pytest
 
       - name: Coverage report
         run: |

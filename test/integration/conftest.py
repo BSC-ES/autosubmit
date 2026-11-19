@@ -68,7 +68,7 @@ if TYPE_CHECKING:
 
     # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
-    from pytest import FixtureRequest
+    from pytest import FixtureRequest, MonkeyPatch
     from pytest_mock import MockerFixture
 
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -401,13 +401,13 @@ def ps_platform() -> PsPlatform:
 
 @pytest.fixture(scope="function")
 def ssh_server(
-    request, tmp_path: "LocalPath", mocker: "MockerFixture"
+    request, tmp_path: "LocalPath", monkey_patch: "MonkeyPatch"
 ) -> Generator["Container", Any, None]:
     """Start a single Docker container serving SSH for integration tests."""
     container, ssh_port = get_ssh_container(mfa=False, x11=False)
     with container:
         prepare_and_test_ssh_container(
-            container, ssh_port, Path(tmp_path, "ssh/"), mocker
+            container, ssh_port, Path(tmp_path, "ssh/"), monkey_patch
         )
         yield container.get_wrapped_container()
         copy_content_from_containers(request, "ssh_server", "app/")
@@ -415,13 +415,13 @@ def ssh_server(
 
 @pytest.fixture(scope="function")
 def ssh_x11_server(
-    request, tmp_path: "LocalPath", mocker: "MockerFixture"
+    request, tmp_path: "LocalPath", monkey_patch: "MonkeyPatch"
 ) -> Generator["Container", Any, None]:
     """Get a running SSH server with X11 enabled (no MFA)."""
     container, ssh_port = get_ssh_container(mfa=False, x11=True)
     with container:
         prepare_and_test_ssh_container(
-            container, ssh_port, Path(tmp_path, "ssh/"), mocker
+            container, ssh_port, Path(tmp_path, "ssh/"), monkey_patch
         )
         yield container.get_wrapped_container()
         copy_content_from_containers(request, "ssh_server", "app/")
@@ -429,13 +429,13 @@ def ssh_x11_server(
 
 @pytest.fixture(scope="function")
 def ssh_x11_mfa_server(
-    request, tmp_path: "LocalPath", mocker: "MockerFixture"
+    request, tmp_path: "LocalPath", monkey_patch: "MonkeyPatch"
 ) -> Generator["Container", Any, None]:
     """Get a running SSH server with X11 and MFA enabled."""
     container, ssh_port = get_ssh_container(mfa=True, x11=True)
     with container:
         prepare_and_test_ssh_container(
-            container, ssh_port, Path(tmp_path, "ssh/"), mocker
+            container, ssh_port, Path(tmp_path, "ssh/"), monkey_patch
         )
         yield container.get_wrapped_container()
         copy_content_from_containers(request, "ssh_server", "app/")
@@ -522,7 +522,7 @@ def postgres_server(
             password=_PG_PASSWORD,
             dbname=_PG_DATABASE,
         ).with_bind_ports(5432, pg_random_port) as container:
-            # Setup database
+            # Set up database
             with create_engine(conn_url).connect() as conn:
                 setup_pg_db(conn)
                 conn.commit()
@@ -629,9 +629,15 @@ def copy_content_from_containers(request, log_name, path_to_docker=""):
         else:
             container_in_use = func_args[log_name]
 
-        if "No such file" not in str(
-            container_in_use.exec_run(f"ls {path_to_docker}").output
-        ):
+        std_out: bytes | Iterator[bytes] = container_in_use.exec_run(
+            f"ls {path_to_docker}"
+        ).output
+        if isinstance(std_out, bytes):
+            std_out_text = std_out.decode("utf-8")
+        else:
+            std_out_text = b"".join(std_out).decode("utf-8")
+
+        if "No such file" not in std_out_text:
             stream = (container_in_use.get_archive(path_to_docker))[0]
             file_object = io.BytesIO()
 
