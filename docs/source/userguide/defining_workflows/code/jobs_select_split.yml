@@ -1,0 +1,15 @@
+JOBS:
+  SIM:
+    SCRIPT: 'sleep 0'
+    RUNNING: chunk
+    SPLITS: '4'
+
+  POST:
+    SCRIPT: 'sleep 0'
+    RUNNING: chunk
+    SPLITS: '4'
+    DEPENDENCIES:
+      SIM:
+        SPLITS_FROM:
+          '[1:2]':
+            SPLITS_TO: '1'
