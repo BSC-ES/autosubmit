@@ -221,12 +221,20 @@ class BasicConfig:
             # Call read_file_config with the value of the environment variable
             BasicConfig.__read_file_config(config_file_path)
         else:
-            user_config_path = Path.cwd() / dot_filename
+            try:
+                user_config_path = Path.cwd() / dot_filename
+            except OSError:
+                # The working directory may have been deleted (for example when
+                # an Autosubmit ``refresh`` removes the ``proj`` folder while the
+                # user is inside it); skip the current-directory configuration
+                # instead of crashing and fall back to the user and system
+                # files. See GH issue #3332.
+                user_config_path = None
             home_user_config_path = Path.home() / dot_filename
             etc_rc_path = Path("/etc") / filename
             legacy_etc_rc_path = Path("/etc") / dot_filename
 
-            if user_config_path.exists():
+            if user_config_path is not None and user_config_path.exists():
                 BasicConfig.__read_file_config(user_config_path)
             elif home_user_config_path.exists():
                 BasicConfig.__read_file_config(home_user_config_path)

@@ -15,11 +15,28 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import shutil
+
 from pathlib import Path
 
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.scripts._traceability import log_command_context
+
+
+def test_startup_from_deleted_working_directory_does_not_crash(tmp_path, monkeypatch):
+    # Running a command from a directory that has been deleted (for example
+    # after a ``refresh`` removed ``proj`` while the user was inside it) must not
+    # crash the command startup. Both the traceability log (``os.getcwd()``) and
+    # the configuration read (``Path.cwd()``) run before any command-specific
+    # work and must tolerate the missing directory. GH #3332.
+    monkeypatch.delenv("AUTOSUBMIT_CONFIGURATION", raising=False)
+    monkeypatch.chdir(tmp_path)
+    shutil.rmtree(tmp_path)  # the working directory no longer exists
+
+    log_command_context(argv=["autosubmit", "readme"])  # must not raise
+    BasicConfig.read()  # must not raise
 
 
 def test_read_file_config(tmp_path, monkeypatch):
