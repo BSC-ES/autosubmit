@@ -17,6 +17,8 @@
 
 """Unit tests for ``autosubmit.experiment.lock``."""
 
+from types import SimpleNamespace
+
 import pytest
 from portalocker.exceptions import BaseLockException
 
@@ -27,10 +29,24 @@ from autosubmit.exceptions import (
     FailedToReleaseLockException,
 )
 from autosubmit.experiment import lock as lock_module
+
+# noinspection PyProtectedMember
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 
 # noinspection PyProtectedMember
 from autosubmit.scripts._args import exit_from_error
+
+# noinspection PyProtectedMember
+from autosubmit.scripts._lock import LockPolicy, manage_experiment_lock
+
+
+@pytest.fixture
+def opts():
+    """Provide minimal CLI options for lock tests."""
+    return SimpleNamespace(
+        expid="a123",
+        _is_locked=False,
+    )
 
 
 @pytest.fixture
@@ -120,7 +136,7 @@ def test_exit_from_error(
 
     assert result == expected_code
     assert mocked_log.critical.call_count == critical_calls
-    assert mocked_log.warning.called is warning_called
+    assert mocked_log.warning.called == warning_called
 
 
 def test_exit_from_error_logs_autosubmit_critical_trace(mocker):
@@ -623,3 +639,68 @@ def test_postgres_lock_release_failure_preserves_original_exception(
     assert str(original_exception) == "Command failed"
 
     conn.invalidate.assert_called_once()
+
+
+def test_manage_experiment_lock_none(mocker, opts):
+    """Do not acquire a lock when the policy is NONE."""
+    mocked_experiment_lock = mocker.patch(
+        "autosubmit.scripts._lock.experiment_lock",
+    )
+
+    with manage_experiment_lock(LockPolicy.NONE, opts):  # type: ignore
+        assert opts._is_locked is False
+
+    mocked_experiment_lock.assert_not_called()
+
+
+def test_manage_experiment_lock_success(mocker, opts):
+    """Set _is_locked to True when the lock is acquired."""
+    mocked_experiment_lock = mocker.patch(
+        "autosubmit.scripts._lock.experiment_lock",
+    )
+
+    with manage_experiment_lock(LockPolicy.REQUIRED, opts):  # type: ignore
+        assert opts._is_locked is True
+
+    mocked_experiment_lock.assert_called_once_with(opts.expid)
+
+
+def test_manage_experiment_lock_required_failure(mocker, opts):
+    """Raise an exception when a REQUIRED lock cannot be acquired."""
+    mocked_experiment_lock = mocker.patch(
+        "autosubmit.scripts._lock.experiment_lock",
+    )
+
+    mocked_experiment_lock.return_value.__enter__.side_effect = (
+        ExperimentAlreadyLockedException("Experiment is locked")
+    )
+
+    with pytest.raises(
+        ExperimentAlreadyLockedException,
+        match="Experiment is locked",
+    ):
+        with manage_experiment_lock(LockPolicy.REQUIRED, opts):  # type: ignore
+            pass
+
+    assert opts._is_locked is False
+
+
+def test_manage_experiment_lock_optional_failure(mocker, opts):
+    """Continue execution without a lock when an OPTIONAL lock fails."""
+    mocked_experiment_lock = mocker.patch(
+        "autosubmit.scripts._lock.experiment_lock",
+    )
+
+    mocked_experiment_lock.return_value.__enter__.side_effect = (
+        ExperimentAlreadyLockedException("Experiment is locked")
+    )
+
+    command_executed = False
+
+    with manage_experiment_lock(LockPolicy.OPTIONAL, opts):  # type: ignore
+        command_executed = True
+        assert opts._is_locked is False
+
+    assert command_executed is True
+    assert opts._is_locked is False
+    mocked_experiment_lock.assert_called_once_with(opts.expid)

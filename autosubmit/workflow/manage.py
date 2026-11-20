@@ -1211,6 +1211,7 @@ def inspect(
     force=False,
     check_wrapper=False,
     quick=False,
+    locked=False,
 ) -> bool:
     """Generates cmd files experiment.
 
@@ -1222,13 +1223,14 @@ def inspect(
     :param force: If true, forces the generation of all cmd files.
     :param check_wrapper: If true, checks the wrapper.
     :param quick: If true, performs a quick inspect.
+    :param locked: Whether the experiment is currently locked, or not. This affects whether certain scripts are
+        recreated or not.
     :return: True if run to the end, False otherwise
     :raises AutosubmitCritical: If there is a critical error during the inspection process.
     """
     Log.info(f"Inspecting experiment {expid}")
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
     tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
-    locked = (tmp_path / "autosubmit.lock").exists()
     Log.info("Starting inspect command")
     os.system("clear")
     signal.signal(signal.SIGINT, _signal_handler)
@@ -1255,7 +1257,7 @@ def inspect(
     jobs = []
     jobs_cw = []
 
-    if not isinstance(job_list, type([])):
+    if not isinstance(job_list, list):
         if check_wrapper and (not locked or (force and locked)):
             job_list.clear_wrappers_db(preview=True)
             Log.info("Generating all cmd script adapted for wrappers")
@@ -1326,7 +1328,7 @@ def inspect(
         del jobs_aux
     file_paths = ""
 
-    if isinstance(jobs, type([])):
+    if isinstance(jobs, list):
         for job in jobs:
             file_paths += f"{str(tmp_path / (job.name + '.cmd'))} | {job.file}\n"
             job.status = Status.WAITING

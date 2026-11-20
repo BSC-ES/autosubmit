@@ -30,6 +30,7 @@ from autosubmit.scripts._args import (
     create_argparse_parser,
 )
 from autosubmit.scripts._cli_function import cli_function
+from autosubmit.scripts._lock import LockPolicy
 from autosubmit.scripts._validation import validate_expid
 
 
@@ -54,11 +55,13 @@ class DeleteOptions(AutosubmitOptions):
     """Whether or not the sub-command accepts multiple expids. Default is no."""
     accepts_other_users = False
     """Whether or not the sub-command accepts other users. Default is no."""
-    acquires_lock = True
-    """Whether or not the sub-command holds the experiment lock while it runs. Default is no."""
+    lock_policy = LockPolicy.REQUIRED
+    """Type of lock required. Default is :py:attr:`LockPolicy.REQUIRED`."""
 
     expid: str
     """Experiment identifiers separated by commas."""
+    _is_locked: bool = False
+    """Whether the experiment lock was successfully acquired."""
 
 
 def args_parser() -> ArgumentParser:

@@ -48,6 +48,7 @@ from autosubmit.scripts._args import (
     create_argparse_parser,
 )
 from autosubmit.scripts._cli_function import cli_function
+from autosubmit.scripts._lock import LockPolicy
 from autosubmit.scripts._validation import validate_expid
 
 
@@ -61,6 +62,8 @@ class InspectOptions(ExpidOptions):
     filter_chunks: str
     filter_status: str
     filter_type: str
+    
+    lock_policy = LockPolicy.OPTIONAL
 
 
 def args_parser() -> ArgumentParser:

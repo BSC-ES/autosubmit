@@ -47,6 +47,8 @@ __all__ = [
     "parse_expids",
 ]
 
+from autosubmit.scripts._lock import LockPolicy
+
 
 class AutosubmitOptions(Namespace):
     """Autosubmit options object."""
@@ -68,11 +70,13 @@ class DefaultOptions(AutosubmitOptions):
     """Whether or not the sub-command accepts multiple expids. Default is no."""
     accepts_other_users = False
     """Whether or not the sub-command accepts other users. Default is no."""
-    acquires_lock = False
-    """Whether or not the sub-command holds the experiment lock while it runs. Default is no."""
+    lock_policy = LockPolicy.NONE
+    """Type of lock required. Default is :py:attr:`LockPolicy.NONE`."""
 
     _profiler: Profiler | None = None
     """The profiler instance if set."""
+    _is_locked = False
+    """Whether the experiment is locked or not."""
 
 
 class ExpidOptions(DefaultOptions):
