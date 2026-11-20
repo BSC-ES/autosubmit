@@ -348,6 +348,12 @@ These are always available regardless of the raw YAML keys defined.
       is used by the ECMWF header, ``CURRENT_RESERVATION`` by
       SLURM and PBS, and ``CURRENT_EXCLUSIVITY`` by SLURM.
 
+    * Exclusivity uses different keys in the two configuration sections:
+      ``EXCLUSIVE`` for jobs and ``EXCLUSIVITY`` for platforms. A job-level
+      ``CURRENT_EXCLUSIVE`` value takes precedence; otherwise the platform's
+      ``CURRENT_EXCLUSIVITY`` value is retained when job parameters are
+      refreshed.
+
 
 Other variables
 ===============
