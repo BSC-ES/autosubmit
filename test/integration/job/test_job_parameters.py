@@ -164,3 +164,58 @@ def test_reservation(tmp_path, autosubmit_exp, reservation):
             )
             assert not additional_templates
             assert f"#SBATCH --reservation={reservation}" in template_content
+
+
+def test_loading_variables(autosubmit_exp, tmpdir, mocker):
+    """Test job platforms with a platform. Builds job and platform using YAML data, without mocks."""
+    as_exp = autosubmit_exp(experiment_data={
+            "JOBS": {
+                "LOCAL_SETUP": {
+                    "SCRIPT": "echo $(date -u -d '${startdate} + $(( numchunks * chunksize )) month' +%Y%m%d)",
+                    "PLATFORM": "TEST_SLURM",
+                    "RUNNING": "once",
+                    "CHECK": "on_submission",
+                    "TEST": {
+                        "A": "%PATTERN=%YYYY%MM%DD",
+                        "B": "%CURRENT.C%",
+                        "C": "%CURRENT.B%",
+                    },
+                    "CUSTOM": (
+                        "a",
+                        "b",
+                        "c%d",
+                    )
+                }
+            },
+            "PLATFORMS": {
+                "TEST_SLURM": {
+                    "ADD_PROJECT_TO_HOST": "False",
+                    "HOST": "127.0.0.1",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "PROCESSORS_PER_NODE": "4",
+                    "MAX_PROCESSORS": "4",
+                }
+            },
+        }, include_jobs=False, create=True)
+    job_list = load_job_list(
+        as_exp.expid,
+        as_exp.as_conf,
+        monitor=False,
+        new=True,
+        full_load=True,
+        submitter=None,
+        check_failed_jobs=False,
+    )
+
+    mocked_log = mocker.patch('autosubmit.log.log.Log.warning')
+
+    for job in job_list.get_job_list():
+        job.update_parameters(as_exp.as_conf, set_attributes=True)
+
+    assert "Configuration files has variables that point to nothing!" in mocked_log.call_args[0][0]

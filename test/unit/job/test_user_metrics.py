@@ -35,8 +35,6 @@ from autosubmit.platforms.locplatform import LocalPlatform
 
 _EXPID = "t123"
 
-_EXPID = "t123"
-
 
 @pytest.fixture
 def disable_metric_manager(mocker):
