@@ -1580,7 +1580,7 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
     mocked_log = mocker.patch('autosubmit.job.job.Log')
 
     if has_completed_files:
-        job_completed_file = local.root_dir / local.config.get('LOCAL_TMP_DIR') / f'LOG_{as_conf.expid}' / f'{job.name}_COMPLETED'
+        job_completed_file = Path(local.root_dir) / local.config.get('LOCAL_TMP_DIR') / f'LOG_{as_conf.expid}' / f'{job.name}_COMPLETED'
         job_completed_file.parent.mkdir(parents=True, exist_ok=True)
         job_completed_file.touch()
         job.update_status(as_conf=as_conf)
@@ -2147,7 +2147,7 @@ def test_update_parameters(autosubmit_config, experiment_data):
                              'CURRENT_EXCLUSIVITY': '',
                              'CURRENT_EXTENDED_HEADER_PATH': 'bla', 'CURRENT_EXTENDED_TAILER_PATH': 'bla2',
                              'CURRENT_FILE': 'test.sh', 'CURRENT_HOST': '', 'CURRENT_HYPERTHREADING': 'false',
-                             'CURRENT_LOGDIR': 't001/LOG_t001', 'CURRENT_METRIC_FOLDER': 't001/LOG_t001/test_job',
+                             'CURRENT_LOGDIR': 't001/LOG_t001', 'CURRENT_METRIC_FOLDER': 't001/test_job',
                              'CURRENT_PLATFORM': 'DUMMY_PLATFORM', 'CURRENT_PROJ': '', 'CURRENT_PROJ_DIR': '',
                              'CURRENT_QUEUE': '',
                              'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3, 'CURRENT_ROOTDIR': 't001',
@@ -2289,7 +2289,7 @@ def test_check_remote_log_exists(tmp_path, show_logs: bool, exists, autosubmit_c
     job.platform = platform
     job.remote_logs = (str(platform.remote_log_dir / 'some.out'), str(platform.remote_log_dir / 'some.err'))
 
-    log = job.check_remote_log_exists(show_logs=show_logs)
+    log = job.check_remote_log_exists()
     if exists:
         assert log
     else:
@@ -2923,7 +2923,7 @@ def test_is_over_wallclock_elapsed_exceeds(mocker, start_time_timestamp, effecti
     platform.set_start_time_from_remote_stat_file.side_effect = _set_start_time
     job._platform = platform
     future = datetime(2030, 1, 1, 0, 0, 0)
-    mocker.patch("autosubmit.job.job.datetime.datetime", **{
+    mocker.patch("autosubmit.job.job.datetime", **{
         "now.return_value": future,
         "strptime": datetime.strptime,
     })

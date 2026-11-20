@@ -87,8 +87,8 @@ class PsPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Updates commands for platforms."""
-        self.root_dir = Path(self.scratch) / self.project_dir / self.user / self.expid
-        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
+        self.root_dir = str(Path(self.scratch) / self.project_dir / self.user / self.expid)
+        self.remote_log_dir = Path(self.root_dir) / f"LOG_{self.expid}"
         self.cancel_cmd = "kill -2"
         self._checkhost_cmd = "echo 1"
         self.put_cmd = "scp"

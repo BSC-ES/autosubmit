@@ -41,11 +41,11 @@ from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_utils import Dependency, change_jobs_status
 from autosubmit.log.log import AutosubmitCritical, Log
-from autosubmit.platforms.platform import Platform
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.monitor.diagram import JobData
+    from autosubmit.platforms.platform import Platform
 
 
 class JobList:
@@ -171,6 +171,7 @@ class JobList:
     def expid(self):
         """Returns the experiment identifier
 
+        :autosubmit-group: DEFAULT
         :return: experiment's identifier
         """
         return self._expid
@@ -2138,9 +2139,9 @@ class JobList:
         The purpose is that all jobs share the same name structure.
 
         :param filtered_jobs_list: A list of jobs of only those that comply with certain criteria,
-        e.g. those belonging to a user defined job type for wrapping. \n
-        :return filtered_jobs_fake_date_member: List of fake jobs. \n
-        :return fake_original_job_map: Dictionary that maps fake job to original one. \n
+        e.g. those belonging to a user defined job type for wrapping.
+        :return filtered_jobs_fake_date_member: List of fake jobs.
+        :return fake_original_job_map: Dictionary that maps fake job to original one.
         """
         filtered_jobs_fake_date_member = []
         fake_original_job_map = {}
@@ -3135,7 +3136,7 @@ class JobList:
         :param job: The job whose parent statuses are to be checked.
         :param parents_edge_info: Dictionary or list containing information about the edges from parent jobs.
         :param parents_nodes: Dictionary mapping parent job names to Job objects.
-        :return A tuple containing two lists: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
+        :return: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
         """
         non_completed = []
         completed = []
@@ -4174,7 +4175,7 @@ class JobList:
                         int(data["submit"])).strftime("%Y%m%d%H%M%S")
             job.updated_log = job.fail_count + 1
 
-    def _get_jobs_by_name(self, status: list[int] | None = None, platform: Platform = None,
+    def _get_jobs_by_name(self, status: list[int] | None = None, platform: "Platform" = None,
                           return_only_names=False) -> list[str] | list["Job"]:
         """Return jobs filtered by status and/or platform as names or Job objects.
 
@@ -4192,7 +4193,7 @@ class JobList:
             return [job for job in self.get_job_list() if
                     (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
 
-    def recover_all_completed_jobs_from_exp_history(self, platform: Platform = None) -> set[str]:
+    def recover_all_completed_jobs_from_exp_history(self, platform: "Platform" = None) -> set[str]:
         """Recover all completed jobs from experiment history
 
         :param platform: Platform to filter by.
