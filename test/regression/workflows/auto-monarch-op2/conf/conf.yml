@@ -81,7 +81,6 @@ JOBS:
     DEPENDENCIES:
       LOCAL_SEND_EMISSIONS:
         STATUS: FAILED
-        OPTIONAL: false
     RUNNING: chunk
     SYNCHRONIZE: member
     WALLCLOCK: 00:30
@@ -137,7 +136,6 @@ JOBS:
     DEPENDENCIES:
       LOCAL_SEND_CHEM:
         STATUS: FAILED
-        OPTIONAL: false
     RUNNING: chunk
     SYNCHRONIZE: member
     WALLCLOCK: 00:30
@@ -221,13 +219,10 @@ JOBS:
     DEPENDENCIES:
       LOCAL_SEND_SOURCE:
         STATUS: COMPLETED
-        OPTIONAL: false
       COMPILE_OBSPREPROC:
         STATUS: COMPLETED
-        OPTIONAL: false
       LOCAL_SEND_OBS:
         STATUS: FAILED
-        OPTIONAL: false
     RUNNING: chunk
     SYNCHRONIZE: member
     WALLCLOCK: 00:30
@@ -239,7 +234,6 @@ JOBS:
     DEPENDENCIES:
       OBS_PREPROC:
         STATUS: FAILED
-        OPTIONAL: false
     RUNNING: chunk
     SYNCHRONIZE: member
     WALLCLOCK: 00:30

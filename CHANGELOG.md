@@ -81,10 +81,26 @@ several bug fixes and enhancements to improve the overall user experience.
   process is unavailable, default `true`) #3342
 - Add `[database] backup` option to `autosubmitrc` to disable SQLite backups #3129
 
-**Migration from `job_list.pkl` to Database**
+**Upgrading from 4.1 to 4.2:**
 
-- All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted
-  in significant changes to the code.
+- Start conditions (`STATUS`) are a set of exact statuses, as a comma or whitespace separated
+  string or a YAML list. When `STATUS` is omitted the dependency waits for `SUCCEEDED`
+  (`COMPLETED` or `SKIPPED`).
+  `SUCCEEDED` expands to `COMPLETED`/`SKIPPED` and `FINISHED` expands to
+  `COMPLETED`/`SKIPPED`/`FAILED`. `COMPLETED` and `SKIPPED` are distinct, and `UNKNOWN` and
+  `SUSPENDED` are not valid `STATUS` values. #3262
+- The ordered behaviour is gone. A parent that already moved past the selected status no longer
+  satisfies the dependency. Experiments using a non-default `STATUS` (for example `QUEUING`,
+  `READY`) must add the statuses the parent can reach, for example `STATUS: 'RUNNING,SUCCEEDED'`,
+  or use `SUCCEEDED`/`FINISHED`.
+- The `?` weak-dependency suffix is no longer accepted. Enabled `FAIL_OK` and `OPTIONAL` flags are
+  rejected. Use an explicit `STATUS` list, or `FINISHED` when any outcome is acceptable. Disabled
+  flags are ignored.
+- The workflow is stored in the database. The `job_list.pkl` written by 4.1 is no longer read.
+- To upgrade an experiment, stop it, update the start conditions in `conf/*.yml`, run
+  `autosubmit updateversion <EXPID>`, `autosubmit create <EXPID> -f -np`, and
+  `autosubmit recovery <EXPID> -s --all`. Then resume it with `autosubmit run <EXPID> -v`.
+  See the "Upgrading from 4.1 to 4.2" section in the user guide.
 
 **Memory and Performance Improvements**:
 

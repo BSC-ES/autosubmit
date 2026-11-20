@@ -36,50 +36,8 @@ from autosubmit.database.models.tables import (
     WrapperJobsTable,
 )
 from autosubmit.database.schema_version import JOB_LIST_SCHEMA_VERSION
-from autosubmit.job.job_common import Status
+from autosubmit.job.job_common import DEFAULT_START_CONDITION, Status, is_edge_satisfied
 from autosubmit.log.log import Log
-
-
-def _edge_satisfied(
-    parent_status: str,
-    min_trigger_status: str | None,
-    fail_ok: bool,
-    from_step: int | None,
-    child_checkpoint_step: int,
-) -> bool:
-    """Check if a parent edge status satisfies the trigger requirements.
-
-    :param parent_status: Current status of the parent job.
-    :param min_trigger_status: Minimum status required to trigger.
-    :param fail_ok: Whether a FAILED parent is acceptable.
-    :param from_step: Step threshold for checkpoint-based satisfaction.
-    :param child_checkpoint_step: Checkpoint step of the child job.
-    :return: True if the edge is satisfied, False otherwise.
-    """
-    from_step = int(from_step) if from_step is not None else 0
-    child_checkpoint_step = int(child_checkpoint_step) if child_checkpoint_step is not None else 0
-    min_trigger_status = min_trigger_status or "COMPLETED"
-
-    if parent_status == 'SUSPENDED':
-        return False
-    elif parent_status in ('COMPLETED', 'SKIPPED'):
-         return True
-    elif parent_status == 'FAILED':
-        if min_trigger_status == 'FAILED' or (min_trigger_status in ('COMPLETED', 'SKIPPED') and (fail_ok or child_checkpoint_step >= from_step > 0)):
-            return True
-        return False
-    elif parent_status == 'RUNNING':
-        if min_trigger_status == 'RUNNING' and child_checkpoint_step >= from_step > 0 or min_trigger_status in ('COMPLETED', 'SKIPPED', 'FAILED'):
-            return True
-    elif parent_status == min_trigger_status:
-        return True
-    elif parent_status in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW and min_trigger_status in Status.LOGICAL_ORDER:
-        idx_parent = Status.LOGICAL_ORDER.index(parent_status)
-        idx_edge = Status.LOGICAL_ORDER.index(min_trigger_status)
-        if idx_parent >= idx_edge:
-            return True
-    return False
-
 
 _LOG_EXCLUDE_KEYS = {
     'updated_log', 'updated_stats'
@@ -321,7 +279,7 @@ class JobsDbManager(DbManager):
         """Return non-completed jobs in sections whose cross-section parents are all COMPLETED.
 
         Uses a single SQL query with NOT EXISTS to find jobs whose
-        parents from other sections all have completion_status = COMPLETED.
+        parents from other sections all have ``is_satisfied`` set to true.
 
         :param sections: List of section names to search.
         :param already_loaded_names: Set of job names already in memory.
@@ -348,7 +306,7 @@ class JobsDbManager(DbManager):
                 .where(and_(
                     structure_table.c.e_to == jobs_table.c.name,
                     parent_alias.c.section.notin_(sections),
-                    structure_table.c.completion_status != 'COMPLETED',
+                    structure_table.c.is_satisfied.is_(False),
                     parent_alias.c.status != 'COMPLETED'
                 ))
             )
@@ -379,7 +337,7 @@ class JobsDbManager(DbManager):
                     select(structure_table.c.e_to)
                     .where(and_(
                         structure_table.c.e_to == table.c.name,
-                        structure_table.c.completion_status != 'COMPLETED'
+                        structure_table.c.is_satisfied.is_(False)
                     ))
                 )
             )
@@ -437,8 +395,7 @@ class JobsDbManager(DbManager):
                     select(
                         experiment_structure_table.c.e_from,
                         experiment_structure_table.c.e_to,
-                        experiment_structure_table.c.min_trigger_status,
-                        experiment_structure_table.c.fail_ok,
+                        experiment_structure_table.c.accepted_statuses,
                         experiment_structure_table.c.from_step,
                         jobs_table.c.status.label("parent_status"),
                     ).select_from(
@@ -475,10 +432,9 @@ class JobsDbManager(DbManager):
                             p_job = next((j for j in job_list_tmp if j['name'] == e.e_from), None)
                             if p_job:
                                 parent_status = p_job.get('status', parent_status)
-                        if not _edge_satisfied(
+                        if not is_edge_satisfied(
                             parent_status=parent_status,
-                            min_trigger_status=e.min_trigger_status or "COMPLETED",
-                            fail_ok=bool(e.fail_ok) if e.fail_ok is not None else False,
+                            accepted_statuses=e.accepted_statuses or DEFAULT_START_CONDITION,
                             from_step=e.from_step,
                             child_checkpoint_step=cp,
                         ):
@@ -515,8 +471,8 @@ class JobsDbManager(DbManager):
         pkeys = ['e_from', 'e_to']
         self.upsert_many(table.name, graph, pkeys)
 
-    def update_outgoing_edges_completion(self, job_name: str, job_status: str) -> bool:
-        """Update completion_status to COMPLETED for all satisfied outgoing edges of a job.
+    def update_outgoing_edges_satisfied(self, job_name: str, job_status: str) -> bool:
+        """Mark all satisfied outgoing edges of a job as satisfied in the database.
 
         Queries experiment_structure directly and updates matching edges in DB.
 
@@ -533,8 +489,7 @@ class JobsDbManager(DbManager):
             rows = conn.execute(
                 select(
                     structure_table.c.e_to,
-                    structure_table.c.min_trigger_status,
-                    structure_table.c.fail_ok,
+                    structure_table.c.accepted_statuses,
                     structure_table.c.from_step,
                     jobs_table.c.current_checkpoint_step,
                 ).select_from(
@@ -548,10 +503,9 @@ class JobsDbManager(DbManager):
 
             updated = False
             for row in rows:
-                if _edge_satisfied(
+                if is_edge_satisfied(
                     parent_status=job_status,
-                    min_trigger_status=row.min_trigger_status or "COMPLETED",
-                    fail_ok=bool(row.fail_ok) if row.fail_ok is not None else False,
+                    accepted_statuses=row.accepted_statuses or DEFAULT_START_CONDITION,
                     from_step=row.from_step or 0,
                     child_checkpoint_step=row.current_checkpoint_step or 0,
                 ):
@@ -561,7 +515,7 @@ class JobsDbManager(DbManager):
                             structure_table.c.e_from == job_name,
                             structure_table.c.e_to == row.e_to
                         ))
-                        .values(completion_status="COMPLETED")
+                        .values(is_satisfied=True)
                     )
                     updated = True
         return updated

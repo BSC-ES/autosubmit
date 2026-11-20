@@ -31,18 +31,16 @@ _SAMPLE_EDGES: list[dict[str, Any]] = [
     {
         "e_from": "a001_LOCAL_SETUP",
         "e_to": "a001_REMOTE_SETUP",
-        "min_trigger_status": "COMPLETED",
-        "completion_status": "WAITING",
+        "accepted_statuses": "COMPLETED",
+        "is_satisfied": False,
         "from_step": 0,
-        "fail_ok": True,
     },
     {
         "e_from": "a001_REMOTE_SETUP",
         "e_to": "a001_20000101_fc0_INI",
-        "min_trigger_status": "COMPLETED",
-        "completion_status": "WAITING",
+        "accepted_statuses": "COMPLETED",
+        "is_satisfied": False,
         "from_step": 0,
-        "fail_ok": False,
     },
 ]
 
@@ -234,7 +232,7 @@ def test_save_historical_edges_upserts_on_conflict(autosubmit_exp) -> None:
 
     manager._save_historical_edges(_SAMPLE_EDGES, run_id)
     modified_edges = [
-        {**edge, "fail_ok": not edge.get("fail_ok")} for edge in _SAMPLE_EDGES
+        {**edge, "from_step": edge["from_step"] + 1} for edge in _SAMPLE_EDGES
     ]
     manager._save_historical_edges(modified_edges, run_id)
 
@@ -307,10 +305,9 @@ def test_save_historical_edges_raises_without_run(autosubmit_exp) -> None:
                 {
                     "e_from": "j_A",
                     "e_to": "j_B",
-                    "min_trigger_status": "COMPLETED",
-                    "completion_status": "WAITING",
+                    "accepted_statuses": "COMPLETED",
+                    "is_satisfied": False,
                     "from_step": 0,
-                    "fail_ok": True,
                 }
             ],
             id="single_edge",
@@ -320,10 +317,9 @@ def test_save_historical_edges_raises_without_run(autosubmit_exp) -> None:
                 {
                     "e_from": f"j_{i}",
                     "e_to": f"j_{i + 1}",
-                    "min_trigger_status": "COMPLETED",
-                    "completion_status": "WAITING",
+                    "accepted_statuses": "COMPLETED",
+                    "is_satisfied": False,
                     "from_step": i,
-                    "fail_ok": bool(i % 2),
                 }
                 for i in range(5)
             ],

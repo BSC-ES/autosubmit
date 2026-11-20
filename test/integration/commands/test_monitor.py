@@ -29,7 +29,7 @@ def new_as_exp(autosubmit_exp, general_data, experiment_data, wrapper_type: str,
     return autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
 
 
-@pytest.mark.parametrize("wrapper_type,min_trigger_status,from_step", [
+@pytest.mark.parametrize("wrapper_type,accepted_statuses,from_step", [
     ('simple', None, None),
     ("simple", "READY", 0),
     ("simple", "QUEUING", 0),
@@ -90,7 +90,7 @@ def new_as_exp(autosubmit_exp, general_data, experiment_data, wrapper_type: str,
     ("horizontal-vertical", "COMPLETED", 3),
     ("horizontal-vertical", "FAILED", 3),
 ])
-def test_monitor(autosubmit_exp, wrapper_type, min_trigger_status, from_step, general_data, experiment_data):
+def test_monitor(autosubmit_exp, wrapper_type, accepted_statuses, from_step, general_data, experiment_data):
     """Test the monitor of an experiment."""
 
     as_exp = new_as_exp(
@@ -98,7 +98,7 @@ def test_monitor(autosubmit_exp, wrapper_type, min_trigger_status, from_step, ge
         general_data=general_data,
         experiment_data=experiment_data,
         wrapper_type=wrapper_type,
-        structure={'min_trigger_status': min_trigger_status, 'from_step': from_step} if min_trigger_status and from_step is not None else {},
+        structure={'accepted_statuses': accepted_statuses, 'from_step': from_step} if accepted_statuses and from_step is not None else {},
         sizes={"MIN_V": 2, "MAX_V": 2, "MIN_H": 2, "MAX_H": 2}
     )
 

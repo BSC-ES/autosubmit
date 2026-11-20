@@ -5,10 +5,11 @@ from networkx import DiGraph  # type: ignore
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status
+from autosubmit.job.job_common import Status, is_edge_satisfied
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import Dependency
+from autosubmit.log.log import AutosubmitCritical
 
 _MEMBER_LIST = ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6", "fc7", "fc8", "fc9", "fc10"]
 _CHUNK_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -363,7 +364,7 @@ def test_check_dates(joblist, test_job, relationships_dates, relationships_chunk
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
         "SPLITS_TO": "1",
-        "MIN_TRIGGER_STATUS": "COMPLETED"
+        "ACCEPTED_STATUSES": "COMPLETED,SKIPPED"
     }
     assert result == expected_output
 
@@ -377,7 +378,7 @@ def test_check_dates(joblist, test_job, relationships_dates, relationships_chunk
         "MEMBERS_TO": "none",
         "CHUNKS_TO": "none",
         "SPLITS_TO": "none",
-        "MIN_TRIGGER_STATUS": "COMPLETED"
+        "ACCEPTED_STATUSES": "COMPLETED,SKIPPED"
     }
     assert result == expected_output
 
@@ -400,7 +401,7 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
         "SPLITS_TO": "1",
-        "MIN_TRIGGER_STATUS": "COMPLETED"
+        "ACCEPTED_STATUSES": "COMPLETED,SKIPPED"
     }
     assert result == expected_output
 
@@ -412,7 +413,7 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
         "SPLITS_TO": "1",
-        "MIN_TRIGGER_STATUS": "COMPLETED"
+        "ACCEPTED_STATUSES": "COMPLETED,SKIPPED"
 
     }
     assert result == expected_output
@@ -426,7 +427,7 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "MEMBERS_TO": "none",
         "CHUNKS_TO": "none",
         "SPLITS_TO": "none",
-        "MIN_TRIGGER_STATUS": "COMPLETED"
+        "ACCEPTED_STATUSES": "COMPLETED,SKIPPED"
     }
     assert result == expected_output
 
@@ -450,7 +451,7 @@ def test_check_splits(joblist, test_job, relationships_splits):
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
         "SPLITS_TO": "1",
-        "MIN_TRIGGER_STATUS": "COMPLETED"
+        "ACCEPTED_STATUSES": "COMPLETED,SKIPPED"
     }
     assert result == expected_output
     test_job.split = 2
@@ -478,7 +479,7 @@ def test_check_chunks(joblist, test_job, relationships_chunks):
     }
 
     result = joblist._check_chunks(chunks, test_job)
-    expected_output = {'SPLITS_TO': '4', "MIN_TRIGGER_STATUS": "COMPLETED"}
+    expected_output = {'SPLITS_TO': '4', "ACCEPTED_STATUSES": "COMPLETED,SKIPPED"}
 
     assert result == expected_output
     chunks = {
@@ -489,7 +490,7 @@ def test_check_chunks(joblist, test_job, relationships_chunks):
 
     result = joblist._check_chunks(chunks, test_job)
     expected_output = {'DATES_TO': 'none', 'MEMBERS_TO': 'none', 'CHUNKS_TO': 'none', 'SPLITS_TO': 'none',
-                       "MIN_TRIGGER_STATUS": "COMPLETED"}
+                       "ACCEPTED_STATUSES": "COMPLETED,SKIPPED"}
     assert result == expected_output
 
     test_job.chunk = 2
@@ -522,46 +523,46 @@ def test_check_general(joblist, test_job, relationships_general):
 def test_check_relationship(joblist):
     relationships = {'MEMBERS_FROM': {
         'TestMember,   TestMember2,TestMember3   ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0,
-                                                     'MEMBERS_TO': 'None', 'MIN_TRIGGER_STATUS': 'COMPLETED'}}}
+                                                     'MEMBERS_TO': 'None', 'ACCEPTED_STATUSES': 'COMPLETED'}}}
     level_to_check = "MEMBERS_FROM"
     value_to_check = "TestMember"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
         {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
-         'MIN_TRIGGER_STATUS': "COMPLETED"}]
+         'ACCEPTED_STATUSES': "COMPLETED"}]
     assert result == expected_output
     value_to_check = "TestMember2"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
         {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
-         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
+         'ACCEPTED_STATUSES': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "TestMember3"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
         {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
-         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
+         'ACCEPTED_STATUSES': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "TestMember   "
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
         {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
-         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
+         'ACCEPTED_STATUSES': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "   TestMember"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
         {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
-         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
+         'ACCEPTED_STATUSES': 'COMPLETED'}]
     assert result == expected_output
     relationships = {'DATES_FROM': {
         '20000101, 20000102, 20000103 ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0,
-                                          'MEMBERS_TO': 'None', 'MIN_TRIGGER_STATUS': 'COMPLETED'}}}
+                                          'MEMBERS_TO': 'None', 'ACCEPTED_STATUSES': 'COMPLETED'}}}
     value_to_check = datetime(2000, 1, 1)
     result = joblist._check_relationship(relationships, "DATES_FROM", value_to_check)
     expected_output = [
         {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
-         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
+         'ACCEPTED_STATUSES': 'COMPLETED'}]
     assert result == expected_output
 
 
@@ -584,7 +585,7 @@ def _init_special_conditions(joblist: JobList) -> tuple[Job, Job, Job, dict, Job
     job.splits = 1
     job.max_checkpoint_step = 0
     job.status = Status.WAITING
-    special_conditions = {"MIN_TRIGGER_STATUS": "RUNNING", "FROM_STEP": "2", "FAIL_OK": False}
+    special_conditions = {"ACCEPTED_STATUSES": "RUNNING", "FROM_STEP": "2"}
 
     parent = Job("parent", 1, Status.READY, 1)
     parent.section = "parent_one"
@@ -607,7 +608,7 @@ def _init_special_conditions(joblist: JobList) -> tuple[Job, Job, Job, dict, Job
     joblist.graph.add_edge(parent.name, job.name)
     joblist.graph.add_edge(parent2.name, job.name)
     joblist.add_special_conditions(job, special_conditions, parent)
-    special_conditions = {"MIN_TRIGGER_STATUS": "FAILED", "FROM_STEP": 0, "FAIL_OK": False}
+    special_conditions = {"ACCEPTED_STATUSES": "FAILED", "FROM_STEP": 0}
     joblist.add_special_conditions(job, special_conditions, parent2)
     return job, parent, parent2, special_conditions, joblist
 
@@ -618,15 +619,13 @@ def test_add_special_conditions(_init_special_conditions):
     edge = joblist.graph.edges[parent.name, job.name]
     assert job.max_checkpoint_step == 2
     assert edge.get("from_step") == 2
-    assert edge.get("min_trigger_status") == "RUNNING"
-    assert not edge.get("fail_ok")
+    assert edge.get("accepted_statuses") == "RUNNING"
 
     edge = joblist.graph.edges[parent2.name, job.name]
     # Still 2 because it is the MAX value between all dependencies
     assert job.max_checkpoint_step == 2
     assert edge.get("from_step") == 0
-    assert edge.get("min_trigger_status") == "FAILED"
-    assert not edge.get("fail_ok")
+    assert edge.get("accepted_statuses") == "FAILED"
 
 
 def test_job_dict_get_jobs_filtered(mocker, joblist):
@@ -846,84 +845,88 @@ def test_normalize_auto_keyword(as_conf, mocker):
 @pytest.mark.parametrize(
     "parents_config,checkpoint_step,expected",
     [
-        ([(Status.RUNNING, "RUNNING", 0, False)] * 3, 0, True),
+        ([(Status.RUNNING, "RUNNING", 0)] * 3, 0, True),
         (
             [
-                (Status.RUNNING, "RUNNING", 0, False),
-                (Status.SUSPENDED, "RUNNING", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.RUNNING, "RUNNING", 0),
+                (Status.SUSPENDED, "RUNNING", 0),
+                (Status.RUNNING, "RUNNING", 0),
             ], 0, False,
         ),
         (
             [
-                (Status.COMPLETED, "COMPLETED", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.COMPLETED, "COMPLETED", 0),
+                (Status.RUNNING, "RUNNING", 0),
+                (Status.RUNNING, "RUNNING", 0),
             ], 0, True,
         ),
         (
             [
-                (Status.COMPLETED, "COMPLETED", 0, False),
-                (Status.SUSPENDED, "RUNNING", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.COMPLETED, "COMPLETED", 0),
+                (Status.SUSPENDED, "RUNNING", 0),
+                (Status.RUNNING, "RUNNING", 0),
             ], 0, False,
         ),
         (
             [
-                (Status.RUNNING, "COMPLETED", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.RUNNING, "COMPLETED", 0),
+                (Status.RUNNING, "RUNNING", 0),
+                (Status.RUNNING, "RUNNING", 0),
             ], 0, False,
         ),
-        ([(Status.COMPLETED, "RUNNING", 0, False)] * 3, 0, True),
+        ([(Status.COMPLETED, "RUNNING", 0)] * 3, 0, False),
+        ([(Status.COMPLETED, "RUNNING,SUCCEEDED", 0)] * 3, 0, True),
+        ([(Status.SKIPPED, "RUNNING", 0)] * 3, 0, False),
+        ([(Status.SKIPPED, "RUNNING,SUCCEEDED", 0)] * 3, 0, True),
+        ([(Status.FAILED, "RUNNING,SUCCEEDED", 0)] * 3, 0, False),
         (
             [
-                (Status.SUSPENDED, "RUNNING", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.SUSPENDED, "RUNNING", 0),
+                (Status.RUNNING, "RUNNING", 0),
+                (Status.RUNNING, "RUNNING", 0),
             ], 0, False,
         ),
-        ([(Status.SUSPENDED, "RUNNING", 0, False)] * 3, 0, False),
+        ([(Status.SUSPENDED, "RUNNING", 0)] * 3, 0, False),
         (
             [
-                (Status.COMPLETED, "COMPLETED", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
-                (Status.SUSPENDED, "RUNNING", 0, False),
+                (Status.COMPLETED, "COMPLETED", 0),
+                (Status.RUNNING, "RUNNING", 0),
+                (Status.SUSPENDED, "RUNNING", 0),
             ], 0, False,
         ),
-
-        ([(Status.FAILED, "FAILED", 0, False)] * 3, 0, True),
-        ([(Status.FAILED, "COMPLETED", 0, True)] * 3, 0, True),
-        ([(Status.FAILED, "COMPLETED", 0, False)] * 3, 0, False),
-        ([(Status.FAILED, "RUNNING", 0, False)] * 3, 0, False),
+        ([(Status.FAILED, "FAILED", 0)] * 3, 0, True),
+        ([(Status.FAILED, "COMPLETED", 0)] * 3, 0, False),
+        ([(Status.FAILED, "FAILED,COMPLETED", 0)] * 3, 0, True),
+        ([(Status.SKIPPED, "FAILED,COMPLETED", 0)] * 3, 0, False),
+        ([(Status.FAILED, "RUNNING", 0)] * 3, 0, False),
         (
             [
-                (Status.FAILED, "FAILED", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.FAILED, "FAILED", 0),
+                (Status.RUNNING, "RUNNING", 0),
             ], 0, True,
         ),
         (
             [
-                (Status.FAILED, "COMPLETED", 0, True),
-                (Status.RUNNING, "RUNNING", 0, False),
-            ], 0, True,
-        ),
-        (
-            [
-                (Status.FAILED, "COMPLETED", 0, False),
-                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.FAILED, "COMPLETED", 0),
+                (Status.RUNNING, "RUNNING", 0),
             ], 0, False,
         ),
-
-        ([(Status.COMPLETED, "FAILED", 0, True)] * 3, 0, True),
-        ([(Status.COMPLETED, "FAILED", 0, False)] * 3, 0, False),
-
-        ([(Status.RUNNING, "RUNNING", 3, False)], 0, False),
-        ([(Status.RUNNING, "RUNNING", 3, False)], 3, True),
-        ([(Status.RUNNING, "RUNNING", 3, False)], 5, True),
-        ([(Status.RUNNING, "RUNNING", 5, False)], 3, False),
-
-        ([(Status.COMPLETED, "FAILED", 1, False)], 3, True),
+        ([(Status.COMPLETED, "FAILED,SUCCEEDED", 0)] * 3, 0, True),
+        ([(Status.COMPLETED, "FAILED", 0)] * 3, 0, False),
+        ([(Status.QUEUING, "QUEUING", 0)] * 3, 0, True),
+        ([(Status.COMPLETED, "QUEUING", 0)] * 3, 0, False),
+        ([(Status.COMPLETED, "QUEUING,SUCCEEDED", 0)] * 3, 0, True),
+        ([(Status.RUNNING, "QUEUING", 0)] * 3, 0, False),
+        ([(Status.SKIPPED, "COMPLETED", 0)] * 3, 0, False),
+        ([(Status.SKIPPED, "SUCCEEDED", 0)] * 3, 0, True),
+        ([(Status.COMPLETED, "SKIPPED", 0)] * 3, 0, False),
+        ([(Status.COMPLETED, "SUCCEEDED", 0)] * 3, 0, True),
+        ([(Status.RUNNING, "RUNNING", 3)], 0, False),
+        ([(Status.RUNNING, "RUNNING", 3)], 3, True),
+        ([(Status.RUNNING, "RUNNING", 3)], 5, True),
+        ([(Status.RUNNING, "RUNNING", 5)], 3, False),
+        ([(Status.COMPLETED, "RUNNING,SUCCEEDED", 3)], 0, True),
+        ([(Status.COMPLETED, "FAILED,COMPLETED", 1)], 3, True),
     ],
     ids=[
         "all_running_with_edge",
@@ -931,24 +934,37 @@ def test_normalize_auto_keyword(as_conf, mocker):
         "completed_parent_without_edge_counted",
         "suspended_with_completed_sibling_blocks",
         "running_parent_without_edge_uncounted",
-        "all_completed_with_edge",
+        "completed_parent_blocks_strict_running",
+        "completed_parent_satisfies_relaxed_running",
+        "skipped_parent_blocks_strict_running",
+        "skipped_parent_satisfies_relaxed_running",
+        "failed_parent_blocks_relaxed_running",
         "first_parent_suspended_blocks",
         "all_suspended_blocks",
         "completed_running_suspended_blocks",
         "failed_parent_meets_failed_edge",
-        "failed_parent_fail_ok_meets_completed_edge",
-        "failed_parent_no_fail_ok_blocked_by_completed_edge",
+        "failed_parent_blocks_strict_completed",
+        "failed_parent_meets_failed_or_completed",
+        "skipped_parent_blocks_failed_or_completed",
         "failed_parent_with_running_edge_blocked",
-        "mixed_failed_meets_failed_edge_and_running",
-        "mixed_failed_fail_ok_and_running",
-        "mixed_failed_no_fail_ok_blocks_child",
-        "completed_parent_fail_ok_meets_failed_edge",
-        "completed_parent_no_fail_ok_blocked_by_failed_edge",
+        "mixed_failed_and_running_meet",
+        "mixed_failed_strict_blocks_child",
+        "completed_parent_meets_failed_or_succeeded",
+        "completed_parent_blocks_strict_failed",
+        "queuing_parent_meets_queuing_edge",
+        "completed_parent_blocks_strict_queuing",
+        "completed_parent_meets_relaxed_queuing",
+        "running_parent_blocks_queuing",
+        "skipped_parent_blocks_strict_completed",
+        "skipped_parent_meets_succeeded",
+        "completed_parent_blocks_strict_skipped",
+        "completed_parent_meets_succeeded",
         "running_from_step_not_reached",
         "running_from_step_exactly_reached",
         "running_from_step_exceeded",
         "running_from_step_partially_reached",
-        "completed_failed_edge_no_fail_ok_but_checkpoint_met",
+        "completed_parent_meets_relaxed_running_ignoring_checkpoint",
+        "completed_parent_meets_failed_or_completed",
     ],
 )
 def test_check_special_status(
@@ -963,7 +979,7 @@ def test_check_special_status(
     non-completed parents, at least one completed parent).
 
     :param joblist: A fresh JobList fixture.
-    :param parents_config: List of ``(status, min_trigger_status, from_step, fail_ok)``
+    :param parents_config: List of ``(status, accepted_statuses, from_step)``
         tuples, one per parent.
     :param checkpoint_step: Value assigned to ``child.current_checkpoint_step``.
     :param expected: Whether the child should appear in ``check_special_status()``.
@@ -972,18 +988,156 @@ def test_check_special_status(
     child.current_checkpoint_step = checkpoint_step
     joblist.graph.add_node(child.name, job=child)
 
-    for i, (p_status, min_trigger, from_step, fail_ok) in enumerate(parents_config):
+    for i, (p_status, accepted_status, from_step) in enumerate(parents_config):
         parent = Job(f"parent{i + 1}", i + 1, p_status, 0)
         joblist.graph.add_node(parent.name, job=parent)
         joblist.graph.add_edge(
             parent.name, child.name,
-            min_trigger_status=min_trigger,
+            accepted_statuses=accepted_status,
             from_step=from_step,
-            fail_ok=fail_ok,
         )
 
     result = joblist.check_special_status()
     assert (child in result) is expected
+
+
+@pytest.mark.parametrize(
+    "parent_status,accepted_statuses,from_step,child_checkpoint_step,expected",
+    [
+        ("RUNNING", "RUNNING", 0, 0, True),
+        ("RUNNING", "RUNNING", 3, 3, True),
+        ("RUNNING", "RUNNING", 3, 0, False),
+        ("COMPLETED", "RUNNING", 0, 0, False),
+        ("COMPLETED", "RUNNING,SUCCEEDED", 0, 0, True),
+        ("SKIPPED", "RUNNING", 0, 0, False),
+        ("SKIPPED", "RUNNING,SUCCEEDED", 0, 0, True),
+        ("FAILED", "RUNNING", 0, 0, False),
+        ("FAILED", "RUNNING,SUCCEEDED", 0, 0, False),
+        ("QUEUING", "RUNNING", 0, 0, False),
+        ("SUBMITTED", "RUNNING", 0, 0, False),
+        ("READY", "RUNNING", 0, 0, False),
+        ("QUEUING", "QUEUING", 0, 0, True),
+        ("COMPLETED", "QUEUING", 0, 0, False),
+        ("COMPLETED", "QUEUING,SUCCEEDED", 0, 0, True),
+        ("SKIPPED", "QUEUING,SUCCEEDED", 0, 0, True),
+        ("RUNNING", "QUEUING", 0, 0, False),
+        ("QUEUING", "SUBMITTED", 0, 0, False),
+        ("READY", "SUBMITTED", 0, 0, False),
+        ("COMPLETED", "COMPLETED", 0, 0, True),
+        ("COMPLETED", "SKIPPED", 0, 0, False),
+        ("SKIPPED", "COMPLETED", 0, 0, False),
+        ("SKIPPED", "SKIPPED", 0, 0, True),
+        ("COMPLETED", "SUCCEEDED", 0, 0, True),
+        ("SKIPPED", "SUCCEEDED", 0, 0, True),
+        ("FAILED", "FAILED", 0, 0, True),
+        ("COMPLETED", "FAILED", 0, 0, False),
+        ("FAILED", "COMPLETED", 0, 0, False),
+        ("FAILED", "FAILED,COMPLETED", 0, 0, True),
+        ("COMPLETED", "FAILED,COMPLETED", 0, 0, True),
+        ("SKIPPED", "FAILED,COMPLETED", 0, 0, False),
+        ("FAILED", "FINISHED", 0, 0, True),
+        ("COMPLETED", "FINISHED", 0, 0, True),
+        ("SKIPPED", "FINISHED", 0, 0, True),
+        ("RUNNING", "FINISHED", 0, 0, False),
+        (Status.RUNNING, Status.RUNNING, 0, 0, True),
+        (Status.COMPLETED, Status.RUNNING, 0, 0, False),
+        ("RUNNING", "RUNNING,FAILED", 0, 0, True),
+        ("FAILED", "RUNNING,FAILED", 0, 0, True),
+        ("COMPLETED", "RUNNING,FAILED", 0, 0, False),
+        ("RUNNING", "RUNNING,FAILED", 3, 0, False),
+        ("RUNNING", "RUNNING,FAILED", 3, 3, True),
+        ("COMPLETED", "RUNNING,FAILED", 3, 0, False),
+        ("COMPLETED", "RUNNING,SUCCEEDED", 3, 0, True),
+        ("UNKNOWN", "SUCCEEDED", 0, 0, False),
+        ("SUSPENDED", "SUCCEEDED", 0, 0, False),
+        ("RUNNING", ["RUNNING", "FAILED"], 0, 0, True),
+        ("COMPLETED", None, 0, 0, True),
+        ("SKIPPED", None, 0, 0, True),
+        ("SKIPPED", "COMPLETED", 0, 0, False),
+    ],
+    ids=[
+        "running_strict",
+        "running_checkpoint_reached",
+        "running_checkpoint_pending",
+        "completed_blocks_strict_running",
+        "completed_meets_relaxed_running",
+        "skipped_blocks_strict_running",
+        "skipped_meets_relaxed_running",
+        "failed_blocks_strict_running",
+        "failed_blocks_relaxed_running",
+        "queuing_blocks_running",
+        "submitted_blocks_running",
+        "ready_blocks_running",
+        "queuing_meets_queuing",
+        "completed_blocks_strict_queuing",
+        "completed_meets_relaxed_queuing",
+        "skipped_meets_relaxed_queuing",
+        "running_blocks_queuing",
+        "queuing_blocks_submitted",
+        "ready_blocks_submitted",
+        "completed_meets_completed",
+        "completed_blocks_strict_skipped",
+        "skipped_blocks_strict_completed",
+        "skipped_meets_skipped",
+        "completed_meets_succeeded",
+        "skipped_meets_succeeded",
+        "failed_meets_failed",
+        "completed_blocks_strict_failed",
+        "failed_blocks_strict_completed",
+        "failed_meets_failed_or_completed",
+        "completed_meets_failed_or_completed",
+        "skipped_blocks_failed_or_completed",
+        "failed_meets_finished",
+        "completed_meets_finished",
+        "skipped_meets_finished",
+        "running_blocks_finished",
+        "int_running_strict",
+        "int_completed_blocks_strict_running",
+        "running_meets_running_or_failed",
+        "failed_meets_running_or_failed",
+        "completed_blocks_running_or_failed",
+        "running_checkpoint_pending_with_failed",
+        "running_checkpoint_reached_with_failed",
+        "completed_meets_running_or_failed_ignoring_checkpoint",
+        "completed_meets_relaxed_running_ignoring_checkpoint",
+        "unknown_blocks_edge",
+        "suspended_blocks_edge",
+        "list_start_condition",
+        "default_start_condition",
+        "default_accepts_skipped",
+        "strict_completed_blocks_skipped",
+    ],
+)
+def test_is_edge_satisfied(
+    parent_status: int | str,
+    accepted_statuses: int | str | list[str] | None,
+    from_step: int,
+    child_checkpoint_step: int,
+    expected: bool,
+) -> None:
+    """is_edge_satisfied accepts status codes, names and sets of exact statuses."""
+    assert is_edge_satisfied(
+        parent_status, accepted_statuses, from_step, child_checkpoint_step
+    ) is expected
+
+
+@pytest.mark.parametrize(
+    "accepted_statuses",
+    ["BOGUS", 99, True],
+    ids=["invalid_name", "invalid_code", "bool"],
+)
+def test_is_edge_satisfied_rejects_invalid_start_condition(accepted_statuses):
+    """An invalid start condition fails instead of falling back to the default."""
+    with pytest.raises(AutosubmitCritical, match="Invalid STATUS") as exc_info:
+        is_edge_satisfied("COMPLETED", accepted_statuses)
+    assert exc_info.value.code == 7014
+
+
+def test_is_edge_satisfied_rejects_unordered_start_condition():
+    """Unordered containers are rejected because the canonical order must be deterministic."""
+    with pytest.raises(AutosubmitCritical, match="ordered list") as exc_info:
+        is_edge_satisfied("RUNNING", {"RUNNING", "FAILED"})
+    assert exc_info.value.code == 7014
 
 
 @pytest.mark.parametrize("steps_back,job_split,total_splits,expected_split", [
@@ -1249,16 +1403,15 @@ def test_apply_splits_filter(as_conf, filter_value, split_values, child_split, e
     ),
     pytest.param(
         {
-            "STATUS": "COMPLETED", "FAIL_OK": False, "OPTIONAL": True,
-            "FROM_STEP": 0, "MIN_TRIGGER_STATUS": "COMPLETED",
-            "ANY_FINAL_STATUS_IS_VALID": True,
+            "STATUS": "COMPLETED",
+            "FROM_STEP": 0, "ACCEPTED_STATUSES": "COMPLETED",
             "DATES_TO": "20220101",
         },
         {"DATES_TO": "20220101"},
         id="filters_out_non_to_keys",
     ),
     pytest.param(
-        {"FAIL_OK": True, "OPTIONAL": False, "FROM_STEP": 5},
+        {"FROM_STEP": 5},
         {},
         id="only_non_to_keys_returns_empty",
     ),

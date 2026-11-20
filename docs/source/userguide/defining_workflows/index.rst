@@ -281,13 +281,11 @@ Sometimes you want to run a job only when a certain condition is met. For exampl
 certain task is running.
 This can be achieved using the ``START_CONDITIONS`` feature based on the dependencies rework.
 
-Start conditions are achieved by adding the keyword ``STATUS`` and optionally ``FROM_STEP`` keywords into any dependency
+Start conditions are achieved by adding the keyword ``STATUS`` and optionally ``FROM_STEP`` into any dependency
 that you want.
 
-The ``STATUS`` keyword can be used to select the status of the dependency that you want to check. The possible values
-(case-insensitive) are:
-See :ref:`job_status_reference` for a complete reference and meanings.
-
+``STATUS`` accepts one or more status names. A job starts when its parent is in any of the listed statuses.
+The possible values (case-insensitive) are the statuses listed in :ref:`job_status_reference`:
 
 .. list-table::
     :widths: 25 75
@@ -315,16 +313,84 @@ See :ref:`job_status_reference` for a complete reference and meanings.
       - The task is skipped.
     * - ``FAILED``
       - The task is failed.
-    * - ``UNKNOWN``
-      - The task is unknown.
     * - ``COMPLETED``
-      - The task is completed. # Default
-    * - ``SUSPENDED``
-      - The task is suspended.
+      - The task is completed.
 
-The status are ordered, so if you select ``RUNNING`` status, the task will be run if the parent is in any of the
-following statuses: ``RUNNING``, ``QUEUING``, ``HELD``, ``SUBMITTED``, ``READY``, ``PREPARED``, ``DELAYED``,
-``WAITING``.
+``UNKNOWN`` and ``SUSPENDED`` are not valid ``STATUS`` values. A parent in either one never satisfies a
+start condition.
+
+A ``STATUS`` value can be a single status, a comma or whitespace separated string, or a YAML
+list:
+
+.. code-block:: yaml
+
+    DEPENDENCIES:
+      SIM:
+        STATUS: RUNNING
+      OTHER:
+        STATUS: [RUNNING, FAILED]
+      THIRD:
+        STATUS: 'RUNNING,SUCCEEDED'
+      FOURTH:
+        STATUS: 'RUNNING, FAILED'
+      FIFTH:
+        STATUS: 'RUNNING FAILED'
+      SIXTH:
+        STATUS:
+          - RUNNING
+          - FAILED
+
+Each status is exact. Autosubmit compares the start condition against the last status it sees for the
+parent on the platform, so if the platform moves the parent on faster than Autosubmit checks (for
+example, the parent goes from ``WAITING`` to ``COMPLETED`` between two checks), the intermediate status
+is never observed and the job stays ``WAITING``. Add the terminal statuses you want to accept to the
+list, or use the ``SUCCEEDED`` or ``FINISHED`` aliases.
+
+The following aliases are available:
+
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
+
+    * - Alias
+      - Expands to
+    * - ``SUCCEEDED``
+      - ``COMPLETED`` and ``SKIPPED``.
+    * - ``FINISHED``
+      - ``COMPLETED``, ``SKIPPED`` and ``FAILED``.
+
+If ``STATUS`` is omitted, the dependency waits for a successful ending. This is the same as
+``STATUS: SUCCEEDED`` and accepts a parent that is ``COMPLETED`` or ``SKIPPED``. ``COMPLETED`` and
+``SKIPPED`` are distinct statuses: ``STATUS: COMPLETED`` accepts only ``COMPLETED``, and
+``STATUS: FAILED,COMPLETED`` accepts ``FAILED`` or ``COMPLETED`` but not ``SKIPPED``.
+
+Common examples:
+
+.. list-table::
+    :widths: 35 65
+    :header-rows: 1
+
+    * - Configuration
+      - The job starts when the parent is
+    * - ``STATUS`` omitted or ``SUCCEEDED``
+      - ``COMPLETED`` or ``SKIPPED``.
+    * - ``STATUS: COMPLETED``
+      - ``COMPLETED`` only.
+    * - ``STATUS: FINISHED``
+      - ``COMPLETED``, ``SKIPPED`` or ``FAILED``.
+    * - ``STATUS: RUNNING``
+      - ``RUNNING`` only.
+    * - ``STATUS: RUNNING,SUCCEEDED``
+      - ``RUNNING``, or the parent already ``COMPLETED`` or ``SKIPPED``.
+    * - ``STATUS: RUNNING,FAILED``
+      - ``RUNNING`` or ``FAILED``.
+    * - ``STATUS: FAILED,COMPLETED``
+      - ``FAILED`` or ``COMPLETED``, but not ``SKIPPED``.
+
+.. note::
+   Since 4.2.0 ``STATUS`` accepts a set of exact statuses. Before, a parent that had already moved
+   past the selected status also satisfied the dependency. See :ref:`upgrading_from_4_1` for how to
+   migrate an experiment.
 
 .. tab-set-code::
 
@@ -335,22 +401,28 @@ following statuses: ``RUNNING``, ``QUEUING``, ``HELD``, ``SUBMITTED``, ``READY``
             FILE: ini.sh
             RUNNING: member
 
-          SIM:
-            FILE: sim.sh
-            DEPENDENCIES: ini sim-1
+          MONITOR:
+            FILE: monitor.sh
+            DEPENDENCIES:
+              SIM:
+                STATUS: 'RUNNING'
             RUNNING: chunk
 
           POSTPROCESS:
             FILE: postprocess.sh
             DEPENDENCIES:
               SIM:
-                STATUS: 'RUNNING'
+                STATUS: [RUNNING, SUCCEEDED]
             RUNNING: chunk
 
+In the example above, ``MONITOR`` starts only while ``SIM`` is running, while ``POSTPROCESS`` also
+starts if ``SIM`` already completed or was skipped. To also run ``POSTPROCESS`` when ``SIM`` failed,
+use ``STATUS: FINISHED``.
 
-The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. The
-possible value is an integer. Additionally, the target dependency, must call to ``%AS_CHECKPOINT%`` inside their
-scripts. This will create a checkpoint that will be used to check the amount of steps processed.
+The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. It is
+used together with ``STATUS: 'RUNNING'``. The possible value is an integer. Additionally, the target dependency,
+must call to ``%AS_CHECKPOINT%`` inside their scripts. This will create a checkpoint that will be used to check the
+amount of steps processed.
 
 .. tab-set-code::
 
@@ -1457,15 +1529,14 @@ In this workflow you can see an illustrated example of ``SKIPPABLE`` parameter u
     :caption: Example showing the asim job starting only from chunk 3.
     :alt: skip_workflow
 
-Example 3: Weak dependencies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example 3: Multiple start conditions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In this workflow you can see an illustrated example of weak dependencies.
+A dependency can accept several statuses. The ``FINISHED`` alias is useful when the child should run
+once the parent has finished, regardless of the outcome (``COMPLETED``, ``SKIPPED`` or ``FAILED``).
 
-Weak dependencies, work like this way:
-
-* X job only has one parent. X job parent can have ``COMPLETED`` or ``FAILED`` as status for current job to run.
-* X job has more than one parent. One of the X job parent must have ``COMPLETED`` as status while the rest can be  ``FAILED`` or ``COMPLETED``.
+In the workflow below ``CALC_STATS`` runs once ``IT`` completes and ``GET_FILES`` reaches any final
+state (``COMPLETED``, ``SKIPPED`` or ``FAILED``):
 
 .. tab-set-code::
 
@@ -1494,7 +1565,10 @@ Weak dependencies, work like this way:
 
          CALC_STATS:
            FILE: templates/work.sh
-           DEPENDENCIES: IT GET_FILES ?
+           DEPENDENCIES:
+             IT:
+             GET_FILES:
+               STATUS: FINISHED
            RUNNING: chunk
            SYNCHRONIZE: member
 
@@ -1509,7 +1583,7 @@ Weak dependencies, work like this way:
     :figname: fig-dashed
     :width: 100%
     :align: center
-    :caption: Example showing the asim job starting only from chunk 3.
+    :caption: Example showing a dependency with multiple start conditions.
     :alt: dashed_workflow
 
 Example 4: Select a member

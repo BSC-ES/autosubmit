@@ -128,6 +128,58 @@ from autosubmit.log.log import AutosubmitCritical, Log
         pytest.param(
             {
                 "JOBS": {
+                    "job1": {
+                        "DEPENDENCIES": "job2   job3"
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            {
+                "JOBS": {
+                    "JOB1": {
+                        'FILE': '',
+                        'ADDITIONAL_FILES': [],
+                        "DEPENDENCIES": {"JOB2": {}, "JOB3": {}}
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            True,
+            id="jobs_with_dependencies_repeated_spaces"
+        ),
+        pytest.param(
+            {
+                "JOBS": {
+                    "job1": {
+                        "DEPENDENCIES": ""
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            {
+                "JOBS": {
+                    "JOB1": {
+                        'FILE': '',
+                        'ADDITIONAL_FILES': [],
+                        "DEPENDENCIES": {}
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            True,
+            id="jobs_with_empty_string_dependencies"
+        ),
+        pytest.param(
+            {
+                "JOBS": {
                     "job1": {}
                 },
                 'STORAGE': {
@@ -331,18 +383,16 @@ from autosubmit.log.log import AutosubmitCritical, Log
                     "job1": {
                         "FILE": "FILE1",
                         "DEPENDENCIES": {
-                            "job2": {"MIN_TRIGGER_STATUS": "FAILED"},
-                            "job3": {"MIN_TRIGGER_STATUS": "FAILED?"},
-                            "job4": {"MIN_TRIGGER_STATUS": "RUNNING"},
-                            "job5": {"MIN_TRIGGER_STATUS": "COMPLETED"},
-                            "job6": {"MIN_TRIGGER_STATUS": "SKIPPED"},
-                            "job7": {"MIN_TRIGGER_STATUS": "READY"},
-                            "job8": {"MIN_TRIGGER_STATUS": "DELAYED"},
-                            "job9": {"MIN_TRIGGER_STATUS": "PREPARED"},
-                            "job10": {"MIN_TRIGGER_STATUS": "QUEUING"},
-                            "job11": {"MIN_TRIGGER_STATUS": "SUBMITTED"},
-                            "job12": {"MIN_TRIGGER_STATUS": "HELD"},
-                            "job13": {"MIN_TRIGGER_STATUS": "RUNNING?"},
+                            "job2": {"ACCEPTED_STATUSES": "FAILED"},
+                            "job4": {"ACCEPTED_STATUSES": "RUNNING"},
+                            "job5": {"ACCEPTED_STATUSES": "COMPLETED"},
+                            "job6": {"ACCEPTED_STATUSES": "SKIPPED"},
+                            "job7": {"ACCEPTED_STATUSES": "READY"},
+                            "job8": {"ACCEPTED_STATUSES": "DELAYED"},
+                            "job9": {"ACCEPTED_STATUSES": "PREPARED"},
+                            "job10": {"ACCEPTED_STATUSES": "QUEUING"},
+                            "job11": {"ACCEPTED_STATUSES": "SUBMITTED"},
+                            "job12": {"ACCEPTED_STATUSES": "HELD"},
                         },
                     }
                 },
@@ -356,18 +406,16 @@ from autosubmit.log.log import AutosubmitCritical, Log
                         'FILE': 'FILE1',
                         'ADDITIONAL_FILES': [],
                         'DEPENDENCIES': {
-                            'JOB2': {'MIN_TRIGGER_STATUS': 'FAILED', 'FAIL_OK': False},
-                            'JOB3': {'MIN_TRIGGER_STATUS': 'FAILED', 'FAIL_OK': True},
-                            'JOB4': {'MIN_TRIGGER_STATUS': 'RUNNING', 'FAIL_OK': False},
-                            'JOB5': {'MIN_TRIGGER_STATUS': 'COMPLETED', 'FAIL_OK': False},
-                            'JOB6': {'MIN_TRIGGER_STATUS': 'SKIPPED', 'FAIL_OK': False},
-                            'JOB7': {'MIN_TRIGGER_STATUS': 'READY', 'FAIL_OK': False},
-                            'JOB8': {'MIN_TRIGGER_STATUS': 'DELAYED', 'FAIL_OK': False},
-                            'JOB9': {'MIN_TRIGGER_STATUS': 'PREPARED', 'FAIL_OK': False},
-                            'JOB10': {'MIN_TRIGGER_STATUS': 'QUEUING', 'FAIL_OK': False},
-                            'JOB11': {'MIN_TRIGGER_STATUS': 'SUBMITTED', 'FAIL_OK': False},
-                            'JOB12': {'MIN_TRIGGER_STATUS': 'HELD', 'FAIL_OK': False},
-                            'JOB13': {'MIN_TRIGGER_STATUS': 'RUNNING', 'FAIL_OK': True},
+                            'JOB2': {'ACCEPTED_STATUSES': 'FAILED'},
+                            'JOB4': {'ACCEPTED_STATUSES': 'RUNNING'},
+                            'JOB5': {'ACCEPTED_STATUSES': 'COMPLETED'},
+                            'JOB6': {'ACCEPTED_STATUSES': 'SKIPPED'},
+                            'JOB7': {'ACCEPTED_STATUSES': 'READY'},
+                            'JOB8': {'ACCEPTED_STATUSES': 'DELAYED'},
+                            'JOB9': {'ACCEPTED_STATUSES': 'PREPARED'},
+                            'JOB10': {'ACCEPTED_STATUSES': 'QUEUING'},
+                            'JOB11': {'ACCEPTED_STATUSES': 'SUBMITTED'},
+                            'JOB12': {'ACCEPTED_STATUSES': 'HELD'},
                         },
                     },
                 },
@@ -568,6 +616,168 @@ from autosubmit.log.log import AutosubmitCritical, Log
             True,
             id="wallclock_single_digit_hour_non_zero_seconds"
         ),
+        pytest.param(
+            {
+                "JOBS": {
+                    "job1": {
+                        "FILE": "FILE1",
+                        "DEPENDENCIES": {
+                            "job2": {"STATUS": ["RUNNING", "FINISHED"]},
+                            "job3": {"STATUS": "COMPLETED"},
+                            "job4": {"STATUS": "SUCCEEDED"},
+                            "job5": {"STATUS": ["FAILED", "COMPLETED"]},
+                            "job6": {"STATUS": "RUNNING,,FINISHED"},
+                        },
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            {
+                'JOBS': {
+                    'JOB1': {
+                        'FILE': 'FILE1',
+                        'ADDITIONAL_FILES': [],
+                        'DEPENDENCIES': {
+                            'JOB2': {'ACCEPTED_STATUSES': 'RUNNING,COMPLETED,SKIPPED,FAILED'},
+                            'JOB3': {'ACCEPTED_STATUSES': 'COMPLETED'},
+                            'JOB4': {'ACCEPTED_STATUSES': 'COMPLETED,SKIPPED'},
+                            'JOB5': {'ACCEPTED_STATUSES': 'FAILED,COMPLETED'},
+                            'JOB6': {'ACCEPTED_STATUSES': 'RUNNING,COMPLETED,SKIPPED,FAILED'},
+                        },
+                    },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            True,
+            id="dependencies_start_condition_list_and_aliases"
+        ),
+        pytest.param(
+            {
+                "JOBS": {
+                    "job1": {
+                        "FILE": "FILE1",
+                        "DEPENDENCIES": {
+                            "job2": {"STATUS": "RUNNING FAILED"},
+                            "job3": {"STATUS": "RUNNING, FAILED"},
+                            "job4": {"STATUS": "RUNNING,FAILED"},
+                            "job5": {"STATUS": ["RUNNING", "FAILED"]},
+                            "job6": {"STATUS": ["RUNNING FAILED"]},
+                        },
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            {
+                'JOBS': {
+                    'JOB1': {
+                        'FILE': 'FILE1',
+                        'ADDITIONAL_FILES': [],
+                        'DEPENDENCIES': {
+                            'JOB2': {'ACCEPTED_STATUSES': 'RUNNING,FAILED'},
+                            'JOB3': {'ACCEPTED_STATUSES': 'RUNNING,FAILED'},
+                            'JOB4': {'ACCEPTED_STATUSES': 'RUNNING,FAILED'},
+                            'JOB5': {'ACCEPTED_STATUSES': 'RUNNING,FAILED'},
+                            'JOB6': {'ACCEPTED_STATUSES': 'RUNNING,FAILED'},
+                        },
+                    },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            True,
+            id="dependencies_start_condition_string_forms"
+        ),
+        pytest.param(
+            {
+                "JOBS": {
+                    "job1": {
+                        "FILE": "FILE1",
+                        "DEPENDENCIES": {
+                            "job2": {"STATUS": []},
+                        },
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            {
+                'JOBS': {
+                    'JOB1': {
+                        'FILE': 'FILE1',
+                        'ADDITIONAL_FILES': [],
+                        'DEPENDENCIES': {
+                            'JOB2': {},
+                        },
+                    },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            True,
+            id="dependencies_empty_status_list"
+        ),
+        pytest.param(
+            {
+                "JOBS": {
+                    "job1": {
+                        "FILE": "FILE1",
+                        "DEPENDENCIES": {
+                            "job2": {
+                                "DATES_FROM": {
+                                    "ALL": {
+                                        "STATUS": "RUNNING",
+                                        "CHUNKS_FROM": {
+                                            "ALL": {
+                                                "STATUS": ["FAILED", "COMPLETED"],
+                                            }
+                                        },
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            {
+                'JOBS': {
+                    'JOB1': {
+                        'FILE': 'FILE1',
+                        'ADDITIONAL_FILES': [],
+                        'DEPENDENCIES': {
+                            'JOB2': {
+                                'DATES_FROM': {
+                                    'ALL': {
+                                        'ACCEPTED_STATUSES': 'RUNNING',
+                                        'CHUNKS_FROM': {
+                                            'ALL': {
+                                                'ACCEPTED_STATUSES': 'FAILED,COMPLETED',
+                                            }
+                                        },
+                                    }
+                                }
+                            }
+                        },
+                    },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            True,
+            id="dependencies_nested_start_conditions"
+        ),
     ]
 )
 def test_normalize_variables(autosubmit_config, data, expected_data, must_exists):
@@ -576,6 +786,155 @@ def test_normalize_variables(autosubmit_config, data, expected_data, must_exists
     assert normalized_data == expected_data
     normalized_data = as_conf.normalize_variables(normalized_data, must_exists=must_exists)
     assert normalized_data == expected_data
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        "UNKNOWN",
+        "SUSPENDED",
+        "unknown",
+        "suspended",
+        "RUNNIG",
+        [1],
+        {"RUNNING", "FAILED"},
+    ],
+    ids=[
+        "unknown",
+        "suspended",
+        "unknown_lowercase",
+        "suspended_lowercase",
+        "typo",
+        "non_string",
+        "unordered_set",
+    ],
+)
+def test_normalize_variables_rejects_invalid_start_condition(autosubmit_config, status):
+    """Invalid STATUS start conditions raise AutosubmitCritical."""
+    data = {
+        "JOBS": {
+            "job1": {
+                "FILE": "FILE1",
+                "DEPENDENCIES": {"job2": {"STATUS": status}},
+            }
+        },
+        "STORAGE": {"TYPE": "sqlite"},
+    }
+    as_conf = autosubmit_config(expid='t000', experiment_data=data)
+    with pytest.raises(AutosubmitCritical, match="Invalid STATUS") as exc_info:
+        as_conf.normalize_variables(data, must_exists=True)
+    assert exc_info.value.code == 7014
+
+
+@pytest.mark.parametrize(
+    "dependencies",
+    [
+        {"job2": {"STATUS": "COMPLETED?"}},
+        {"job2?": {}},
+    ],
+    ids=["status_suffix", "dependency_suffix"],
+)
+def test_normalize_variables_rejects_question_mark_suffix(autosubmit_config, dependencies):
+    """The weak '?' suffix is rejected for statuses and dependency names."""
+    data = {
+        "JOBS": {"job1": {"FILE": "FILE1", "DEPENDENCIES": dependencies}},
+        "STORAGE": {"TYPE": "sqlite"},
+    }
+    as_conf = autosubmit_config(expid='t000', experiment_data=data)
+
+    with pytest.raises(AutosubmitCritical, match="no longer supported") as exc_info:
+        as_conf.normalize_variables(data, must_exists=True)
+
+    assert exc_info.value.code == 7014
+
+
+def test_normalize_variables_rejects_status_with_accepted_statuses(autosubmit_config):
+    """STATUS and ACCEPTED_STATUSES cannot be set on the same dependency."""
+    data = {
+        "JOBS": {
+            "job1": {
+                "FILE": "FILE1",
+                "DEPENDENCIES": {
+                    "job2": {"STATUS": "COMPLETED", "ACCEPTED_STATUSES": "FAILED"}
+                },
+            }
+        },
+        "STORAGE": {"TYPE": "sqlite"},
+    }
+    as_conf = autosubmit_config(expid='t000', experiment_data=data)
+
+    with pytest.raises(
+        AutosubmitCritical, match="Both STATUS and ACCEPTED_STATUSES"
+    ) as exc_info:
+        as_conf.normalize_variables(data, must_exists=True)
+
+    assert exc_info.value.code == 7014
+
+
+def test_normalize_variables_rejects_nested_enabled_legacy_flag(autosubmit_config):
+    """Legacy flags are rejected inside nested start condition filters too."""
+    data = {
+        "JOBS": {
+            "job1": {
+                "FILE": "FILE1",
+                "DEPENDENCIES": {
+                    "job2": {"DATES_FROM": {"ALL": {"optional": True}}}
+                },
+            }
+        },
+        "STORAGE": {"TYPE": "sqlite"},
+    }
+    as_conf = autosubmit_config(expid='t000', experiment_data=data)
+
+    with pytest.raises(AutosubmitCritical, match="OPTIONAL") as exc_info:
+        as_conf.normalize_variables(data, must_exists=True)
+
+    assert exc_info.value.code == 7014
+
+
+@pytest.mark.parametrize("key", ["FAIL_OK", "OPTIONAL"])
+@pytest.mark.parametrize("value", [True, "true", 1], ids=["bool", "string", "integer"])
+def test_normalize_variables_rejects_enabled_legacy_flag(autosubmit_config, key, value):
+    """Enabled FAIL_OK and OPTIONAL flags raise AutosubmitCritical."""
+    data = {
+        "JOBS": {
+            "job1": {
+                "FILE": "FILE1",
+                "DEPENDENCIES": {"job2": {"STATUS": "COMPLETED", key: value}},
+            }
+        },
+        "STORAGE": {"TYPE": "sqlite"},
+    }
+    as_conf = autosubmit_config(expid='t000', experiment_data=data)
+    with pytest.raises(AutosubmitCritical, match=key) as exc_info:
+        as_conf.normalize_variables(data, must_exists=True)
+    assert exc_info.value.code == 7014
+
+
+@pytest.mark.parametrize("key", ["FAIL_OK", "OPTIONAL"])
+@pytest.mark.parametrize(
+    "value",
+    [False, "false", 0, None, ""],
+    ids=["bool", "string", "integer", "none", "empty_string"],
+)
+def test_normalize_variables_drops_disabled_legacy_flag(autosubmit_config, key, value):
+    """Disabled FAIL_OK and OPTIONAL flags are removed during normalization."""
+    data = {
+        "JOBS": {
+            "job1": {
+                "FILE": "FILE1",
+                "DEPENDENCIES": {"job2": {"STATUS": "COMPLETED", key: value}},
+            }
+        },
+        "STORAGE": {"TYPE": "sqlite"},
+    }
+    as_conf = autosubmit_config(expid='t000', experiment_data=data)
+
+    normalized = as_conf.normalize_variables(data, must_exists=True)
+
+    assert normalized["JOBS"]["JOB1"]["DEPENDENCIES"]["JOB2"] == {
+        "ACCEPTED_STATUSES": "COMPLETED"
+    }
 
 
 def test_normalize_wrappers_jobs_in_wrapper(autosubmit_config):

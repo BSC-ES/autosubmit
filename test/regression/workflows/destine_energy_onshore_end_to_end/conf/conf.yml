@@ -48,15 +48,13 @@ JOBS:
     FILE: hidden
     DEPENDENCIES:
       SIM:
-        STATUS: RUNNING
-        OPTIONAL: true
+        STATUS: RUNNING,SUCCEEDED
       DN:
         SPLITS_FROM:
           ALL:
             SPLITS_TO: previous
       APP_ENERGY_ONSHORE-1:
         STATUS: FAILED
-        OPTIONAL: false
     RUNNING: chunk
     WALLCLOCK: 02:00
     PLATFORM: TEST_SLURM
@@ -118,8 +116,7 @@ JOBS:
     PLATFORM: TEST_SLURM
     DEPENDENCIES:
       SIM:
-        STATUS: RUNNING
-        OPTIONAL: true
+        STATUS: RUNNING,SUCCEEDED
     RUNNING: chunk
     WALLCLOCK: 00:30
     CHECK: on_submission
