@@ -465,6 +465,31 @@ def test_get_finish_data_dc(tmp_path, monkeypatch):
     assert finish_data_dc.qos == inserted_job_data_dc.qos
 
 
+def test_write_finish_time_keeps_zero(tmp_path, monkeypatch):
+    """An unknown finish time must stay 0 instead of being replaced with now."""
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+    monkeypatch.setattr(BasicConfig, "HISTORICAL_LOG_DIR", str(tmp_path))
+
+    exp_history = ExperimentHistory("tt00")
+    exp_history.initialize_database()
+    exp_history.create_new_experiment_run()
+
+    job_name = "a29z_20000101_fc2_1_SIM"
+    exp_history.write_submit_time(
+        job_name, time.time(), "COMPLETED", 128, "00:30",
+        "debug", "20000101", "fc2", "SIM", 1, "marenostrum5",
+        101, children="", fail_count=0
+    )
+    result = exp_history.write_finish_time(
+        job_name, finish=0, status="COMPLETED", job_id=101, fail_count=0
+    )
+
+    assert result is not None
+    finish_data = exp_history.get_finish_data_dc(job_name, fail_count=0)
+    assert finish_data is not None
+    assert finish_data.finish == 0
+
+
 def test_update_submit_time(tmp_path, monkeypatch):
     """Test that update_submit_time correctly updates the submit time of an existing job record.
 

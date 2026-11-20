@@ -453,11 +453,10 @@ def monitor(
     # WRAPPERS
     try:
         if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0:
+            job_list.run_id = get_last_run_id(expid)
             if check_wrapper:
                 job_list.clear_wrappers_db(preview=True)
                 generate_scripts_andor_wrappers(as_conf, job_list, True)
-            if not check_wrapper:
-                job_list.run_id = get_last_run_id(expid)
             job_list.load_wrappers(preview=check_wrapper)
     except Exception as e:
         raise AutosubmitCritical(
@@ -709,7 +708,7 @@ def run(
                 platform.try_respawn_log_recovery_process(as_conf)
 
             # Check wrappers status and inner jobs
-            _, _wrapper_job_changes = check_wrappers(as_conf, job_list, expid)
+            check_wrappers(as_conf, job_list, expid)
             # Check non-wrapped jobs
             check_non_wrapped_jobs(platforms_to_test, job_list, as_conf, expid)
             # Safe spot to store changes
@@ -1241,6 +1240,7 @@ def inspect(
     Log.debug(f"Sleep: {safetysleeptime}")
 
     job_list = load_job_list(expid, as_conf, full_load=True)
+    job_list.run_id = get_last_run_id(expid)
     job_list.clear_wrappers_db(preview=True)
 
     job_list.packages_dict = {}
