@@ -36,6 +36,7 @@ covered at the end.
    /userguide/retries/retries.rst
    /userguide/modifying_workflow/index
    /userguide/manage/index
+   /userguide/locking
 
 .. toctree::
    :maxdepth: 1

@@ -540,7 +540,15 @@ def as_db(
 ):
     """A parametrised fixture that creates the autosubmitrc file for databases.
 
-    Works with sqlite and postgres.
+    Works with sqlite and PostgreSQL. To use only PostgreSQL, for instance, you
+    can add this to your test:
+
+    .. code-block:: python
+
+      @pytest.mark.docker
+      @pytest.mark.postgres
+      @pytest.mark.parametrize("as_db", ["postgres"], indirect=True)
+      ...
 
     The database created is exclusive for the current test. It is not shared
     with other tests.

@@ -80,6 +80,7 @@ several bug fixes and enhancements to improve the overall user experience.
   `INLINE_FALLBACK` (recover pending logs in the main process while the separate
   process is unavailable, default `true`) #3342
 - Add `[database] backup` option to `autosubmitrc` to disable SQLite backups #3129
+- Support database-based locking for experiments, as alternative to the portalocker file lock #1392
 
 **Migration from `job_list.pkl` to Database**
 

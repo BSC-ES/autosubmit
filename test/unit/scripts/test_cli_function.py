@@ -27,6 +27,9 @@ from autosubmit.scripts._args import CommandGroup
 # noinspection PyProtectedMember
 from autosubmit.scripts._cli_function import cli_function
 
+# noinspection PyProtectedMember
+from autosubmit.scripts._lock import LockPolicy
+
 
 class Options:
     """Minimal options object used by the tests."""
@@ -418,3 +421,82 @@ def test_cli_function_without_profile_does_not_create_profiler(
     decorated()
 
     profiler_class.assert_not_called()
+
+
+def test_cli_function_lock_policy_requires_is_locked(mocker, cli_factory):
+    """Test that lock_policy requires the options class to define _is_locked."""
+    exit_from_error = mocker.patch(
+        "autosubmit.scripts._cli_function.exit_from_error",
+        return_value=1,
+    )
+
+    class LockableOptions:
+        lock_policy = LockPolicy.REQUIRED
+
+        def __init__(self):
+            self.expid = "a000"
+            self.profile = False
+
+    decorated, command, _ = cli_factory(
+        options_type=LockableOptions,  # type: ignore
+    )
+
+    assert decorated() == 1
+
+    error = exit_from_error.call_args.args[0]
+    assert isinstance(error, TypeError)
+    assert str(error) == (
+        "LockableOptions defines 'lock_policy' but does not define '_is_locked'."
+    )
+
+    command.assert_not_called()
+
+
+def test_cli_function_uses_experiment_lock(mocker, cli_factory):
+    """Test that commands declaring a lock policy use the lock manager."""
+
+    class LockableOptions:
+        lock_policy = LockPolicy.REQUIRED
+        _is_locked = False
+
+        def __init__(self):
+            self.expid = "a000"
+            self.profile = False
+
+    manage_lock = mocker.patch(
+        "autosubmit.scripts._cli_function.manage_experiment_lock",
+    )
+
+    command = mocker.Mock(return_value=0)
+
+    decorated, _, _ = cli_factory(
+        command,
+        options_type=LockableOptions,  # type: ignore
+    )
+
+    assert decorated() == 0
+
+    manage_lock.assert_called_once_with(
+        LockPolicy.REQUIRED,
+        mocker.ANY,
+    )
+    command.assert_called_once_with(mocker.ANY)
+
+
+def test_cli_function_without_lock_policy_skips_lock_manager(
+    mocker,
+    cli_factory,
+):
+    """Test that commands without a lock policy don't use the lock manager."""
+    manage_lock = mocker.patch(
+        "autosubmit.scripts._cli_function.manage_experiment_lock",
+    )
+
+    command = mocker.Mock(return_value=0)
+
+    decorated, _, _ = cli_factory(command)
+
+    assert decorated() == 0
+
+    manage_lock.assert_not_called()
+    command.assert_called_once()

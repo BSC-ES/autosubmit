@@ -17,3 +17,7 @@ path = /app/metadata/logs
 backend = postgres
 connection_url = postgresql://autosubmit:autosubmit@postgres:5432/autosubmit
 path = /app/database/
+
+[experiment_lock]
+timeout = 5.0
+retry_interval = 0.5
