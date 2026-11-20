@@ -78,6 +78,7 @@ def _insert_run(manager: HistoricalDbManager) -> int:
         "submitted": 0,
         "suspended": 0,
         "metadata": None,
+        "pending_create": 0,
     }
     manager.insert(ExperimentRunTable.name, run_data)
     rows = manager.select_all_with_columns(ExperimentRunTable.name)
@@ -185,6 +186,35 @@ def test_get_current_run_id_returns_latest_run(autosubmit_exp) -> None:
 
     run_id = manager.get_current_run_id()
     assert run_id == 2
+
+
+def test_get_current_run_id_uses_max_run_id_when_modified_ties(autosubmit_exp) -> None:
+    """get_current_run_id must prefer the highest run_id when timestamps tie."""
+    exp = autosubmit_exp(create=False)
+    manager = _make_manager(exp)
+    manager.create_table(ExperimentRunTable.name)
+
+    tied_row = {
+        "created": "2026-01-01 00:00:00",
+        "modified": "2026-01-01 00:00:00",
+        "start": 1000,
+        "finish": None,
+        "chunk_unit": "month",
+        "chunk_size": 1,
+        "completed": 0,
+        "total": 3,
+        "failed": 0,
+        "queuing": 0,
+        "running": 0,
+        "submitted": 0,
+        "suspended": 0,
+        "metadata": None,
+        "pending_create": 0,
+    }
+    manager.insert(ExperimentRunTable.name, tied_row)
+    manager.insert(ExperimentRunTable.name, tied_row)
+
+    assert manager.get_current_run_id() == 2
 
 
 def _setup_structure_tables(manager: HistoricalDbManager) -> None:

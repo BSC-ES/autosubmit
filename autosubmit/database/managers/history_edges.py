@@ -58,7 +58,7 @@ class HistoricalDbManager(DbManager):
         """Get the current run_id from the experiment_run table. Assumes that the latest run_id corresponds to the current run."""
         table_name: str = "experiment_run"
         columns: list[str] = ["run_id"]
-        result: dict = self.select_last_with_columns(table_name, columns)
+        result: dict = self.select_last_with_columns(table_name, columns, order_by="run_id")
         run_id = result["run_id"] if result else None
         if not run_id:
             raise ValueError("No run_id found in the experiment_run table.")

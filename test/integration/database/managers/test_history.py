@@ -440,6 +440,9 @@ def test_sqlalchemy_initialize_migration_postgres(as_db):
     assert "out" in cols
     assert "err" in cols
 
+    cols = {c['name'] for c in inspector.get_columns("experiment_run", schema=schema)}
+    assert "pending_create" in cols
+
     with db_manager.engine.connect() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
         conn.commit()
@@ -597,3 +600,44 @@ def test_update_experiment_run_dc_by_id_returns_updated_run(as_db, autosubmit_ex
 
     assert updated.run_id == first.run_id
     assert updated.finish == 100
+
+
+def test_sqlalchemy_initialize_migration_sqlite_adds_pending_create(autosubmit_exp) -> None:
+    """Migration adds ``pending_create`` to an existing SQLite historical database."""
+    exp = autosubmit_exp(create=False)
+    db_manager = _create_db_manager(
+        "sqlite",
+        expid=exp.expid,
+        jobdata_dir_path=str(BasicConfig.JOBDATA_DIR),
+    )
+
+    old_experiment_run_table.create(db_manager.engine)
+    with db_manager.engine.begin() as conn:
+        conn.execute(
+            old_experiment_run_table.insert().values(
+                run_id=1,
+                created="2026-01-01 00:00:00",
+                modified="2026-01-01 00:00:00",
+                start=1,
+                finish=0,
+                chunk_unit="month",
+                chunk_size=1,
+                completed=0,
+                total=1,
+                failed=0,
+                queuing=0,
+                running=0,
+                submitted=0,
+            )
+        )
+
+    db_manager.initialize()
+
+    columns = {
+        column["name"]
+        for column in inspect(db_manager.engine).get_columns("experiment_run")
+    }
+    assert "pending_create" in columns
+
+    run = db_manager.get_experiment_run_dc_with_max_id()
+    assert run.pending_create == 0

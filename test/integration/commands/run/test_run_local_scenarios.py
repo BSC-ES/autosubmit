@@ -21,6 +21,7 @@ from multiprocessing import Process
 from pathlib import Path
 from textwrap import dedent
 from threading import Event
+from time import sleep, time
 
 import pytest
 from ruamel.yaml import YAML
@@ -232,6 +233,63 @@ def test_run_uninterrupted(
         _assert_files_recovered(files_check_list)
     except AssertionError:
         pytest.fail(e_msg)
+
+
+def test_run_keeps_a_single_run_snapshot_for_edges(
+    autosubmit_exp, prepare_scratch, general_data
+):
+    """``create`` does not register a run. ``run`` opens one and keeps it."""
+    yaml = YAML(typ="rt")
+    jobs_data = dedent("""\
+        EXPERIMENT:
+            NUMCHUNKS: '1'
+        JOBS:
+            INIT:
+                SCRIPT: |
+                    echo "init"
+                PLATFORM: LOCAL
+                RUNNING: chunk
+                wallclock: 00:01
+            SIM:
+                SCRIPT: |
+                    echo "sim"
+                PLATFORM: LOCAL
+                RUNNING: chunk
+                DEPENDENCIES: INIT
+                wallclock: 00:01
+    """)
+    as_exp = autosubmit_exp(
+        expid="a901",
+        experiment_data=general_data | yaml.load(jobs_data),
+        include_jobs=False,
+        create=True,
+    )
+    prepare_scratch(expid=as_exp.expid)
+    as_exp.as_conf.set_last_as_command("run")
+
+    with sqlite3.connect(_job_data_db(as_exp.expid)) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM experiment_run").fetchone()[0] == 0
+
+    exit_code = run(expid=as_exp.expid)
+    _assert_exit_code("COMPLETED", exit_code)
+
+    with sqlite3.connect(_job_data_db(as_exp.expid)) as conn:
+        runs = conn.execute(
+            "SELECT run_id, completed, total FROM experiment_run"
+        ).fetchall()
+        edges = conn.execute(
+            "SELECT run_id, completion_status, COUNT(*) FROM structure_data "
+            "GROUP BY run_id, completion_status"
+        ).fetchall()
+        job_data_run_ids = {
+            row[0] for row in conn.execute("SELECT DISTINCT run_id FROM job_data")
+        }
+
+    assert len(runs) == 1
+    run_id, completed, total = runs[0]
+    assert completed == total
+    assert edges == [(run_id, "COMPLETED", 1)]
+    assert job_data_run_ids == {run_id}
 
 
 @pytest.mark.parametrize(
@@ -1196,6 +1254,13 @@ def test_start_after_does_not_start(
         process = Process(target=_run_locked, args=(as_exp_a.expid,))
         process.start()
         wait_locker(lock_file, expect_locked=True, timeout=60)
+        # Wait until A registers its run: ``autosubmit create`` no longer
+        # creates a run, it is opened at the start of the first real run.
+        # A database row has no event to wait on, so this bounded poll is
+        # intentional.
+        deadline = time() + 60
+        while _get_last_run_row(as_exp_a.expid) is None and time() < deadline:
+            sleep(0.5)
         process.terminate()
         process.join(timeout=30)
         if process.is_alive():
