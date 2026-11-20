@@ -265,6 +265,13 @@ _VERTICAL_WRAPPER_EXPERIMENT = {
                         },
                     },
                 },
+                "APPLICATION": {
+                    "SPLITS_FROM": {
+                        "ALL": {
+                            "SPLITS_TO": "previous",
+                        },
+                    },
+                },
             },
         },
     },
@@ -320,6 +327,10 @@ def test_build_packages_loads_wrappable_child_with_stale_edge(
     ``parent_completed_in_db`` is False the parent status is stale too, which is
     the exact state that produced the ``strict`` policy 7014 in CI. The child
     must be loaded from the DB so the wrapper can reach ``MIN_WRAPPED``.
+
+    The four APPLICATION splits form a single dependency lineage (each split
+    depends on the previous one), so a vertical wrapper may legitimately wrap
+    all four together while split independence is preserved.
     """
     job_list = wrappable_packager._jobs_list
 
@@ -355,3 +366,38 @@ def test_build_packages_loads_wrappable_child_with_stale_edge(
     )
     package_sizes = _package_sizes(packages, "APPLICATION")
     assert 4 in package_sizes, f"Expected a 4-job APPLICATION wrapper, got sizes {package_sizes}"
+
+
+def test_build_packages_removes_loaded_jobs_not_submitted(wrappable_packager: JobPackager, mocker):
+    """Jobs loaded only to build a wrapper are removed when no package is submitted.
+
+    The strict policy is stubbed to return no submitted package, injecting the
+    held-package state without depending on a real below-minimum deadlock.
+    """
+    job_list = wrappable_packager._jobs_list
+    job_list.save_edges()
+
+    operators = _jobs_in_section(job_list, "OPERATOR")
+    applications = sorted(
+        _jobs_in_section(job_list, "APPLICATION"),
+        key=lambda job: int(job.split or 0),
+    )
+    for job in applications[:3]:
+        job.status = Status.READY
+    applications[3].status = Status.WAITING
+    for job in operators:
+        job.status = Status.COMPLETED
+    job_list.save_jobs()
+
+    # Simulate the last application split not being loaded in memory yet.
+    job_list._remove_job_from_graph(applications[3].name)
+
+    mocker.patch.object(
+        wrappable_packager,
+        "check_packages_respect_wrapper_policy",
+        side_effect=lambda built, to_submit, max_jobs, limits, any_simple: (to_submit, max_jobs),
+    )
+
+    wrappable_packager.build_packages()
+
+    assert job_list.get_job_by_name(applications[3].name) is None

@@ -465,6 +465,68 @@ def test_get_jobs_by_section_db(setup_job_list):
         )
 
 
+def test_remaining_blocked_by_package_in_memory(as_conf):
+    """In-memory counterpart of the DB check: blocked only when no non-COMPLETED
+    parent outside the package/remaining chain can still feed the wrapper."""
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
+    job_list.graph = networkx.DiGraph()
+    job_list.disable_save = True  # preview mode: resolve in memory, not via the DB
+
+    external = Job('external', 1, Status.WAITING, 0)
+    root = Job('root', 2, Status.WAITING, 0)
+    child = Job('child', 3, Status.WAITING, 0)
+    root.add_parent(external)
+    child.add_parent(root)
+    for job in (external, root, child):
+        job_list.add_job(job)
+
+    # `root` depends on a non-completed external job -> more jobs can still come.
+    assert job_list.remaining_blocked_by_package({'root', 'child'}, {'child'}) is False
+    # A pending job that is not loaded in memory cannot be proven blocked.
+    assert job_list.remaining_blocked_by_package({'root', 'not_loaded'}, {'root'}) is False
+
+    external.status = Status.COMPLETED
+    assert job_list.remaining_blocked_by_package({'root', 'child'}, {'child'}) is True
+
+
+def test_get_pending_job_names_in_memory(as_conf):
+    """Preview mode resolves pending names from memory, not from the database."""
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
+    job_list.graph = networkx.DiGraph()
+    job_list.disable_save = True
+
+    done = Job('done', 1, Status.COMPLETED, 0)
+    done.section = 'SIM'
+    pending = Job('pending', 2, Status.WAITING, 0)
+    pending.section = 'SIM'
+    other = Job('other', 3, Status.WAITING, 0)
+    other.section = 'OTHER'
+    for job in (done, pending, other):
+        job_list.add_job(job)
+
+    assert job_list.get_pending_job_names(['SIM']) == {'pending'}
+    assert job_list.get_pending_job_names(['SIM'], ['pending']) == set()
+
+
+def test_get_pending_job_names_uses_db(setup_job_list):
+    """In a real run the pending names come from the database."""
+    _, _, job_list = setup_job_list
+    job_list.disable_save = False
+    with patch.object(job_list, 'get_jobs_by_section_db', return_value={'job2'}) as mock:
+        assert job_list.get_pending_job_names(['SEC1'], ['banned']) == {'job2'}
+        mock.assert_called_once_with(['SEC1'], ['banned'], get_only_non_completed=True)
+
+
+def test_remaining_blocked_by_package_uses_db(setup_job_list):
+    """In a real run the blocked check is delegated to the database."""
+    _, _, job_list = setup_job_list
+    job_list.disable_save = False
+    with patch.object(
+            job_list.dbmanager, 'remaining_blocked_by_package', return_value=True) as mock:
+        assert job_list.remaining_blocked_by_package({'job2'}, {'job1'}) is True
+        mock.assert_called_once_with({'job2'}, {'job1'})
+
+
 @pytest.mark.parametrize(
     'make_exception,seconds',
     [
@@ -1237,3 +1299,13 @@ def test_wrappable_child_loaded_when_parent_completed_in_memory(
     load(job_list)
 
     assert job_list.get_job_by_name("app4") is not None
+
+
+def test_load_inner_jobs_by_section_tracks_loaded_jobs(as_conf):
+    """The loader reports the names it brought from the DB so they can be unloaded."""
+    job_list = _job_list_with_stale_parent_edge(as_conf)
+    loaded_tracker = set()
+
+    job_list.load_inner_jobs_by_section(["APPLICATION"], loaded_tracker)
+
+    assert loaded_tracker == {"app4"}

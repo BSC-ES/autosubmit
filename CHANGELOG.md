@@ -57,6 +57,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `Log.set_file` failing (after retrying) when the log directory had missing parent directories or
   when given a bare file name; the directory is now created with its parents #3240 (thanks @anyingiit)
 - Ensure Autosubmit deletes PostgreSQL database schemas when deleting an experiment #3383
+- Vertical wrappers now always wrap a single dependent lineage with one job per level, following static dependencies across dates, members, chunks and splits. Independent jobs no longer share a package #3106
 
 **New Features:**
 
@@ -133,6 +134,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Added a development Docker Compose setup for Autosubmit and Postgres #3363
 - Updated project coverage replacing pass statements by ... #2585 (thanks @Vietpr)
 - Tidy the "Stopping the experiment" documentation section #3423 (thanks @Muhtasim-Munif-Fahim)
+- Unified `JobPackagerVertical` and `JobPackagerVerticalMixed` into a single vertical packager #3106
 
 ### 4.1.17.2: Bug fixes and enhancements (port of #3309)
 
