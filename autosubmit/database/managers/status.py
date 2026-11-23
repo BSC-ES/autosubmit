@@ -15,12 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from sqlalchemy import inspect, select, update
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.schema import CreateTable
-
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.schema import CreateTable
 
 import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
@@ -83,13 +82,13 @@ class SqlAlchemyExperimentStatusDbManager:
             _insert_fn = pg_insert
         else:
             _insert_fn = sqlite_insert
-        values = dict(
-            exp_id=exp_id,
-            name=expid,
-            status=status,
-            seconds_diff=0,
-            modified=HUtils.get_current_datetime(),
-        )
+        values = {
+            "exp_id": exp_id,
+            "name": expid,
+            "status": status,
+            "seconds_diff": 0,
+            "modified": HUtils.get_current_datetime(),
+        }
         try:
             with self.status_engine.begin() as conn:
                 result = conn.execute(self._upsert_statement(_insert_fn, values, expid, status))
