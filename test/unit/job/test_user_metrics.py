@@ -35,8 +35,6 @@ from autosubmit.platforms.locplatform import LocalPlatform
 
 _EXPID = "t123"
 
-_EXPID = "t123"
-
 
 @pytest.fixture
 def disable_metric_manager(mocker):
@@ -310,7 +308,7 @@ def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPl
 
     assert (
         isinstance(parameters["CURRENT_ROOTDIR"], str)
-        and parameters["CURRENT_ROOTDIR"] is not None
+        and len(parameters["CURRENT_ROOTDIR"]) > 0
     )
 
     assert parameters["CURRENT_METRIC_FOLDER"] == str(

@@ -415,25 +415,41 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
 
 
 @pytest.mark.parametrize(
-    'must_exist,expected_error_or_return_value',
+    'error,must_exist,expected_error_or_return_value',
     [
-        (True, AutosubmitError),
-        (True, AutosubmitError),
-        (False, False),
-        (True, AutosubmitError),
-        (True, AutosubmitError),
-        (False, False)
+        (OSError("Garbage"), True, AutosubmitError),
+        (OSError("garbage"), True, AutosubmitError),
+        (OSError("DifferentIssue"), False, False),
+        (Exception("Garbage"), True, AutosubmitError),
+        (Exception("garbage"), True, AutosubmitError),
+        (Exception("DifferentIssue"), False, False)
+    ],
+    ids=[
+            "OSError garbage should exists",
+            "OSError garbage optional",
+            "OSError garbage missing",
+            "Exception garbage should exists",
+            "Exception garbage optional",
+            "Exception garbage missing",
     ]
 )
-def test_move_file_errors(must_exist, expected_error_or_return_value, paramiko_platform: ParamikoPlatform,
+def test_move_file_errors(error, must_exist, expected_error_or_return_value, paramiko_platform: ParamikoPlatform,
                           mocker, tmp_path):
     """Test the error paths for ``move_file``.
 
     The main execution path of that function is tested with an integration test.
     """
+    paramiko_platform._ftpChannel = mocker.MagicMock()
+    paramiko_platform._ftpChannel.stat.side_effect = error
+    paramiko_platform._ftpChannel.rename.side_effect = error
+
     if expected_error_or_return_value is AutosubmitError:
-        with pytest.raises(expected_error_or_return_value):  # type: ignore
+        with pytest.raises(expected_error_or_return_value) as exc_info:  # type: ignore
             paramiko_platform.move_file('a.txt', 'b.txt', must_exist=must_exist)
+
+        files_path = paramiko_platform.files_path
+        assert str(files_path / 'a.txt') in str(exc_info.value)
+        assert str(files_path / files_path / 'a.txt') not in str(exc_info.value)
     else:
         r = paramiko_platform.move_file('a.txt', 'b.txt', must_exist=must_exist)
         assert r == expected_error_or_return_value

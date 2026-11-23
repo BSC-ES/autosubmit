@@ -504,9 +504,9 @@ class Job:
         """Number of failed attempts to run this job. (FAIL_COUNT)"""
         self.expid: str = self.name.split('_')[0]
         BasicConfig.read()
-        self._tmp_path = os.path.join(
+        self._tmp_path = Path(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
-        self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
+        self._log_path = self._tmp_path / f"LOG_{self.expid}"
         self.updated = False
         if not loaded_data:
             self.log_recovery_call_count = copy.copy(self.updated_log)
@@ -1338,8 +1338,8 @@ class Job:
         :param index: Row position to retrieve.
         :param attempt: Fail count to determine the STAT file name. Default to self.stat_file for non-wrapped jobs.
         """
-        logname = os.path.join(self._tmp_path, f"{self.stat_file}{attempt}")
-        if os.path.exists(logname):
+        logname = self._tmp_path / f"{self.stat_file}{attempt}"
+        if logname.exists():
             with open(logname) as f:
                 lines = f.readlines()
             if len(lines) >= index + 1:
@@ -1392,7 +1392,7 @@ class Job:
 
         result = self._get_from_stat(2, attempt)
         if result == 0:
-            stat_file = Path(self._tmp_path) / f"{self.stat_file}{attempt}"
+            stat_file = self._tmp_path / f"{self.stat_file}{attempt}"
             if stat_file.exists():
                 stat_file.unlink()
         return result > 0
@@ -1412,9 +1412,9 @@ class Job:
 
         :return: list of dates of retrial [submit, start, finish] in datetime format
         """
-        log_name = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
+        log_name = self._tmp_path / f"{self.name}_TOTAL_STATS"
         retrials_list: list = []
-        if os.path.exists(log_name):
+        if log_name.exists():
             already_completed = False
             # Read lines of the TOTAL_STATS file starting from last
             with open(log_name) as f:
@@ -1466,9 +1466,7 @@ class Job:
 
         # Compress if enabled
         for idx, remote_log in enumerate(remote_logs):
-            log_full_path = Path(
-                self.platform.files_path, remote_log
-            )
+            log_full_path = self.platform.files_path / remote_log
             if self.platform.compress_remote_logs:
                 compressed_path = self.platform.compress_file(str(log_full_path))
                 remote_logs[idx] = str(Path(compressed_path).name) if compressed_path else remote_log
@@ -1574,7 +1572,7 @@ class Job:
                     result_local = self.local_logs
                     result_remote = self.remote_logs
             else:
-                remote_out = Path(self.platform.files_path, self.remote_logs[0])
+                remote_out = self.platform.files_path / self.remote_logs[0]
                 parsed_id = self.platform.read_jobid_from_remote_log(str(remote_out))
                 if parsed_id is not None:
                     self.id = parsed_id
@@ -2674,7 +2672,7 @@ class Job:
 
         script_name = f'{self.name}.cmd'
         self.script_name = script_name
-        script_path = Path(self._tmp_path) / script_name
+        script_path = self._tmp_path / script_name
         with open(script_path, 'wb') as f:
             f.write(template_content.encode(lang))
         script_path.chmod(0o755)
@@ -2798,8 +2796,7 @@ class Job:
         :param lang: Encoding language.
         :return: None
         """
-        tmp_path = Path(self._tmp_path)
-        full_path = tmp_path.joinpath(self.construct_real_additional_file_name(additional_file))
+        full_path = self._tmp_path.joinpath(self.construct_real_additional_file_name(additional_file))
         with full_path.open('wb') as f:
             f.write(content.encode(lang))
 
@@ -2824,9 +2821,9 @@ class Job:
                 '%(?<!%%)' + variable + '%(?!%%)', '', template_content, flags=re.IGNORECASE)
         template_content = template_content.replace("%%", "%")
         script_name = f'{self.name}.{wrapper_tag}.cmd'
-        with open(Path(self._tmp_path) / script_name, 'w', encoding='utf-8') as f:
+        with open(self._tmp_path / script_name, 'w', encoding='utf-8') as f:
             f.write(template_content)
-        os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
+        os.chmod(str(self._tmp_path / script_name), 0o755)
         return script_name
 
     def check_script(self, as_conf: 'AutosubmitConfig', show_logs="false") -> bool:
@@ -2882,7 +2879,7 @@ class Job:
         _aux_local_logs = list(copy.deepcopy(self.local_logs))
         for i, log_file in enumerate(self.local_logs):
             for ext in compress_ext:
-                _aux_path = Path(self._tmp_path, f"LOG_{self.expid}").joinpath(log_file + ext)
+                _aux_path = (self._tmp_path / f"LOG_{self.expid}").joinpath(log_file + ext)
                 if _aux_path.exists():
                     Log.debug(f"Found compressed log file: {_aux_path}")
                     compressed = True
@@ -2905,7 +2902,7 @@ class Job:
         else:
             value_to_write = self.status_str
 
-        path = Path(self._tmp_path) / f"{self.name}_TOTAL_STATS"
+        path = self._tmp_path / f"{self.name}_TOTAL_STATS"
         if path.exists():
             text = path.read_text(encoding='utf-8')
             lines: list[str] = text.splitlines()
@@ -2962,7 +2959,7 @@ class Job:
         """
         extensions = ["", ".gz", ".xz"]
         for log_file in self.local_logs:
-            logs_path = Path(self._tmp_path, f"LOG_{self.expid}")
+            logs_path = self._tmp_path / f"LOG_{self.expid}"
 
             for ext in extensions:
                 old_log_path = logs_path.joinpath(log_file.replace(new_timestamp, current_timestamp) + ext)

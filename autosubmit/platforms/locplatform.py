@@ -237,12 +237,12 @@ class LocalPlatform(ParamikoPlatform):
         """
         # This function is a copy of the slurm one
         log_dir = self.tmp_path / f"LOG_{self.expid}"
-        multiple_delete_previous_run = Path(log_dir) / "multiple_delete_previous_run.sh"
+        multiple_delete_previous_run = log_dir / "multiple_delete_previous_run.sh"
         if log_dir.exists():
             lang = locale.getlocale()[1]
             if lang is None:
                 lang = 'UTF-8'
-            open(multiple_delete_previous_run, 'wb+').write(("rm -f" + filenames).encode(lang))
+            open(multiple_delete_previous_run, 'wb+').write(("rm -f -- " + filenames).encode(lang))
             multiple_delete_previous_run.chmod(mode=0o770)
         return ""
 
@@ -286,7 +286,7 @@ class LocalPlatform(ParamikoPlatform):
         # This function has a short sleep as the files are locally
         sleeptime = 1
         for i in range(max_retries):
-            if (Path(self.files_path) / src).is_file():
+            if (self.files_path / src).is_file():
                 return True
             sleep(sleeptime)
         return False
@@ -311,8 +311,8 @@ class LocalPlatform(ParamikoPlatform):
         :param dest: destination name.
         :param must_exist: ignore if file exist or not.
         """
+        path_root = self.files_path
         try:
-            path_root = self.files_path
             (path_root / src).rename(path_root / dest)
             return True
         except OSError as e:
@@ -322,7 +322,7 @@ class LocalPlatform(ParamikoPlatform):
                 Log.debug(f"File {str(path_root)} does not exist ")
                 return False
         except Exception as e:
-            if str(e) in "Garbage":
+            if "garbage" in str(e).lower():
                 raise AutosubmitError(f"File {self.files_path / src} does not exist", 6004, str(e))
             if must_exist:
                 raise AutosubmitError(f"File {self.files_path / src} does not exist", 6004, str(e))

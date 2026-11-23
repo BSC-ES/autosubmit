@@ -58,8 +58,8 @@ def test_properties(platform):
         'hyperthreading': True,
         'type': 'SuperSlurm',
         'scratch': '/scratch/1',
-        'project_dir': '/proj1',
-        'root_dir': '/root_1',
+        'project_dir': Path('/proj1'),
+        'root_dir': Path('/root_1'),
         'partition': 'inter',
         'queue': 'prio1'
     }
@@ -166,7 +166,7 @@ def test_process_ready_jobs_valid_packages_to_submit(mocker, slurm_platform, cre
 
 
 def test_get_submitted_job_id_x11(slurm_platform):
-    assert slurm_platform.get_submitted_job_id("10000\n", x11=True) == 10000
+    assert slurm_platform.get_submitted_job_id("10000\n", x11=True) == [10000]
 
 
 @pytest.mark.parametrize("exists", [True, False])

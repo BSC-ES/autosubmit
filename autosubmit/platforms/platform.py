@@ -49,6 +49,9 @@ if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
     from autosubmit.job.job_packages import JobPackageBase
 
+_DEFAULT_2FA_TIMEOUT = 300
+"""Default number of seconds of inactivity after which Paramiko timeouts the 2FA session."""
+
 
 def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
     Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
@@ -216,9 +219,9 @@ class Platform(ABC):
         self._submit_cmd_x11 = None
         self._checkhost_cmd = None
         self.cancel_cmd = None
-        self.otp_timeout = self.platform_config.get("2FA_TIMEOUT", 60 * 5)
-        self.two_factor_auth = self.platform_config.get("2FA", False)
-        self.two_factor_method = self.platform_config.get("2FA_METHOD", "token")
+        self.otp_timeout = self._get_platform_option("2FA_TIMEOUT", _DEFAULT_2FA_TIMEOUT)
+        self.two_factor_auth = self._get_platform_option("2FA", False)
+        self.two_factor_method = self._get_platform_option("2FA_METHOD", "token")
         if auth_password is not None and self.two_factor_auth:
             if isinstance(auth_password, list):
                 self.pw: str | None = auth_password[0]
@@ -245,17 +248,17 @@ class Platform(ABC):
         self.compression_level = 9
         log_queue_size = 200
         if self.config:
-            platform_config: dict = self.config.get("PLATFORMS", {}).get(self.name.upper(), {})
             log_queue_size = resolve_log_recovery_queue_size(self.config, self.name)
-            self.compress_remote_logs = platform_config.get("COMPRESS_REMOTE_LOGS", False)
-            self.remote_logs_compress_type = platform_config.get("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
-            self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
+            self.compress_remote_logs = self._get_platform_option("COMPRESS_REMOTE_LOGS", False)
+            self.remote_logs_compress_type = self._get_platform_option("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
+            self.compression_level = self._get_platform_option("COMPRESSION_LEVEL", 9)
 
         self.log_queue_size = log_queue_size
         self.remote_log_dir: Path = Path("")
         self.has_scheduler: bool = True
         self.IO_SAFE_WAIT = int(
-            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("IO_SAFE_WAIT", self.IO_SAFE_WAIT))
+            self._get_platform_option("IO_SAFE_WAIT", self.IO_SAFE_WAIT)
+        )
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -393,12 +396,23 @@ class Platform(ABC):
 
     @root_dir.setter
     def root_dir(self, value):
-        self._root_dir = value
+        self._root_dir = Path(value)
 
-    @property
-    def platform_config(self) -> dict:
-        """Defining the config of a platform as a property facilitating its use and reducing code."""
-        return self.config.get("PLATFORMS", {}).get(self.name.upper(), {})
+    def _get_platform_option(self, key_value: str, default_value):
+        """Return a platform configuration option, falling back to ``default``.
+
+        The value is read from ``PLATFORMS.<NAME>``, so it is resolved at call
+        time and reflects configuration reloads.
+
+        :param key_value: Name of the platform option.
+        :param default_value: Value returned when the option is not set.
+        :return: The configured value, or ``default``.
+        """
+        return (
+            self.config.get("PLATFORMS", {})
+            .get(self.name.upper(), {})
+            .get(key_value, default_value)
+        )
 
     def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
                            packages_to_submit: list['JobPackageBase'], inspect: bool = False,
@@ -729,9 +743,9 @@ class Platform(ABC):
         :autosubmit-group: JOB
         """
         if self.TYPE is PlatformType.LOCAL:
-            path = Path(self.root_dir) / self.config.get("LOCAL_TMP_DIR", "") / f"LOG_{self.expid}"
+            path = self.root_dir / self.config.get("LOCAL_TMP_DIR", "") / f"LOG_{self.expid}"
         else:
-            path = Path(self.remote_log_dir)
+            path = self.remote_log_dir
 
         return path
 

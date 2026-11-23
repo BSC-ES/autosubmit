@@ -140,7 +140,7 @@ class EcPlatform(ParamikoPlatform):
             self._ec_retry_count = 100
         self._ec_retry_flag = f"-retry {self._ec_retry_count}"
         self._allow_python_jobs = False
-        self.root_dir: Path | None = None
+        self.root_dir: Path = Path("")
         self.remote_log_dir: Path = Path("")
         self.cancel_cmd = ""
         self._checkjob_cmd = ""
@@ -466,13 +466,16 @@ class EcPlatform(ParamikoPlatform):
     def send_file(self, filename, check=True) -> bool:
         self.check_remote_log_dir()
         self.delete_file(filename)
-        command = f'{self.put_cmd} {self.tmp_path / filename} {self.host}:{self.files_path / os.path.basename(filename)}'
-        command = f'{self.put_cmd} {Path(self.tmp_path) / filename} {self.host}:{self.files_path / os.path.basename(filename)}'
+        remote_path = self.files_path / os.path.basename(filename)
+        command = f'{self.put_cmd} {Path(self.tmp_path) / filename} {self.host}:{remote_path}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError as e:
-            raise AutosubmitError(f"Could not send file {self.tmp_path / filename} to {self.files_path / filename}", 6005, str(e))
-            raise AutosubmitError(f"Could not send file {Path(self.tmp_path) / filename} to {self.files_path / filename}", 6005, str(e))
+            raise AutosubmitError(
+                f"Could not send file {Path(self.tmp_path) / filename} to {remote_path}",
+                6005,
+                str(e),
+            )
         return True
 
     def move_file(self, src, dest, must_exist=False):

@@ -173,7 +173,7 @@ class SlurmPlatform(ParamikoPlatform):
             return status
         return status[0]
 
-    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[int] | int:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[int]:
         """Parses the output of the submit command to get the job ID.
 
         :param output: output of the submit command.
@@ -185,7 +185,7 @@ class SlurmPlatform(ParamikoPlatform):
             if "failed" in output.lower():
                 raise AutosubmitCritical("Submission failed. Command Failed", 7014)
             if x11:
-                return int(output.splitlines()[0])
+                return [int(output.splitlines()[0])]
             for line in output.splitlines():
                 jobs_id.append(int(line.split(' ')[3]))
             return jobs_id

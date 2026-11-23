@@ -18,6 +18,7 @@
 """Unit tests for the PBS platform."""
 
 from collections import OrderedDict
+from pathlib import Path
 
 import pytest
 
@@ -47,8 +48,8 @@ def test_properties(platform):
         'hyperthreading': True,
         'type': 'SuperPBS',
         'scratch': '/scratch/1',
-        'project_dir': '/proj1',
-        'root_dir': '/root_1',
+        'project_dir': Path('/proj1'),
+        'root_dir': Path('/root_1'),
         'partition': 'inter',
         'queue': 'prio1'
     }

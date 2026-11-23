@@ -93,7 +93,7 @@ class PsPlatform(ParamikoPlatform):
         self.put_cmd = "scp"
         self.get_cmd = "scp"
         self.mkdir_cmd = f"mkdir -p {self.remote_log_dir}"
-        folder_checker = Path(self.scratch) / self.project_dir / self.user/ "ps_permission_checker_azxbyc"
+        folder_checker = Path(self.scratch) / self.project_dir / self.user / "ps_permission_checker_azxbyc"
         self.remove_checker = f"rm -rf {folder_checker}"
         self.mkdir_checker = f"mkdir -p {folder_checker}"
 

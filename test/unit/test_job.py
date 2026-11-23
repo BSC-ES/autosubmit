@@ -2971,7 +2971,7 @@ def test_check_compressed_local_logs_detects_compressed(tmp_path, ext):
     """check_compressed_local_logs finds .gz and .xz variants."""
     job = Job("t000_test", 1, Status.WAITING, 0)
     job.expid = "t000"
-    job._tmp_path = str(tmp_path)
+    job._tmp_path = tmp_path
     log_dir = tmp_path / "LOG_t000"
     log_dir.mkdir(parents=True)
     log_file = log_dir / f"out_log{ext}"
