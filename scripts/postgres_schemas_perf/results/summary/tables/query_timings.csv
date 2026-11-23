@@ -1,0 +1,49 @@
+test,experiments,query,execution_time_ms
+T0-PG,0,Schemas,1.07
+T0-PG,0,Relations,0.315
+T0-PG,0,Attributes,0.339
+T0-PG,0,Dependencies,0.266
+T0-PG,0,Indexes,0.134
+T0-PG,0,Schema listing,0.108
+T0-AS,0,Schemas,1.027
+T0-AS,0,Relations,0.265
+T0-AS,0,Attributes,0.378
+T0-AS,0,Dependencies,0.309
+T0-AS,0,Indexes,0.148
+T0-AS,0,Schema listing,0.114
+T1,1,Schemas,0.948
+T1,1,Relations,0.272
+T1,1,Attributes,0.389
+T1,1,Dependencies,0.29
+T1,1,Indexes,0.145
+T1,1,Schema listing,0.114
+T2,10,Schemas,0.949
+T2,10,Relations,0.368
+T2,10,Attributes,0.853
+T2,10,Dependencies,0.442
+T2,10,Indexes,0.173
+T2,10,Schema listing,0.108
+T3,100,Schemas,1.04
+T3,100,Relations,0.866
+T3,100,Attributes,4.353
+T3,100,Dependencies,1.645
+T3,100,Indexes,0.402
+T3,100,Schema listing,0.177
+T4,1000,Schemas,1.404
+T4,1000,Relations,5.567
+T4,1000,Attributes,33.138
+T4,1000,Dependencies,10.387
+T4,1000,Indexes,2.814
+T4,1000,Schema listing,0.581
+T5,5000,Schemas,2.985
+T5,5000,Relations,26.82
+T5,5000,Attributes,84.853
+T5,5000,Dependencies,40.205
+T5,5000,Indexes,14.473
+T5,5000,Schema listing,2.309
+T6,10000,Schemas,4.673
+T6,10000,Relations,42.902
+T6,10000,Attributes,152.591
+T6,10000,Dependencies,50.909
+T6,10000,Indexes,16.048
+T6,10000,Schema listing,3.902
