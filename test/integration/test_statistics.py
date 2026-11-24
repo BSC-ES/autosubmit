@@ -1,5 +1,4 @@
 from typing import Callable
-from unittest.mock import MagicMock
 from pytest_mock import MockerFixture
 
 from autosubmit.autosubmit import Autosubmit
@@ -33,8 +32,8 @@ def test_stats_get_params(
         },
     )
 
-    mock_monitor = MagicMock()
-    mock_gen_stats = MagicMock()
+    mock_monitor = mocker.MagicMock()
+    mock_gen_stats = mocker.MagicMock()
     mock_monitor.generate_output_stats = mock_gen_stats
     mocker.patch("autosubmit.monitor.monitor.Monitor", return_value=mock_monitor)
 

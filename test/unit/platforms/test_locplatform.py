@@ -18,7 +18,7 @@
 """Unit tests for the Local Platform."""
 from multiprocessing.process import BaseProcess
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
 
 import pytest
 
@@ -110,10 +110,37 @@ def test_refresh_log_recovery_process(autosubmit, autosubmit_config, mocker):
     spy2 = mocker.spy(local, 'spawn_log_retrieval_process')
 
     local.clean_log_recovery_process()
+    spy.reset_mock()
     local.log_recovery_process = BaseProcess()
+    mocker.patch('multiprocessing.process.BaseProcess.is_alive', return_value=True)
 
-    with patch('multiprocessing.process.BaseProcess.is_alive', return_value=True):
-        autosubmit.refresh_log_recovery_process(platforms=[local], as_conf=as_conf)
-        spy.assert_called()
-        spy2.assert_not_called()
-        assert local.work_event is None
+    autosubmit.refresh_log_recovery_process(platforms=[local], as_conf=as_conf)
+    spy.assert_not_called()
+    spy2.assert_not_called()
+    assert local.work_event is None
+
+
+def test_local_connect_spawns_only_on_initial_connect(mocker):
+    """The recovery process must not be spawned from inside the recovery child."""
+    local = LocalPlatform(_EXPID, 'local', {})
+    spawn = mocker.patch.object(local, 'spawn_log_retrieval_process')
+
+    local.connect(None, log_recovery_process=True)
+    spawn.assert_not_called()
+
+    local.connect(None)
+    spawn.assert_called_once()
+
+
+def test_spawn_resets_active_flag_when_process_is_dead(mocker):
+    """A stale active flag must not prevent a new recovery process from starting."""
+    local = LocalPlatform(_EXPID, 'local', {})
+    local.log_retrieval_process_active = True
+    local.log_recovery_process = SimpleNamespace(is_alive=lambda: False, pid=123, name='child')
+    mocker.patch.object(local, 'should_run_log_recovery', return_value=True)
+    mocker.patch.object(local, 'prepare_process', return_value=mocker.Mock())
+    mocker.patch.object(local, 'create_new_process')
+    mocker.patch.object(local, 'join_new_process')
+
+    assert local.spawn_log_retrieval_process(mocker.MagicMock()) is False
+    assert local.log_retrieval_process_active is False

@@ -22,7 +22,6 @@ import re
 import shutil
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 from ruamel.yaml import YAML
@@ -146,7 +145,7 @@ def test_custom_config_for(temp_folder: Path, default_yaml_file: dict[str, Any],
     prepare_yaml_files(default_yaml_file, temp_folder)
     as_conf = AutosubmitConfig("test")
     as_conf.conf_folder_yaml = Path(temp_folder)
-    as_conf.load_workflow_commit = MagicMock()
+    as_conf.load_workflow_commit = mocker.MagicMock()
     as_conf.reload(True)
     for file_name in project_yaml_files.keys():
         assert temp_folder / file_name in as_conf.current_loaded_files.keys()
@@ -253,7 +252,7 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
     basic_parameters = BasicConfig().props()
     # TODO Reference File has to be updated
     list_of_differences = [(key, value, reference) for key, value, reference in list_of_differences if
-                           key not in basic_parameters and not isinstance(value, MagicMock) and not key.startswith(
+                           key not in basic_parameters and not isinstance(value, mocker.MagicMock) and not key.startswith(
                                "HPC")]
 
     if list_of_differences:
@@ -335,7 +334,7 @@ def test_override_immutable_variables_in_custom_config(
 
     as_conf = AutosubmitConfig("test")
     as_conf.conf_folder_yaml = Path(temp_folder)
-    as_conf.load_workflow_commit = MagicMock()
+    as_conf.load_workflow_commit = mocker.MagicMock()
     as_conf.reload(True)
 
     # Custom file merged

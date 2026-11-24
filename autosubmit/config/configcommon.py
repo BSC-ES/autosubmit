@@ -37,6 +37,8 @@ from pyparsing import nested_expr
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.runtime import RuntimeConfig
+from autosubmit.config.utils import as_bool, as_mapping
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.config.yamlparser import YAMLParserFactory
@@ -119,6 +121,33 @@ class AutosubmitConfig(object):
             raise AutosubmitCritical(
                 f"Error while reading PLATFORMS section: {exc}", 7014
             )
+
+    @property
+    def runtime(self) -> RuntimeConfig:
+        """Parsed ``RUNTIME`` section of the experiment configuration.
+
+        :return: The runtime configuration with normalized values and defaults.
+        """
+        return RuntimeConfig.from_experiment_data(self.experiment_data)
+
+    def is_recovery_threads_disabled(self, platform_name: Optional[str]) -> bool:
+        """Whether the recovery threads are disabled for the given platform.
+
+        :param platform_name: Name of the platform (case-insensitive).
+        :return: ``True`` when ``DISABLE_RECOVERY_THREADS`` is enabled for the platform.
+        """
+        if not platform_name:
+            return False
+        platforms = as_mapping(self.experiment_data.get("PLATFORMS"), "PLATFORMS")
+        platforms_by_name = {name.upper(): data for name, data in platforms.items()}
+        platform_data = as_mapping(
+            platforms_by_name.get(platform_name.upper()), f"PLATFORMS.{platform_name}"
+        )
+        return as_bool(
+            platform_data.get("DISABLE_RECOVERY_THREADS"),
+            False,
+            f"PLATFORMS.{platform_name}.DISABLE_RECOVERY_THREADS",
+        )
 
     def get_wrapper_export(self, wrapper=None) -> str:
         """Returns modules variable from the wrapper
@@ -2537,16 +2566,6 @@ class AutosubmitConfig(object):
         :rtype: str
         """
         return self.get_section(['CONFIG', 'MAX_WALLCLOCK'], "")
-
-    def get_disable_recovery_threads(self, section):
-        """Returns FALSE/TRUE
-        :return: recovery_threads_option
-        :rtype: str
-        """
-        if self.platforms_data.get(section, "false") != "false":
-            return str(self.platforms_data[section].get('DISABLE_RECOVERY_THREADS', "false")).lower()
-        else:
-            return "false"
 
     def get_max_processors(self):
         """Returns max processors from autosubmit's config file
