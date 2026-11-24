@@ -16,9 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 """This package contains unit tests for R templates."""
 
-import shutil
 from subprocess import run
-from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import pytest
@@ -26,12 +24,11 @@ import pytest
 from autosubmit.job.template import r
 from autosubmit.job.template.r import _DEFAULT_EXECUTABLE, as_body, as_header, as_tailer
 
-from ._helpers import build_script
+from ._helpers import _RSCRIPT, build_script
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-_RSCRIPT = shutil.which('Rscript')
 _JOBNAME = 't000_test'
 _FAIL_COUNT = '0'
 
@@ -171,24 +168,3 @@ def test_stat_file_written_on_failure(tmp_path: 'Path'):
     assert (tmp_path / f'{_JOBNAME}_STAT_{_FAIL_COUNT}').exists()
 
 
-def test_checkpoint_file_created(tmp_path: 'Path'):
-    """Calling ``as_checkpoint()`` creates a ``_CHECKPOINT_N`` file."""
-    script_path = _build_script(tmp_path, "as_checkpoint()")
-    run([_RSCRIPT, str(script_path)], capture_output=True, text=True)
-    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_1').exists()
-
-
-def test_multiple_checkpoints_create_sequential_files(tmp_path: 'Path'):
-    """Each ``as_checkpoint()`` call creates a sequentially numbered file."""
-    script_path = _build_script(
-        tmp_path,
-        dedent("""\
-            as_checkpoint()
-            as_checkpoint()
-            as_checkpoint()
-        """),
-    )
-    run([_RSCRIPT, str(script_path)], capture_output=True, text=True)
-    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_1').exists()
-    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_2').exists()
-    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_3').exists()

@@ -871,14 +871,15 @@ def test_normalize_variables_rejects_status_with_accepted_statuses(autosubmit_co
     assert exc_info.value.code == 7014
 
 
-def test_normalize_variables_rejects_nested_enabled_legacy_flag(autosubmit_config):
+@pytest.mark.parametrize("key", ["FAIL_OK", "OPTIONAL", "WEAK"])
+def test_normalize_variables_rejects_nested_enabled_legacy_flag(autosubmit_config, key):
     """Legacy flags are rejected inside nested start condition filters too."""
     data = {
         "JOBS": {
             "job1": {
                 "FILE": "FILE1",
                 "DEPENDENCIES": {
-                    "job2": {"DATES_FROM": {"ALL": {"optional": True}}}
+                    "job2": {"DATES_FROM": {"ALL": {key.lower(): True}}}
                 },
             }
         },
@@ -886,16 +887,16 @@ def test_normalize_variables_rejects_nested_enabled_legacy_flag(autosubmit_confi
     }
     as_conf = autosubmit_config(expid='t000', experiment_data=data)
 
-    with pytest.raises(AutosubmitCritical, match="OPTIONAL") as exc_info:
+    with pytest.raises(AutosubmitCritical, match=key) as exc_info:
         as_conf.normalize_variables(data, must_exists=True)
 
     assert exc_info.value.code == 7014
 
 
-@pytest.mark.parametrize("key", ["FAIL_OK", "OPTIONAL"])
+@pytest.mark.parametrize("key", ["FAIL_OK", "OPTIONAL", "WEAK"])
 @pytest.mark.parametrize("value", [True, "true", 1], ids=["bool", "string", "integer"])
 def test_normalize_variables_rejects_enabled_legacy_flag(autosubmit_config, key, value):
-    """Enabled FAIL_OK and OPTIONAL flags raise AutosubmitCritical."""
+    """Enabled legacy flags raise AutosubmitCritical."""
     data = {
         "JOBS": {
             "job1": {
@@ -911,14 +912,14 @@ def test_normalize_variables_rejects_enabled_legacy_flag(autosubmit_config, key,
     assert exc_info.value.code == 7014
 
 
-@pytest.mark.parametrize("key", ["FAIL_OK", "OPTIONAL"])
+@pytest.mark.parametrize("key", ["FAIL_OK", "OPTIONAL", "WEAK"])
 @pytest.mark.parametrize(
     "value",
     [False, "false", 0, None, ""],
     ids=["bool", "string", "integer", "none", "empty_string"],
 )
 def test_normalize_variables_drops_disabled_legacy_flag(autosubmit_config, key, value):
-    """Disabled FAIL_OK and OPTIONAL flags are removed during normalization."""
+    """Disabled legacy flags are removed during normalization."""
     data = {
         "JOBS": {
             "job1": {

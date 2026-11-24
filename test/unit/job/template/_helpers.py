@@ -17,6 +17,7 @@
 
 """Shared helpers for Autosubmit job template unit tests."""
 
+import os
 import shutil
 import sys
 from collections.abc import Callable
@@ -27,7 +28,27 @@ from textwrap import dedent
 from autosubmit.job.template import Language, get_template_snippet
 from autosubmit.job.template.common import TemplateSnippet
 
-_RSCRIPT = shutil.which('Rscript')
+
+def _find_executable(name: str) -> str | None:
+    """Return the path to an executable, or ``None`` when it is unavailable.
+
+    ``shutil.which`` is the standard library way to resolve an executable. Windows is
+    not supported by Autosubmit, so skip the lookup there to avoid the Python 3.12
+    Windows search path changes at test collection time.
+
+    :param name: Executable name to resolve.
+    :return: Absolute path to the executable, or ``None``.
+    """
+    if sys.platform == "win32":
+        return None
+    try:
+        return shutil.which(name, mode=os.F_OK | os.X_OK)
+    except OSError:
+        return None
+
+
+_RSCRIPT = _find_executable('Rscript')
+_PYTHON2 = _find_executable('python2')
 
 
 def build_script(
@@ -59,6 +80,7 @@ def build_script(
     script = script.replace('%CURRENT_LOGDIR%', str(tmp_path))
     script = script.replace('%JOBNAME%', job_name)
     script = script.replace('%FAIL_COUNT%', fail_count)
+    script = script.replace('%CHECKPOINT_ATTEMPT%', fail_count)
 
     script_path = tmp_path / filename
     script_path.write_text(script)
@@ -105,6 +127,13 @@ TEMPLATE_LANGUAGES: list[TemplateLanguage] = [
         filename='the_script.sh',
         runner=lambda script_path: [str(script_path)],
         body='echo "$AS_JOB_ID" > as_job_id.txt',
+    ),
+    TemplateLanguage(
+        language=Language.PYTHON2,
+        filename='the_script.py2',
+        runner=lambda script_path: [_PYTHON2 or 'python2', str(script_path)],
+        body="open('as_job_id.txt', 'w').write(AS_JOB_ID)",
+        skip_reason=None if _PYTHON2 else 'python2 not found on PATH',
     ),
     TemplateLanguage(
         language=Language.PYTHON3,

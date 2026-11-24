@@ -183,6 +183,7 @@ JobsTable = Table(
     Column("wallclock", String),
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
+    Column("checkpoint_attempt", Integer, nullable=False, default=0),
     Column("platform_name", String),
     Column("created", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
     Column("modified", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))

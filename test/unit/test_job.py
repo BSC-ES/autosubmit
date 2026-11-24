@@ -24,7 +24,7 @@ from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
-from unittest.mock import MagicMock, Mock  # type: ignore
+from unittest.mock import MagicMock, Mock, call  # type: ignore
 
 import pytest
 from bscearth.utils.date import date2str
@@ -699,6 +699,27 @@ def test_apply_status_resets_attempt_state_for_rerunnable(new_status):
     assert job.log_recovery_call_count == 0
     assert job.wrapper_type is None
     assert job.id is None
+
+
+def test_begin_new_attempt_removes_previous_checkpoints():
+    """A new attempt removes the checkpoint files of the previous attempt."""
+    job = Job("parent", 1, Status.RUNNING, 0)
+    job.checkpoint_attempt = 1
+    job.current_checkpoint_step = 2
+    job.max_checkpoint_step = 2
+    platform = MagicMock()
+    platform.connected = True
+    platform.serial_platform = platform
+    job.platform = platform
+
+    job.begin_new_attempt()
+
+    assert job.checkpoint_attempt == 2
+    assert job.current_checkpoint_step == 0
+    assert platform.remove_checkpoint_file.call_args_list == [
+        call("parent_CHECKPOINT_1_1", warn_missing=False),
+        call("parent_CHECKPOINT_1_2", warn_missing=False),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -1909,7 +1930,7 @@ def test_update_job_parameters(autosubmit_config, experiment_data):
                 'CHUNK_START_HOUR': '00', 'CHUNK_START_MONTH': '08', 'CHUNK_START_YEAR': '2023',
                 'DAY_BEFORE': '20230814',
                 'DELAY': None, 'DELAY_RETRIALS': None, 'DELETE_WHEN_EDGELESS': True, 'EXPORT': 'none',
-                'FAIL_COUNT': '0',
+                'FAIL_COUNT': '0', 'CHECKPOINT_ATTEMPT': '0',
                 'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'LDATE': '20230815',
                 'MEMBER': 'fc00', 'NUMMEMBERS': 0,
                 'PACKED': False, 'PREV': '0', 'PROJECT_TYPE': 'none', 'RETRIALS': 0, 'RUN_DAYS': '1',

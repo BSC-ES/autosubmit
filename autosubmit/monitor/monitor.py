@@ -276,9 +276,9 @@ def _check_final_status(
         # Avoid "yellow" arrows for successful conditions (old normal behaviour).
         edge_color = "black"
     label = (
-        str(child_edge_info["from_step"]) if child_edge_info["from_step"] > 0 else None
+        str(child_edge_info["from_step"]) if (child_edge_info["from_step"] or 0) > 0 else None
     )
-    dotted = len(statuses) > 1 and not set(statuses) <= SUCCEEDED_ENDINGS
+    dotted = len(statuses) > 1 and any(status not in SUCCEEDED_ENDINGS for status in statuses)
 
     return edge_color, label, dotted
 

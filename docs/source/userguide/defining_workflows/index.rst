@@ -420,9 +420,27 @@ starts if ``SIM`` already completed or was skipped. To also run ``POSTPROCESS`` 
 use ``STATUS: FINISHED``.
 
 The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. It is
-used together with ``STATUS: 'RUNNING'``. The possible value is an integer. Additionally, the target dependency,
-must call to ``%AS_CHECKPOINT%`` inside their scripts. This will create a checkpoint that will be used to check the
+used together with ``STATUS: 'RUNNING'`` or ``STATUS: 'FAILED'``. The possible value is a non-negative integer. When
+``FROM_STEP`` is greater than zero, ``STATUS`` must include ``RUNNING`` or ``FAILED``. Additionally, the target dependency
+must call ``%AS_CHECKPOINT%`` inside their scripts. This will create a checkpoint that will be used to check the
 amount of steps processed.
+
+With ``STATUS: 'RUNNING'`` the child runs while the parent is still running and has reached ``FROM_STEP``. With
+``STATUS: 'FAILED'`` the child runs when the parent failed after reaching ``FROM_STEP``.
+
+``FROM_STEP`` only filters the ``RUNNING`` and ``FAILED`` branches. ``COMPLETED`` and ``SKIPPED`` ignore it, because a
+parent that finished already ran all its steps. If a parent fails before reaching ``FROM_STEP``, the child stays in
+``WAITING``. That is a valid outcome for a branch that is not meant to run, since a workflow does not need every job to
+complete.
+
+The ``%AS_CHECKPOINT%`` counter belongs to the parent job, the one that calls it. A single parent counter can satisfy
+several dependency edges with different ``FROM_STEP`` values, and each edge uses the counter of its own parent.
+
+.. note::
+
+   Known limitation: ``FROM_STEP`` is not tracked across the internal retries of a job that runs
+   inside a vertical wrapper. A child waiting on that job may see checkpoints from the previous
+   attempt. This will be fixed in a later release.
 
 .. tab-set-code::
 
@@ -455,11 +473,11 @@ function that is generating the checkpoint file. You can see the function below:
     AS_CHECKPOINT_CALLS=0
     function as_checkpoint {
         AS_CHECKPOINT_CALLS=$((AS_CHECKPOINT_CALLS+1))
-        touch ${job_name_ptrn}_CHECKPOINT_${AS_CHECKPOINT_CALLS}
+        touch ${job_name_ptrn}_CHECKPOINT_%CHECKPOINT_ATTEMPT%_${AS_CHECKPOINT_CALLS}
     }
 
 And what you would have to include in your target dependency or dependencies is the call to this function which in this
-example is a.sh.
+example is a.sh. The attempt segment isolates the checkpoint files of a retry or a rerun from the previous attempt.
 
 The amount of calls is strongly related to the ``FROM_STEP`` value.
 

@@ -2102,6 +2102,7 @@ class ParamikoPlatform(Platform):
         wrapper_failed: bool = False,
         sleeptime: int = 5,
         max_retries: int = 3,
+        warn_missing: bool = True,
     ):
         """Checks if a file exists on the FTP server.
 
@@ -2109,6 +2110,7 @@ class ParamikoPlatform(Platform):
         :param wrapper_failed: Whether the wrapper has failed. Defaults to False.
         :param sleeptime: Time to sleep between retries in seconds. Defaults to 5.
         :param max_retries: Maximum number of retries. Defaults to 3.
+        :param warn_missing: Whether to log a warning when the file is missing.
         :return: True if the file exists, False otherwise
         """
 
@@ -2134,7 +2136,7 @@ class ParamikoPlatform(Platform):
                     retries = retries + 1
                 else:
                     raise
-        if not file_exist:
+        if not file_exist and warn_missing:
             Log.warning(f"File {src} couldn't be found")
         return file_exist
 

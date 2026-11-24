@@ -228,6 +228,76 @@ def test_select_children_jobs_honours_start_conditions(
         assert ("child" in names) is expect_child
 
 
+def _edge_flags(mgr, structure) -> dict:
+    """Return the ``is_satisfied`` flag per outgoing edge of the test parent."""
+    return {
+        dict(row)["e_to"]: dict(row)["is_satisfied"]
+        for row in mgr.select_where_with_columns(structure, {"e_from": "parent"})
+    }
+
+
+def test_outgoing_edges_satisfied_lifecycle():
+    """update writes both directions and reset clears the stored satisfaction flags."""
+    mgr = JobsDbManager(schema="test_schema_edges_lifecycle")
+    mgr.create_table(ExperimentStructureTable.name)
+    structure = mgr.table_registry.get(ExperimentStructureTable.name)
+    mgr.insert_many(structure.name, [
+        {"e_from": "parent", "e_to": "child1", "accepted_statuses": "FAILED",
+         "from_step": 0, "is_satisfied": False},
+        {"e_from": "parent", "e_to": "child2", "accepted_statuses": "COMPLETED",
+         "from_step": 0, "is_satisfied": False},
+    ])
+
+    assert mgr.update_outgoing_edges_satisfied("parent", "FAILED", 0) is True
+    assert _edge_flags(mgr, structure) == {"child1": True, "child2": False}
+
+    assert mgr.update_outgoing_edges_satisfied("parent", "COMPLETED", 0) is True
+    assert _edge_flags(mgr, structure) == {"child1": False, "child2": True}
+
+    assert mgr.reset_outgoing_edges_satisfied("parent") is True
+    assert _edge_flags(mgr, structure) == {"child1": False, "child2": False}
+    assert mgr.reset_outgoing_edges_satisfied("parent") is False
+
+def test_update_outgoing_edges_uses_parent_checkpoint_step():
+    """One parent counter satisfies each outgoing edge with its own from_step."""
+    mgr = JobsDbManager(schema="test_schema_edges_steps")
+    mgr.create_table(ExperimentStructureTable.name)
+    structure = mgr.table_registry.get(ExperimentStructureTable.name)
+    mgr.insert_many(structure.name, [
+        {"e_from": "parent", "e_to": "child1", "accepted_statuses": "RUNNING",
+         "from_step": 1, "is_satisfied": False},
+        {"e_from": "parent", "e_to": "child2", "accepted_statuses": "RUNNING",
+         "from_step": 3, "is_satisfied": False},
+    ])
+
+    assert mgr.update_outgoing_edges_satisfied("parent", "RUNNING", 2) is True
+
+    assert _edge_flags(mgr, structure) == {"child1": True, "child2": False}
+
+
+def test_update_outgoing_edges_satisfied_batch():
+    """The batch reconciles many parents with their own status and checkpoint step."""
+    mgr = JobsDbManager(schema="test_schema_edges_batch")
+    mgr.create_table(ExperimentStructureTable.name)
+    structure = mgr.table_registry.get(ExperimentStructureTable.name)
+    mgr.insert_many(structure.name, [
+        {"e_from": "p1", "e_to": "c1", "accepted_statuses": "COMPLETED",
+         "from_step": 0, "is_satisfied": False},
+        {"e_from": "p2", "e_to": "c2", "accepted_statuses": "RUNNING",
+         "from_step": 2, "is_satisfied": True},
+        {"e_from": "p2", "e_to": "c3", "accepted_statuses": "RUNNING",
+         "from_step": 3, "is_satisfied": False},
+    ])
+
+    mgr.update_outgoing_edges_satisfied_batch([("p1", "COMPLETED", 0), ("p2", "RUNNING", 2)])
+
+    flags = {
+        (row["e_from"], row["e_to"]): row["is_satisfied"]
+        for row in (dict(raw) for raw in mgr.select_all_with_columns(structure.name))
+    }
+    assert flags == {("p1", "c1"): True, ("p2", "c2"): True, ("p2", "c3"): False}
+
+
 def test_remaining_blocked_by_package(tmp_path):
     """remaining_blocked_by_package returns True only when all parents are within package/remaining/COMPLETED."""
     with patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path)):

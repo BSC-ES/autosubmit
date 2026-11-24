@@ -42,7 +42,10 @@ from autosubmit.config.runtime import RuntimeConfig
 from autosubmit.config.utils import as_bool, as_mapping
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.helpers.enums import ChunkUnit
-from autosubmit.job.job_common import parse_start_conditions
+from autosubmit.job.job_common import (
+    parse_start_conditions,
+    split_start_condition_tokens,
+)
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.platform_type import PlatformType
@@ -614,7 +617,7 @@ class AutosubmitConfig:
                     "Use a status name or a list of status names.",
                     7014,
                 )
-            for token in value.replace(",", " ").split():
+            for token in split_start_condition_tokens(value):
                 if token.endswith("?"):
                     raise AutosubmitCritical(
                         f"The '?' suffix in the dependencies of job '{job_name}' is no longer "
@@ -639,10 +642,15 @@ class AutosubmitConfig:
         "FROM_STEP",
         "FAIL_OK",
         "OPTIONAL",
+        "WEAK",
         "DATES_FROM",
         "MEMBERS_FROM",
         "CHUNKS_FROM",
         "SPLITS_FROM",
+        "DATES_TO",
+        "MEMBERS_TO",
+        "CHUNKS_TO",
+        "SPLITS_TO",
     })
     """Dependency keys that are normalized to uppercase."""
 
@@ -653,7 +661,7 @@ class AutosubmitConfig:
         :param block: Dependency data, possibly with nested ``*_FROM`` filters.
         :param job_name: Name of the job the dependency belongs to, used in messages.
         :raises AutosubmitCritical: If a status is not a valid start condition or a legacy
-            ``FAIL_OK``/``OPTIONAL`` flag is enabled.
+            ``FAIL_OK``/``OPTIONAL``/``WEAK`` flag is enabled.
         """
         for key in list(block):
             if isinstance(key, str) and key.upper() in AutosubmitConfig._START_CONDITION_KEYS:
@@ -671,7 +679,7 @@ class AutosubmitConfig:
         )
         if statuses:
             block["ACCEPTED_STATUSES"] = ",".join(statuses)
-        for key in ("FAIL_OK", "OPTIONAL"):
+        for key in ("FAIL_OK", "OPTIONAL", "WEAK"):
             if key not in block:
                 continue
             value = block.pop(key)
@@ -715,8 +723,8 @@ class AutosubmitConfig:
         :param job_name: Name of the job the dependencies belong to, used in error messages.
         :return: A dictionary with normalized dependencies.
         :raises AutosubmitCritical: If a ``STATUS`` is not a valid start condition, if a
-            dependency name contains a ``?``, or if a legacy ``FAIL_OK``/``OPTIONAL`` flag is
-            enabled.
+            dependency name contains a ``?``, or if a legacy ``FAIL_OK``/``OPTIONAL``/``WEAK``
+            flag is enabled.
         """
         aux_dependencies: dict[str, Any] = {}
         if isinstance(dependencies, str):

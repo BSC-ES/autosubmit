@@ -20,7 +20,8 @@ import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import and_, exists, func, not_, or_, select, update
+from sqlalchemy import and_, bindparam, exists, func, not_, or_, select, update
+from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -36,6 +37,7 @@ from autosubmit.database.models.tables import (
     WrapperJobsTable,
 )
 from autosubmit.database.schema_version import JOB_LIST_SCHEMA_VERSION
+from autosubmit.database.utils import batch_size_for, chunked
 from autosubmit.job.job_common import DEFAULT_START_CONDITION, Status, is_edge_satisfied
 from autosubmit.log.log import Log
 
@@ -398,6 +400,7 @@ class JobsDbManager(DbManager):
                         experiment_structure_table.c.accepted_statuses,
                         experiment_structure_table.c.from_step,
                         jobs_table.c.status.label("parent_status"),
+                        jobs_table.c.current_checkpoint_step.label("parent_checkpoint_step"),
                     ).select_from(
                         experiment_structure_table.join(
                             jobs_table,
@@ -408,35 +411,29 @@ class JobsDbManager(DbManager):
                     )
                 )
 
-                cp_rows = conn.execute(
-                    select(
-                        jobs_table.c.name,
-                        jobs_table.c.current_checkpoint_step,
-                    ).where(
-                        jobs_table.c.name.in_(children_names)
-                    )
-                )
-                child_checkpoint = {r.name: (r.current_checkpoint_step or 0) for r in cp_rows}
-
                 all_edges: dict[str, list] = {}
                 for row in rows:
                     all_edges.setdefault(row.e_to, []).append(row)
 
                 keep = set()
                 for child_name, edges in all_edges.items():
-                    cp = child_checkpoint.get(child_name, 0)
                     blocked = False
                     for e in edges:
                         parent_status = e.parent_status
+                        parent_checkpoint_step = e.parent_checkpoint_step or 0
                         if e.e_from in names_in_memory:
                             p_job = next((j for j in job_list_tmp if j['name'] == e.e_from), None)
                             if p_job:
                                 parent_status = p_job.get('status', parent_status)
+                                parent_checkpoint_step = (
+                                    p_job.get('current_checkpoint_step', parent_checkpoint_step)
+                                    or parent_checkpoint_step
+                                )
                         if not is_edge_satisfied(
                             parent_status=parent_status,
                             accepted_statuses=e.accepted_statuses or DEFAULT_START_CONDITION,
                             from_step=e.from_step,
-                            child_checkpoint_step=cp,
+                            parent_checkpoint_step=parent_checkpoint_step,
                         ):
                             blocked = True
                             break
@@ -464,61 +461,159 @@ class JobsDbManager(DbManager):
         return job_list
 
     def save_edges(self, graph: list[dict[str, Any]]) -> None:
-        """Save the experiment structure into the database."""
+        """Save the experiment structure into the database.
+
+        ``is_satisfied`` is excluded from the update so the flag is only written by
+        :meth:`update_outgoing_edges_satisfied` and :meth:`reset_outgoing_edges_satisfied`.
+        New rows are inserted with the value from ``graph``.
+        """
         table: Table = self.table_registry.get(ExperimentStructureTable.name)
 
         self.create_table(table.name)
         pkeys = ['e_from', 'e_to']
-        self.upsert_many(table.name, graph, pkeys)
+        self.upsert_many(table.name, graph, pkeys, exclude_cols=["is_satisfied"])
 
-    def update_outgoing_edges_satisfied(self, job_name: str, job_status: str) -> bool:
-        """Mark all satisfied outgoing edges of a job as satisfied in the database.
+    def update_outgoing_edges_satisfied(self, job_name: str, job_status: str, checkpoint_step: int = 0) -> bool:
+        """Recompute and store the satisfaction state of the outgoing edges of a job.
 
-        Queries experiment_structure directly and updates matching edges in DB.
+        The checkpoint step belongs to the parent job, the one that runs ``%AS_CHECKPOINT%``.
+        Each outgoing edge is evaluated with its own ``from_step`` and the same parent step.
+        An edge can go back to not satisfied when its parent leaves a final status.
 
         :param job_name: Name of the parent job.
         :param job_status: String representation of the parent job's status.
-        :return: True if at least one edge was updated.
+        :param checkpoint_step: Checkpoint step reached by the parent job.
+        :return: True if at least one edge is satisfied.
         """
         structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
-        jobs_table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(structure_table.name)
-        self.create_table(jobs_table.name)
+        parent_state = {job_name: (job_status, int(checkpoint_step or 0))}
 
         with self._get_engine(structure_table.name).begin() as conn:
             rows = conn.execute(
                 select(
+                    structure_table.c.e_from,
                     structure_table.c.e_to,
                     structure_table.c.accepted_statuses,
                     structure_table.c.from_step,
-                    jobs_table.c.current_checkpoint_step,
-                ).select_from(
-                    structure_table.join(
-                        jobs_table,
-                        structure_table.c.e_to == jobs_table.c.name,
-                        isouter=True
-                    )
+                    structure_table.c.is_satisfied,
                 ).where(structure_table.c.e_from == job_name)
             ).fetchall()
+            satisfied_parents = self._apply_edge_satisfaction_changes(
+                conn, structure_table, rows, parent_state
+            )
+        return job_name in satisfied_parents
 
-            updated = False
-            for row in rows:
-                if is_edge_satisfied(
-                    parent_status=job_status,
-                    accepted_statuses=row.accepted_statuses or DEFAULT_START_CONDITION,
-                    from_step=row.from_step or 0,
-                    child_checkpoint_step=row.current_checkpoint_step or 0,
-                ):
-                    conn.execute(
-                        update(structure_table)
-                        .where(and_(
-                            structure_table.c.e_from == job_name,
-                            structure_table.c.e_to == row.e_to
-                        ))
-                        .values(is_satisfied=True)
-                    )
-                    updated = True
-        return updated
+    def update_outgoing_edges_satisfied_batch(
+            self,
+            states: list[tuple[str, str, int]],
+    ) -> None:
+        """Recompute and store the satisfaction of the outgoing edges of many parents.
+
+        Uses one ``SELECT`` per dialect-sized chunk (see :mod:`autosubmit.database.utils`) and
+        one ``executemany`` for the edges whose flag changed, so reconciling thousands of
+        parents does not open one transaction per parent.
+
+        :param states: ``(job_name, job_status, checkpoint_step)`` per parent.
+        """
+        parent_state = {name: (status, int(step or 0)) for name, status, step in states}
+        if not parent_state:
+            return
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
+        self.create_table(structure_table.name)
+        names = list(parent_state)
+
+        with self._get_engine(structure_table.name).begin() as conn:
+            for chunk in chunked(names, batch_size_for(1, conn.dialect.name)):
+                rows = conn.execute(
+                    select(
+                        structure_table.c.e_from,
+                        structure_table.c.e_to,
+                        structure_table.c.accepted_statuses,
+                        structure_table.c.from_step,
+                        structure_table.c.is_satisfied,
+                    ).where(structure_table.c.e_from.in_(chunk))
+                ).fetchall()
+                self._apply_edge_satisfaction_changes(conn, structure_table, rows, parent_state)
+
+    @staticmethod
+    def _apply_edge_satisfaction_changes(
+            conn: Connection,
+            structure_table: Table,
+            rows: list,
+            parent_state: dict[str, tuple[str, int]],
+    ) -> set[str]:
+        """Store the edges whose satisfaction differs from the computed one.
+
+        :param conn: Open connection, reused for the bulk update.
+        :param structure_table: Edge table.
+        :param rows: Edge rows with ``e_from``, ``e_to``, ``accepted_statuses``, ``from_step`` and ``is_satisfied``.
+        :param parent_state: ``job_name -> (job_status, checkpoint_step)`` for the parents in ``rows``.
+        :return: Names of the parents with at least one satisfied edge.
+        """
+        changes = []
+        satisfied_parents: set[str] = set()
+        for row in rows:
+            parent_status, checkpoint_step = parent_state[row.e_from]
+            satisfied = is_edge_satisfied(
+                parent_status=parent_status,
+                accepted_statuses=row.accepted_statuses or DEFAULT_START_CONDITION,
+                from_step=row.from_step or 0,
+                parent_checkpoint_step=checkpoint_step,
+            )
+            if satisfied:
+                satisfied_parents.add(row.e_from)
+            if row.is_satisfied != satisfied:
+                changes.append({
+                    "b_e_from": row.e_from,
+                    "b_e_to": row.e_to,
+                    "b_is_satisfied": satisfied,
+                })
+        if changes:
+            # ``b_`` is required because SQLAlchemy rejects a bindparam named like a column
+            # in an UPDATE. Each dict key in ``changes`` must match its bindparam name.
+            conn.execute(
+                update(structure_table)
+                .where(and_(
+                    structure_table.c.e_from == bindparam("b_e_from"),
+                    structure_table.c.e_to == bindparam("b_e_to"),
+                ))
+                .values(is_satisfied=bindparam("b_is_satisfied")),
+                changes,
+            )
+        return satisfied_parents
+
+    def reset_outgoing_edges_satisfied(self, job_name: str) -> bool:
+        """Mark all satisfied outgoing edges of a job as not satisfied.
+
+        :param job_name: Name of the parent job.
+        :return: True if at least one edge was reset.
+        """
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
+        self.create_table(structure_table.name)
+
+        with self._get_engine(structure_table.name).begin() as conn:
+            result = conn.execute(
+                update(structure_table)
+                .where(and_(
+                    structure_table.c.e_from == job_name,
+                    structure_table.c.is_satisfied.is_(True)
+                ))
+                .values(is_satisfied=False)
+            )
+        return result.rowcount > 0
+
+    def reset_all_edges_satisfied(self) -> None:
+        """Mark every edge in the experiment structure as not satisfied."""
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
+        self.create_table(structure_table.name)
+
+        with self._get_engine(structure_table.name).begin() as conn:
+            conn.execute(
+                update(structure_table)
+                .where(structure_table.c.is_satisfied.is_(True))
+                .values(is_satisfied=False)
+            )
 
     def load_edges(self, job_list: list[dict[str, Any]] | None = None, full_load: bool = True, remove_unused_edges: bool = True) -> list[dict[str, Any]]:
         table: Table = self.table_registry.get(ExperimentStructureTable.name)

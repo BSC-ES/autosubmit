@@ -279,6 +279,7 @@ class LocalPlatform(ParamikoPlatform):
             wrapper_failed: bool = False,
             sleeptime: int = 1,
             max_retries: int = 1,
+            warn_missing: bool = True,
     ):
         """Checks if a file exists in the platform.
 
@@ -286,14 +287,14 @@ class LocalPlatform(ParamikoPlatform):
         :param wrapper_failed: Checks inner jobs files. Defaults to False.
         :param sleeptime: Time to sleep between retries. Defaults to 1.
         :param max_retries: Maximum number of retries. Defaults to 1
+        :param warn_missing: Whether to log a warning when the file is missing.
         :return: True if the file exists, False otherwise.
         """
-        # This function has a short sleep as the files are locally
-        sleeptime = 1
         for i in range(max_retries):
             if Path(self.get_files_path(), src).is_file():
                 return True
-            sleep(sleeptime)
+            if sleeptime:
+                sleep(sleeptime)
         return False
 
     def delete_file(self, filename, del_cmd=False):

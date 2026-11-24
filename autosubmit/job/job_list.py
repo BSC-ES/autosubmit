@@ -42,6 +42,7 @@ from autosubmit.job.job_common import (
     Status,
     bcolors,
     is_edge_satisfied,
+    parse_start_conditions,
 )
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_utils import Dependency, change_jobs_status
@@ -229,6 +230,7 @@ class JobList:
             full_load: bool = False,
             check_failed_jobs: bool = False,
             monitor: bool = False,
+            reset_satisfaction: bool = False,
     ) -> None:
         """Generates the workflow graph based on the provided configuration and parameters.
         :param as_conf: Autosubmit configuration object.
@@ -246,6 +248,7 @@ class JobList:
         :param full_load: If True, loads the full graph from the database.
         :param check_failed_jobs: If True, checks for failed jobs during loading.
         :param monitor: If True, the edges won't be removed even if there are differences in sections.
+        :param reset_satisfaction: If True, reset the edge satisfaction flags when saving.
         """
         changes = False
         if force:
@@ -265,7 +268,7 @@ class JobList:
             Log.info("Initializing new jobs...")
             self._initialize_new_jobs(new)
             Log.info("Saving the workflow state...")
-            self._save_workflow_state(full_load, new)
+            self._save_workflow_state(full_load, new, reset_satisfaction)
 
         if self.run_mode and changes:
             Log.info("Loading only active jobs...")
@@ -350,6 +353,34 @@ class JobList:
             self._add_edge_and_parent(edge)
 
         self.fill_parents_children()
+        self._recompute_checkpoint_limits(edges)
+
+    def _recompute_checkpoint_limits(self, edges: list[dict[str, Any]] | None = None) -> None:
+        """Recompute each job's max checkpoint step from its outgoing edges.
+
+        :param edges: Optional raw edge list. It is used on partial loads so edges whose child
+            is not loaded still contribute to the parent limit.
+        """
+        for job in self.job_list:
+            job.max_checkpoint_step = 0
+        if edges is None:
+            edge_steps = [
+                (parent_name, edge.get("from_step", 0))
+                for parent_name, _child_name, edge in self.graph.edges(data=True)
+            ]
+        else:
+            edge_steps = [
+                (edge.get("e_from", ""), edge.get("from_step", 0))
+                for edge in edges
+            ]
+        for parent_name, from_step in edge_steps:
+            parent_job = self.graph.nodes.get(parent_name, {}).get("job")
+            if parent_job is None:
+                continue
+            parent_job.max_checkpoint_step = max(
+                int(parent_job.max_checkpoint_step or 0),
+                int(from_step or 0),
+            )
 
     def _add_edge_and_parent(
             self,
@@ -528,6 +559,7 @@ class JobList:
             Log.info("Deleting edgeless jobs...")
         if len(self.graph.edges) > 0:
             self._delete_edgeless_jobs()
+        self._recompute_checkpoint_limits()
 
     def _initialize_new_jobs(self, new: bool) -> None:
         """Initializes new jobs in the workflow graph.
@@ -540,6 +572,7 @@ class JobList:
                 job.updated_stats = 0
                 job.log_recovery_call_count = 0
                 job.wrapper_type = None
+                job.begin_new_attempt()
             if new:
                 job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
             else:
@@ -581,13 +614,18 @@ class JobList:
         return {child_name: self.graph.edges[job_name, child_name] for child_name in names}
 
     def _save_workflow_state(
-            self, create: bool, new: bool
+            self, create: bool, new: bool, reset_satisfaction: bool = False
     ) -> None:
         """Saves the current state of the workflow to the database.
         :param create: If True, creates new entries in the database.
         :param new: If True, saves the state of new jobs.
+        :param reset_satisfaction: If True, reset the edge satisfaction flags.
         """
         self.save_jobs(reset_log_counters=new)
+        if reset_satisfaction:
+            self.dbmanager.reset_all_edges_satisfied()
+            for _parent, _child, edge in self.graph.edges(data=True):
+                edge["is_satisfied"] = False
         self.save_edges()
         self.save_sections()
         for job in self.job_list:
@@ -1309,12 +1347,14 @@ class JobList:
         JobList._normalize_to_filters(unified_filter, "MEMBERS_TO")
         JobList._normalize_to_filters(unified_filter, "CHUNKS_TO")
         JobList._normalize_to_filters(unified_filter, "SPLITS_TO")
-        only_none_values = [filters for filters in unified_filter.values()
-                            if "none" == filters.lower()]
-        if len(only_none_values) != 4:
-            # remove all none filters if not all is none
-            unified_filter = {key: value for key, value in unified_filter.items()
-                              if "none" != value.lower()}
+        to_filter_keys = ("DATES_TO", "MEMBERS_TO", "CHUNKS_TO", "SPLITS_TO")
+        none_filter_keys = [
+            key for key in to_filter_keys if unified_filter.get(key, "").lower() == "none"
+        ]
+        if len(none_filter_keys) != len(to_filter_keys):
+            # remove the none filters only when not every filter is none
+            for key in none_filter_keys:
+                unified_filter.pop(key, None)
 
         return unified_filter
 
@@ -1379,10 +1419,30 @@ class JobList:
         :param job: The child job to which special conditions are applied.
         :param special_conditions: Dictionary containing special condition parameters (e.g., STATUS, FROM_STEP).
         :param parent: The parent job from which the edge originates.
+        :raises AutosubmitCritical: If ``FROM_STEP`` is not a non-negative integer or it is set
+            without ``RUNNING`` or ``FAILED`` in ``STATUS``.
         """
         accepted_statuses = special_conditions.get("ACCEPTED_STATUSES", DEFAULT_START_CONDITION)
-        from_step = int(special_conditions.get("FROM_STEP", 0))
-        job.max_checkpoint_step = max(int(job.max_checkpoint_step), from_step)
+        try:
+            from_step = int(special_conditions.get("FROM_STEP", 0) or 0)
+        except (TypeError, ValueError) as error:
+            raise AutosubmitCritical(
+                f"FROM_STEP must be an integer in the dependency of job '{job.name}'.",
+                7014,
+            ) from error
+        if from_step < 0:
+            raise AutosubmitCritical(
+                f"FROM_STEP must be zero or greater in the dependency of job '{job.name}'.",
+                7014,
+            )
+        if from_step > 0:
+            accepted_names = set(parse_start_conditions(accepted_statuses))
+            if accepted_names.isdisjoint({"RUNNING", "FAILED"}):
+                raise AutosubmitCritical(
+                    f"FROM_STEP requires STATUS RUNNING or FAILED in the dependency of job '{job.name}'.",
+                    7014,
+                )
+        parent.max_checkpoint_step = max(int(parent.max_checkpoint_step or 0), from_step)
         self.graph.edges[parent.name, job.name].update(accepted_statuses=accepted_statuses, from_step=from_step)
 
     def _apply_jobs_edge_info(self, job: Job, dependencies: dict[str, Dependency]) -> None:
@@ -1393,7 +1453,7 @@ class JobList:
         filters_to_apply_by_section = {}
         for key, dependency in dependencies.items():
             filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
-            if "ACCEPTED_STATUSES" in filters_to_apply:
+            if "ACCEPTED_STATUSES" in filters_to_apply or "FROM_STEP" in filters_to_apply:
                 if "-" in key:
                     key = key.split("-")[0]
                 elif "+" in key:
@@ -1504,20 +1564,20 @@ class JobList:
                 if job.section == parent.section:
                     if not self.actual_job_depends_on_previous_chunk:
                         if parent.section not in self.dependency_map[job.section]:
-                            graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION,
+                            graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0,
                                            is_satisfied=False)
                 else:
                     if self.actual_job_depends_on_special_chunk and not self.actual_job_depends_on_previous_chunk:
                         if parent.section not in self.dependency_map[job.section]:
                             if parent.running == job.running:
-                                graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION,
+                                graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0,
                                                is_satisfied=False)
                     elif not self.actual_job_depends_on_previous_chunk:
-                        graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION,
+                        graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0,
                                        is_satisfied=False)
                     elif not self.actual_job_depends_on_special_chunk and self.actual_job_depends_on_previous_chunk:
                         if job.running == "chunk" and job.chunk == 1 or job.running == "member" and parent.running == "member" or job.running == "chunk" and parent.running == "chunk":
-                            graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION,
+                            graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0,
                                            is_satisfied=False)
             else:
                 if job.section == parent.section:
@@ -1541,17 +1601,17 @@ class JobList:
                                     skip = False
                         if not skip:
                             problematic_dependencies.add(parent.name)
-                            graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION,
+                            graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0,
                                            is_satisfied=False)
                 else:
                     if job.running == parent.running:
                         skip = False
                         problematic_dependencies.add(parent.name)
-                        graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION,
+                        graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0,
                                        is_satisfied=False)
                     if parent.running == "chunk":
                         if parent.chunk > (chunk_list[-1] - max_distance):
-                            graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION,
+                            graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0,
                                            is_satisfied=False)
         JobList.handle_frequency_interval_dependencies(chunk, chunk_list, date, date_list, dic_jobs, job,
                                                        member,
@@ -1565,7 +1625,7 @@ class JobList:
                     if found:
                         continue
                 problematic_dependencies.add(parent.name)
-                graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, is_satisfied=False)
+                graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0, is_satisfied=False)
 
         return problematic_dependencies
 
@@ -1631,14 +1691,14 @@ class JobList:
                 if not job.splits or int(job.splits) > 0:
                     self.depends_on_previous_split[job.section] = int(parent.split)
             if self.actual_job_depends_on_previous_chunk and parent.section == job.section:
-                graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, is_satisfied=False)
+                graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0, is_satisfied=False)
                 edge_added = True
             else:
                 # In case we need to improve the perfomance while generating the workflow graph, this could be a point to check. (Workflows with splits and many dependencies).
                 if parent.name not in self.depends_on_previous_special_section.get(
                         job.section, set()) or job.split > 0 or (
                         job.section == parent.section and job.running != "chunk"):
-                    graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, is_satisfied=False)
+                    graph.add_edge(parent.name, job.name, accepted_statuses=DEFAULT_START_CONDITION, from_step=0, is_satisfied=False)
                     edge_added = True
 
             if parent.section == job.section:
@@ -2852,6 +2912,14 @@ class JobList:
         """Loads the job edges"""
         return self.dbmanager.load_edges(job_list, full_load)
 
+    def reset_outgoing_edges_satisfied(self, job_name: str) -> None:
+        """Reset the satisfaction state of the outgoing edges of a job.
+
+        :param job_name: Name of the parent job.
+        """
+        if not self.disable_save:
+            self.dbmanager.reset_outgoing_edges_satisfied(job_name)
+
     def update_status_log(self) -> None:
 
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
@@ -2922,8 +2990,12 @@ class JobList:
         job_status_pairs, unloaded_job_status_pairs = self._collect_update_changes(lines)
         if job_status_pairs:
             change_jobs_status(job_status_pairs)
-        self._persist_unloaded_job_changes(unloaded_job_status_pairs)
+            if store_change:
+                for job, _ in job_status_pairs:
+                    if job.status not in (Status.COMPLETED, Status.FAILED, Status.SKIPPED):
+                        self.reset_outgoing_edges_satisfied(job.name)
         if store_change:
+            self._persist_unloaded_job_changes(unloaded_job_status_pairs)
             self._archive_update_file()
         return True
 
@@ -2940,7 +3012,10 @@ class JobList:
 
     @staticmethod
     def _parse_update_line(line: str, update_file_name: str) -> tuple[str, str] | None:
-        """Parse one update file line into an uppercase ``(job_name, status)`` pair.
+        """Parse one update file line into a ``(job_name, status)`` pair.
+
+        The job name keeps the case written in the file so it can be resolved against the
+        database when the job is not loaded in memory. The status is uppercased.
 
         :param line: Raw line of the update file.
         :param update_file_name: Name of the update file, used in skip warnings.
@@ -2953,7 +3028,7 @@ class JobList:
         if len(parts) < 2:
             Log.warning(f"Skipping invalid line in {update_file_name}: '{line}'")
             return None
-        return parts[0].upper(), parts[1].upper()
+        return parts[0], parts[1].upper()
 
     def _resolve_update_job(self, job_name: str, jobs_by_name: dict[str, Job]) -> tuple[Job | None, bool]:
         """Resolve a job name from memory, falling back to the database.
@@ -2962,11 +3037,11 @@ class JobList:
             telling whether the job was loaded from the database (and therefore is not
             part of the in-memory graph).
         """
-        job = jobs_by_name.get(job_name)
+        job = jobs_by_name.get(job_name.upper())
         if job:
             return job, False
-        # The job may not be loaded (e.g. it finished in a previous run or iteration);
-        # resolve it from the database (names are stored uppercase).
+        # The job may not be loaded (e.g. it finished in a previous run or iteration).
+        # The update file carries the stored job name, so resolve it as written.
         node = self.dbmanager.load_job_by_name(job_name)
         if not node:
             return None, False
@@ -2977,8 +3052,9 @@ class JobList:
     ) -> tuple[list[tuple[Job, int]], list[tuple[Job, int]]]:
         """Validate the update file lines and collect the status changes to apply.
 
-        Loaded jobs and jobs resolved from the database are returned as separate pair
-        lists, since the latter must be persisted to their stored row directly.
+        Loaded jobs and jobs resolved from the database are returned in mutually exclusive
+        pair lists: the first is applied in memory, the second is applied and persisted to
+        its stored row by :meth:`_persist_unloaded_job_changes`.
 
         :param lines: Raw lines of the update file.
         :return: A tuple with the ``(job, status)`` pairs for loaded and for unloaded jobs.
@@ -2991,7 +3067,7 @@ class JobList:
         for line in lines:
             parsed_line = self._parse_update_line(line, self._update_file_path.name)
             if parsed_line is not None:
-                entries[parsed_line[0]] = parsed_line
+                entries[parsed_line[0].upper()] = parsed_line
 
         job_status_pairs: list[tuple[Job, int]] = []
         unloaded_job_status_pairs: list[tuple[Job, int]] = []
@@ -3020,30 +3096,41 @@ class JobList:
                     Log.warning(f"Cannot change status of active job [{job.name}] because the connection to its "
                                 f"platform [{getattr(platform, 'name', 'unknown')}] is not available, skipping it")
                     continue
-            job_status_pairs.append((job, status))
             if from_db:
                 unloaded_job_status_pairs.append((job, status))
+            else:
+                job_status_pairs.append((job, status))
         return job_status_pairs, unloaded_job_status_pairs
 
     def _persist_unloaded_job_changes(self, unloaded_job_status_pairs: list[tuple[Job, int]]) -> None:
-        """Persist status changes of jobs that are not part of the in-memory graph.
+        """Apply and persist status changes of jobs that are not part of the in-memory graph.
 
-        Re-runnable targets are saved with reset per-attempt counters; other targets keep
-        them, and final statuses also reconcile the completion state of their DB edges.
+        The status is applied with :meth:`Job.apply_status`, so re-runnable targets reset
+        their per-attempt counters exactly once. The stored row is then saved and the
+        completion state of the DB edges is reconciled.
 
         :param unloaded_job_status_pairs: ``(job, status)`` pairs resolved from the database.
         """
         if not unloaded_job_status_pairs or self.disable_save:
             return
-        rerunnable_jobs = [job for job, _ in unloaded_job_status_pairs if job.status in Status.RE_RUNNABLE]
+        final_statuses = (Status.COMPLETED, Status.FAILED, Status.SKIPPED)
+        for job, status in unloaded_job_status_pairs:
+            job.apply_status(status)
+        rerunnable_jobs = [job for job, status in unloaded_job_status_pairs if status in Status.RE_RUNNABLE]
         if rerunnable_jobs:
             self.dbmanager.save_jobs(rerunnable_jobs, reset_log_counters=True)
-        other_jobs = [job for job, _ in unloaded_job_status_pairs if job.status not in Status.RE_RUNNABLE]
+        other_jobs = [job for job, status in unloaded_job_status_pairs if status not in Status.RE_RUNNABLE]
         if other_jobs:
             self.dbmanager.save_jobs(other_jobs, reset_log_counters=False)
-            for job in (job for job in other_jobs
-                        if job.status in (Status.COMPLETED, Status.FAILED, Status.SKIPPED)):
-                self.dbmanager.update_outgoing_edges_satisfied(job.name, Status.VALUE_TO_KEY.get(job.status, ''))
+        for job, status in unloaded_job_status_pairs:
+            if status in final_statuses:
+                self.dbmanager.update_outgoing_edges_satisfied(
+                    job.name,
+                    Status.VALUE_TO_KEY.get(status, ''),
+                    job.current_checkpoint_step,
+                )
+            else:
+                self.dbmanager.reset_outgoing_edges_satisfied(job.name)
 
     def _archive_update_file(self) -> None:
         """Rename the update file so it is not processed again in the next iteration."""
@@ -3080,43 +3167,64 @@ class JobList:
     def parameters(self, value):
         self._parameters = value
 
-    @staticmethod
-    def check_checkpoint(job, parent):
-        """Check if a checkpoint step exists for this edge"""
-        return job.get_checkpoint_files(parent.name)
+    def _poll_checkpoint_step(self, job: Job) -> int:
+        """Return the highest checkpoint step reached by the parent job.
 
-    def check_special_status(self) -> list[Job]:
-        """Check if all parents of a job have the correct status for checkpointing.
+        Checkpoint files are named ``<parent>_CHECKPOINT_<attempt>_<step>`` in the parent's
+        log directory. Polling is non-destructive and only advances when a file exists.
 
-        :returns: List of jobs that fulfill the special conditions for checkpointing.
+        :param job: Parent job whose checkpoint files are checked.
+        :return: Highest checkpoint step reached by the job.
         """
-        jobs_to_check: list[Job] = []
-        for current_job in [current_job for current_job in self.job_list if
-                            current_job.status == Status.WAITING and not self.is_wrapper_still_running(current_job)]:
-            self._check_checkpoint(current_job)
-            parents_edge_info = self.get_parents_edges(current_job.name)
-            parents_nodes = {parent_name: self.graph.nodes[parent_name]["job"] for parent_name in
-                             parents_edge_info.keys()}
-            non_completed, completed = self._count_parents_status(current_job, parents_edge_info, parents_nodes)
-            self._update_db_edges_satisfied(completed, non_completed, current_job)
-            if len(non_completed) == 0 and len(completed) > 0:
-                # If all parents are completed, we can run the job
-                jobs_to_check.append(current_job)
-        return jobs_to_check
+        max_step = int(job.max_checkpoint_step or 0)
+        step = int(job.current_checkpoint_step or 0)
+        if step >= max_step:
+            return step
+        platform = getattr(job, "platform", None)
+        if platform is None or not getattr(platform, "connected", False):
+            return step
+        try:
+            while step < max_step:
+                candidate = step + 1
+                if not platform.check_file_exists(
+                    f"{job.name}_CHECKPOINT_{job.checkpoint_attempt or 0}_{candidate}",
+                    sleeptime=0,
+                    max_retries=1,
+                    warn_missing=False,
+                ):
+                    break
+                step = candidate
+        except Exception as error:
+            Log.warning(f"Could not refresh the checkpoint step of job '{job.name}': {error}")
+        return step
 
-    @staticmethod
-    def _check_checkpoint(job: Job) -> None:
-        """Check if a job has a checkpoint.
+    def _refresh_checkpoint_steps(self, persist: bool = True) -> bool:
+        """Refresh the checkpoint counter of the jobs that children wait on.
 
-        :param job: The job to check.
+        The counter belongs to the parent job, the one that runs ``%AS_CHECKPOINT%``. A single
+        counter is shared by all its outgoing edges, each with its own ``FROM_STEP``.
+
+        :param persist: If False, do not write edge satisfaction to the database.
+        :return: True if any checkpoint counter changed, False otherwise.
         """
-        # This will be true only when used under setstatus/run
-        if job.platform and job.platform.connected:
-            job.get_checkpoint_files()
+        changed = False
+        pending: list[tuple[str, str, int]] = []
+        for job in self.job_list:
+            if job.status not in (Status.RUNNING, Status.FAILED):
+                continue
+            previous_step = int(job.current_checkpoint_step or 0)
+            step = self._poll_checkpoint_step(job)
+            if step != previous_step:
+                job.current_checkpoint_step = step
+                changed = True
+            if persist and not self.disable_save and self.graph.out_degree(job.name) > 0:
+                pending.append((job.name, Status.VALUE_TO_KEY.get(job.status, ''), step))
+        if pending:
+            self.dbmanager.update_outgoing_edges_satisfied_batch(pending)
+        return changed
 
     @staticmethod
     def _count_parents_status(
-            job: Job,
             parents_edge_info: dict,
             parents_nodes: dict
     ) -> tuple[list[Job], list[Job]]:
@@ -3124,7 +3232,6 @@ class JobList:
 
         A parent counts as completed when :func:`is_edge_satisfied` accepts it for its edge.
 
-        :param job: The job whose parents are being checked.
         :param parents_edge_info: Edge data (``accepted_statuses``, ``from_step``) per parent name.
         :param parents_nodes: Mapping of parent name to its ``Job`` instance.
         :return: A ``(non_completed, completed)`` tuple of parent lists.
@@ -3137,7 +3244,7 @@ class JobList:
                 parent.status,
                 edge_info.get("accepted_statuses", DEFAULT_START_CONDITION),
                 edge_info.get("from_step", 0),
-                job.current_checkpoint_step,
+                parent.current_checkpoint_step,
             )
             (completed if satisfied else non_completed).append(parent)
 
@@ -3185,28 +3292,7 @@ class JobList:
                             time.sleep(1)
         return len(jobs_to_recover) > 0
 
-    def _update_db_edges_satisfied(
-            self,
-            finished_parents: list[Job],
-            non_finished_parents: list[Job],
-            child: Job,
-    ) -> None:
-        """Update the satisfaction state of the edges to a child job.
-
-        :param finished_parents: List of parent jobs that satisfy their edge.
-        :param non_finished_parents: List of parent jobs that do not satisfy their edge.
-        :param child: The child job whose edges are being updated.
-        """
-        for parent in finished_parents:
-            if self.graph.edges.get((parent.name, child.name)):
-                self.graph.edges[parent.name, child.name]['is_satisfied'] = True
-
-        for parent in non_finished_parents:
-            if self.graph.edges.get((parent.name, child.name)):
-                self.graph.edges[parent.name, child.name]['is_satisfied'] = False
-
-
-    def check_completed_jobs_after_recovery(self):
+    def check_completed_jobs_after_recovery(self, persist: bool = True):
         for job in (job for job in self.job_list if job.status == Status.COMPLETED):
             if any(parent.status == Status.WAITING for parent in job.parents):
                 job.status = Status.WAITING
@@ -3216,6 +3302,9 @@ class JobList:
                 job.updated_stats = 0
                 job.log_recovery_call_count = 0
                 job.wrapper_type = None
+                job.begin_new_attempt()
+                if persist:
+                    self.reset_outgoing_edges_satisfied(job.name)
                 Log.info(f"Job {job.name} was marked as COMPLETED but has WAITING parents. Resetting to WAITING.")
 
     def update_list(
@@ -3223,6 +3312,7 @@ class JobList:
             as_conf: 'AutosubmitConfig',
             store_change: bool = True,
             from_set_status: bool = False,
+            persist_edges: bool = True,
     ) -> bool:
         """Updates job list, resetting failed jobs and changing to READY
                 all WAITING jobs with all parents COMPLETED
@@ -3230,24 +3320,33 @@ class JobList:
         :param as_conf: Autosubmit configuration object.
         :param store_change: Whether to store changes after update.
         :param from_set_status: If called from set status.
+        :param persist_edges: If False, do not write edge satisfaction to the database.
         :return: True if any job status was updated, False otherwise.
         """
         save_jobs = False
         if self.update_from_file(store_change):
             save_jobs = store_change
         Log.debug('Updating FAILED jobs')
-        save_jobs |= self._update_failed_jobs(as_conf)
-        save_jobs |= self._sync_completed_jobs()
+        save_jobs |= self._update_failed_jobs(as_conf, persist=persist_edges)
+        if not from_set_status:
+            save_jobs |= self._refresh_checkpoint_steps(persist=persist_edges)
+        save_jobs |= self._sync_completed_jobs(persist=persist_edges)
         if not from_set_status:
             save_jobs |= self._update_waiting_and_delayed_jobs()
             save_jobs |= self._skip_jobs(as_conf)
         for job in [job for job in self.get_ready() if not self.is_wrapper_still_running(job)]:
             job.set_ready_date()
 
-        if not self.disable_save:
-            for job in self.job_list:
-                if job.status in (Status.COMPLETED, Status.FAILED, Status.SKIPPED):
-                        self.dbmanager.update_outgoing_edges_satisfied(job.name, Status.VALUE_TO_KEY.get(job.status, ''))
+        if persist_edges and not self.disable_save:
+            pending = [
+                (job.name, Status.VALUE_TO_KEY.get(job.status, ''), job.current_checkpoint_step)
+                for job in self.job_list
+                if job.status in (Status.COMPLETED, Status.FAILED, Status.SKIPPED)
+                and self.graph.has_node(job.name)
+                and self.graph.out_degree(job.name) > 0
+            ]
+            if pending:
+                self.dbmanager.update_outgoing_edges_satisfied_batch(pending)
 
         Log.debug('Update finished')
         return save_jobs
@@ -3273,7 +3372,7 @@ class JobList:
                         return job.packed
         return job.packed
 
-    def _update_failed_jobs(self, as_conf: 'AutosubmitConfig') -> bool:
+    def _update_failed_jobs(self, as_conf: 'AutosubmitConfig', persist: bool = True) -> bool:
         """
         Update failed jobs, retrying them if possible or marking as FAILED.
 
@@ -3325,29 +3424,15 @@ class JobList:
                     job.status = Status.WAITING
                     save = True
                     Log.debug(f"Resetting job: {job.name} status to: WAITING for parents completion...")
+                job.begin_new_attempt()
+                if persist:
+                    self.reset_outgoing_edges_satisfied(job.name)
             else:
                 job.status = Status.FAILED
                 save = True
         return save
 
-    def _handle_special_checkpoint_jobs(self) -> tuple[bool, bool]:
-        """Set jobs that fulfill special checkpoint conditions to READY.
-
-        Return a tuple with two booleans: (save_jobs, save_edges).
-        """
-        save_all = False
-        for job in self.check_special_status():
-            if not self._as_conf.is_section_in_any_wrapper(job.section):
-                self._as_conf.check_wrapper_conf()
-
-                job.status = Status.READY
-                job.id = None
-                job.wrapper_type = None
-                save_all = True
-                Log.result(f"JOB: {job.name} was set to READY all parents are in the desired status.")
-        return save_all
-
-    def _sync_completed_jobs(self) -> bool:
+    def _sync_completed_jobs(self, persist: bool = True) -> bool:
         """Synchronize jobs with parents' completion status. If
 
         :return: True if any job status was updated, False otherwise.
@@ -3365,12 +3450,18 @@ class JobList:
                             if parent.status != Status.COMPLETED:
                                 job.status = Status.WAITING
                                 save = True
+                                job.begin_new_attempt()
+                                if persist:
+                                    self.reset_outgoing_edges_satisfied(job.name)
                                 Log.debug(
                                     f"Resetting sync job: {job.name} status to: WAITING for parents completion...")
                                 break
                     else:
                         job.status = Status.WAITING
                         save = True
+                        job.begin_new_attempt()
+                        if persist:
+                            self.reset_outgoing_edges_satisfied(job.name)
                         Log.debug(f"Resetting sync job: {job.name} status to: WAITING for parents completion...")
         return save
 
@@ -3403,7 +3494,7 @@ class JobList:
                         if db_status is not None:
                             parent_job.status = db_status
                 parents_nodes[parent_name] = parent_job
-            non_completed, completed = self._count_parents_status(job, parents_edge_info, parents_nodes)
+            non_completed, completed = self._count_parents_status(parents_edge_info, parents_nodes)
             if len(non_completed) == 0 and len(completed) > 0:
                 Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
                 job.status = Status.READY
@@ -3701,6 +3792,8 @@ class JobList:
                 job_sections.add(job.section)
                 if not monitor:
                     job.status = Status.WAITING
+                    job.begin_new_attempt()
+                    self.reset_outgoing_edges_satisfied(job.name)
                 if job.member is not None and len(str(job.member)) > 0:
                     member_list.add(job.member)
                 if job.chunk is not None and len(str(job.chunk)) > 0:
@@ -3736,6 +3829,8 @@ class JobList:
                                 section_name, job.date, job.member, job.chunk):
                             if not monitor:
                                 parent.status = Status.WAITING
+                                parent.begin_new_attempt()
+                                self.reset_outgoing_edges_satisfied(parent.name)
                             Log.debug("Parent: " + parent.name)
 
     def _get_jobs_parser(self):

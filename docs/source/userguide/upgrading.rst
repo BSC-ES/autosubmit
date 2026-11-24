@@ -10,7 +10,7 @@ Upgrading
 
 Autosubmit 4.2 stores the workflow in a database and does not read the ``job_list.pkl`` file
 written by <4.2. The workflow is regenerated from the YAML configuration, so an experiment created,
-per example, with 4.1 must be created again after upgrading.
+for example, with 4.1 must be created again after upgrading.
 
 Upgrade procedure
 -----------------
@@ -23,6 +23,7 @@ Upgrade procedure
 
    .. code-block:: bash
 
+       autosubmit updateversion <EXPID>
        autosubmit create <EXPID> -f -v
 
 5. Recover the job statuses from the platform and the experiment history. Run the dry-run first,
@@ -35,7 +36,7 @@ Upgrade procedure
 
    Add ``--offline`` if the platform is not reachable and you only need the local history.
 
-7. Resume the experiment:
+6. Resume the experiment:
 
    .. code-block:: bash
 
@@ -43,6 +44,21 @@ Upgrade procedure
 
 The old ``job_list.pkl`` and its backup are no longer used. Keep them for reference or archive them
 with the rest of the experiment.
+
+Databases from pre-release 4.2 builds
+-------------------------------------
+
+Autosubmit 4.2 stores the workflow and the experiment history in databases, and their schema is
+still changing during the 4.2 development line. Database schemas created by a pre-release 4.2
+build are not migrated and may be incompatible with the final 4.2 schema. If the experiment
+already ran with a pre-release 4.2 build, recreate its databases before regenerating the workflow:
+
+- SQLite: remove ``<EXPID>/db/job_list.db`` (under ``[local] path``) and ``job_data_<EXPID>.db``
+  (under ``[historicdb] path``).
+- PostgreSQL: drop and recreate the experiment schema.
+
+or/and run ``autosubmit create <EXPID> -f``. Experiments created with 4.1 have no such
+databases.
 
 Start conditions
 ----------------
@@ -69,7 +85,7 @@ accept. ``SUCCEEDED`` expands to ``COMPLETED`` and ``SKIPPED``, and ``FINISHED``
         behavior. ``COMPLETED`` now means exactly ``COMPLETED``.
     * - ``STATUS: SKIPPED``
       - Changed. In 4.1 a ``COMPLETED`` or ``FAILED`` parent could also satisfy it. Use
-        ``SKIPPED,SUCCEEDED`` for successful outcomes, or ``FINISHED`` to accept any outcome.
+        ``SUCCEEDED`` for successful outcomes, or ``FINISHED`` to accept any outcome.
     * - ``STATUS: FAILED``
       - Changed. In 4.1 a ``COMPLETED`` parent also satisfied it. Use ``FINISHED`` to run after any
         outcome.
@@ -91,6 +107,9 @@ accept. ``SUCCEEDED`` expands to ``COMPLETED`` and ``SKIPPED``, and ``FINISHED``
         Enabled flags raise ``AutosubmitCritical``.
     * - ``FAIL_OK: false``, ``OPTIONAL: false``
       - No behavioural change. They are removed during configuration normalization.
+    * - ``WEAK: true`` (pre-release 4.2)
+      - Removed. Use ``STATUS: FINISHED`` when any outcome is acceptable. An enabled flag raises
+        ``AutosubmitCritical``, and a disabled one is removed during configuration normalization.
 
 If ``autosubmit create`` raises ``Invalid STATUS``, the message lists the accepted values. Fix the
 configuration and run ``autosubmit create <EXPID> -f`` again.

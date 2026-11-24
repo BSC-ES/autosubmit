@@ -925,6 +925,7 @@ def create(
             as_conf.get_default_job_type(),
             force=force,
             full_load=True,
+            reset_satisfaction=True,
         )
         if str(rerun).lower() == "true":
             job_list.rerun(as_conf.get_rerun_jobs(), as_conf)

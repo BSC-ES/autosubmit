@@ -143,10 +143,19 @@ def _status_name(status: int | str | None) -> str | None:
     return None
 
 
+def split_start_condition_tokens(value: str) -> list[str]:
+    """Split a comma or whitespace separated start condition string into raw tokens.
+
+    :param value: Raw ``STATUS`` string.
+    :return: Raw tokens, without normalizing case or expanding aliases.
+    """
+    return value.replace(",", " ").split()
+
+
 def _start_condition_tokens(value: int | str | Sequence[str | int]) -> Iterable[str]:
     """Yield the raw start condition tokens from a scalar or ordered sequence.
 
-    :param value: Status name, status code, comma separated string, or sequence of those.
+    :param value: Status name, status code, comma or whitespace separated string, or sequence of those.
     :return: Raw tokens as strings, without normalizing case or expanding aliases.
     :raise ValueError: If the value is a boolean, an unordered container or an invalid code.
     """
@@ -163,10 +172,7 @@ def _start_condition_tokens(value: int | str | Sequence[str | int]) -> Iterable[
         yield name
         return
     if isinstance(value, str):
-        for token in value.split(","):
-            token = token.strip()
-            if token:
-                yield token
+        yield from split_start_condition_tokens(value)
         return
     for item in value:
         yield from _start_condition_tokens(item)
@@ -196,13 +202,13 @@ def _expand_start_conditions(tokens: Iterable[str]) -> list[str]:
 
 @lru_cache(maxsize=1024)
 def _parse_start_condition_string(value: str) -> tuple[str, ...]:
-    """Return the canonical status names for a comma separated start condition.
+    """Return the canonical status names for a comma or whitespace separated start condition.
 
-    :param value: Comma separated status names or aliases.
+    :param value: Comma or whitespace separated status names or aliases.
     :return: Canonical status names accepted by the condition.
     :raise ValueError: If a token is not a valid start condition status.
     """
-    tokens = [token.strip() for token in value.split(",") if token.strip()]
+    tokens = split_start_condition_tokens(value)
     return tuple(_expand_start_conditions(tokens))
 
 
@@ -212,11 +218,11 @@ def parse_start_conditions(
     """Return the canonical status names accepted by a start condition.
 
     ``SUCCEEDED`` expands to ``COMPLETED, SKIPPED`` and ``FINISHED`` expands to
-    ``COMPLETED, SKIPPED, FAILED``. Names are case-insensitive, can come as a comma separated
-    string or an ordered sequence, and are deduplicated preserving their order. An empty value
-    returns the default condition, ``COMPLETED, SKIPPED``.
+    ``COMPLETED, SKIPPED, FAILED``. Names are case-insensitive, can come as a comma or
+    whitespace separated string or an ordered sequence, and are deduplicated preserving their
+    order. An empty value returns the default condition, ``COMPLETED, SKIPPED``.
 
-    :param value: Status name, status code, comma separated string, sequence of those, or ``None``.
+    :param value: Status name, status code, comma or whitespace separated string, sequence of those, or ``None``.
     :return: Canonical status names accepted by the condition.
     :raise ValueError: If a token is not a valid start condition status.
     """
@@ -231,19 +237,20 @@ def is_edge_satisfied(
     parent_status: int | str,
     accepted_statuses: int | str | Sequence[str | int] | None,
     from_step: int = 0,
-    child_checkpoint_step: int = 0,
+    parent_checkpoint_step: int = 0,
 ) -> bool:
     """Return whether a parent satisfies the start condition of a dependency edge.
 
     ``STATUS`` is a set of exact statuses. When no condition is given, the edge waits for a
     successful ending (``COMPLETED`` or ``SKIPPED``). ``COMPLETED``, ``SKIPPED`` and ``FAILED``
-    are distinct statuses. ``RUNNING`` is the only status that uses the ``FROM_STEP`` checkpoint.
+    are distinct statuses. ``FROM_STEP`` applies to ``RUNNING`` and ``FAILED``, which use the
+    checkpoint step reached by the parent.
 
     :param parent_status: Current status of the parent job, as a ``Status`` code or its name.
-    :param accepted_statuses: Accepted statuses, as names, codes, a comma separated string or an
-        ordered sequence of those.
-    :param from_step: Internal step the parent must have reached, used with ``RUNNING``.
-    :param child_checkpoint_step: Checkpoint step recorded for the child job.
+    :param accepted_statuses: Accepted statuses, as names, codes, a comma or whitespace separated
+        string or an ordered sequence of those.
+    :param from_step: Internal step the parent must have reached, used with ``RUNNING`` and ``FAILED``.
+    :param parent_checkpoint_step: Checkpoint step reached by the parent job.
     :return: ``True`` if the parent satisfies the edge, ``False`` otherwise.
     :raise AutosubmitCritical: If the start condition is not valid.
     """
@@ -259,12 +266,12 @@ def is_edge_satisfied(
         ) from error
     if parent not in accepted:
         return False
-    if parent != "RUNNING":
-        return True
     threshold = int(from_step or 0)
     if threshold == 0:
         return True
-    return int(child_checkpoint_step or 0) >= threshold
+    if parent in ("RUNNING", "FAILED"):
+        return int(parent_checkpoint_step or 0) >= threshold
+    return True
 
 
 class bcolors:

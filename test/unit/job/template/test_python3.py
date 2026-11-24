@@ -19,7 +19,6 @@
 
 import sys
 from subprocess import run
-from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import pytest
@@ -174,24 +173,3 @@ def test_stat_file_written_on_failure(tmp_path: 'Path'):
     assert (tmp_path / f'{_JOBNAME}_STAT_{_FAIL_COUNT}').exists()
 
 
-def test_checkpoint_file_created(tmp_path: 'Path'):
-    """Calling ``as_checkpoint()`` creates a ``_CHECKPOINT_N`` file."""
-    script_path = _build_script(tmp_path, "as_checkpoint()")
-    run([sys.executable, str(script_path)], capture_output=True, text=True)
-    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_1').exists()
-
-
-def test_multiple_checkpoints_create_sequential_files(tmp_path: 'Path'):
-    """Each ``as_checkpoint()`` call creates a sequentially numbered file."""
-    script_path = _build_script(
-        tmp_path,
-        dedent("""\
-            as_checkpoint()
-            as_checkpoint()
-            as_checkpoint()
-        """),
-    )
-    run([sys.executable, str(script_path)], capture_output=True, text=True)
-    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_1').exists()
-    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_2').exists()
-    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_3').exists()

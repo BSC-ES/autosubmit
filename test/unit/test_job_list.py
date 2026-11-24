@@ -25,6 +25,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.database.models.tables import ExperimentStructureTable
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import DEFAULT_START_CONDITION, Status, is_edge_satisfied
 from autosubmit.job.job_dict import DicJobs
@@ -106,6 +107,43 @@ def test_save_jobs(as_conf, setup_job_list, tmp_path):
     assert len(db_edges) == len(job_list.graph.edges)
 
 
+def test_save_jobs_persists_current_checkpoint_step(as_conf):
+    """The parent checkpoint counter is persisted and loaded from the jobs table."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job = Job("cp", 1, Status.RUNNING, 0)
+    job.current_checkpoint_step = 2
+    job.max_checkpoint_step = 3
+    job.checkpoint_attempt = 4
+    job_list.dbmanager.save_jobs([job])
+
+    row = job_list.dbmanager.load_job_by_name("cp")
+
+    assert row["current_checkpoint_step"] == 2
+    assert row["max_checkpoint_step"] == 3
+    assert row["checkpoint_attempt"] == 4
+
+
+def test_sync_completed_jobs_resets_outgoing_edges(as_conf):
+    """A COMPLETED job that goes back to WAITING resets its outgoing edges."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job = Job("sync", 1, Status.COMPLETED, 0)
+    job.synchronize = "true"
+    parent = Job("parent", 2, Status.RUNNING, 0)
+    job.parents.add(parent)
+    job_list.graph.add_node(job.name, job=job)
+    job_list.graph.add_node(parent.name, job=parent)
+    job_list.dbmanager.save_edges([{
+        "e_from": "sync", "e_to": "child",
+        "accepted_statuses": DEFAULT_START_CONDITION, "from_step": 0, "is_satisfied": True,
+    }])
+    structure = job_list.dbmanager.table_registry.get(ExperimentStructureTable.name)
+
+    assert job_list._sync_completed_jobs() is True
+
+    edge = job_list.dbmanager.select_where_with_columns(structure, {"e_from": "sync"})[0]
+    assert dict(edge)["is_satisfied"] is False
+
+
 def test_get_status_counts(as_conf, setup_job_list, tmp_path):
     """get_status_counts counts jobs from the DB, including jobs not in memory."""
     _jobs, _edges, job_list = setup_job_list
@@ -168,7 +206,7 @@ def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool,
                     parent_status=Status.VALUE_TO_KEY.get(job.status, ''),
                     accepted_statuses=edge.get("accepted_statuses", DEFAULT_START_CONDITION),
                     from_step=edge.get("from_step", 0),
-                    child_checkpoint_step=child.current_checkpoint_step or 0,
+                    parent_checkpoint_step=job.current_checkpoint_step or 0,
                 ):
                     childs.append(child)
         view_original = list(set(view_original) | set(childs))
@@ -1008,20 +1046,22 @@ def test_update_from_file_applies_change_to_job_stored_only_in_database(as_conf,
     per-attempt state for re-runnable targets and does not load them into the graph."""
     mocker.patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
     job_list = JobList("a000", as_conf, YAMLParserFactory())
-    stored = Job("STOREDJOB", 9, Status.COMPLETED, 0)
+    stored = Job("a000_STOREDJOB", 9, Status.COMPLETED, 0)
+    stored.checkpoint_attempt = 3
     job_list.dbmanager.save_jobs([stored])
     update_path = tmp_path / "updated_list_a000.txt"
     job_list._update_file_path = update_path
-    update_path.write_text("storedjob WAITING\n", encoding="utf-8")
+    update_path.write_text("a000_STOREDJOB WAITING\n", encoding="utf-8")
 
     assert job_list.update_from_file() is True
 
-    row = job_list.dbmanager.load_job_by_name("STOREDJOB")
+    row = job_list.dbmanager.load_job_by_name("a000_STOREDJOB")
     assert row["status"] == "WAITING"
     assert row["id"] is None
     assert row["fail_count"] == 0
     assert row["updated_log"] == 0
-    assert job_list.get_job_by_name("STOREDJOB") is None
+    assert row["checkpoint_attempt"] == 4
+    assert job_list.get_job_by_name("a000_STOREDJOB") is None
     assert not update_path.exists()
 
 
@@ -1033,14 +1073,14 @@ def test_update_from_file_applies_change_to_job_stored_only_in_database(as_conf,
         ("# a comment", None),
         ("   # indented comment", None),
         ("job1", None),
-        ("job1 COMPLETED trailing", ("JOB1", "COMPLETED")),
-        ("myjob waiting", ("MYJOB", "WAITING")),
+        ("job1 COMPLETED trailing", ("job1", "COMPLETED")),
+        ("myjob waiting", ("myjob", "WAITING")),
     ],
     ids=["blank", "whitespace", "comment", "indented-comment", "missing-status",
-         "extra-tokens", "uppercased"],
+         "extra-tokens", "keeps-name-case"],
 )
 def test_parse_update_line(line, expected):
-    """_parse_update_line strips, uppercases and ignores blank/comment/malformed lines."""
+    """_parse_update_line strips, uppercases the status and ignores blank/comment/malformed lines."""
     assert JobList._parse_update_line(line, "updated_list_a000.txt") == expected
 
 
@@ -1081,6 +1121,7 @@ def test_persist_unloaded_job_changes_splits_reset_and_edge_updates(as_conf, moc
     job_list = JobList("a000", as_conf, YAMLParserFactory())
     mocked_save = mocker.patch.object(job_list.dbmanager, "save_jobs")
     mocked_edges = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_satisfied")
+    mocked_reset = mocker.patch.object(job_list.dbmanager, "reset_outgoing_edges_satisfied")
     rerunnable = Job("RERUN", None, Status.READY, 0)
     final = Job("DONE", 5, Status.COMPLETED, 0)
     other = Job("UNKNOWN_STATE", None, Status.UNKNOWN, 0)
@@ -1092,7 +1133,11 @@ def test_persist_unloaded_job_changes_splits_reset_and_edge_updates(as_conf, moc
         mocker.call([rerunnable], reset_log_counters=True),
         mocker.call([final, other], reset_log_counters=False),
     ])
-    mocked_edges.assert_called_once_with("DONE", "COMPLETED")
+    mocked_reset.assert_has_calls([
+        mocker.call("RERUN"),
+        mocker.call("UNKNOWN_STATE"),
+    ])
+    mocked_edges.assert_called_once_with("DONE", "COMPLETED", 0)
 
 
 def test_persist_unloaded_job_changes_skipped_when_saving_disabled(as_conf, mocker):
@@ -1105,6 +1150,101 @@ def test_persist_unloaded_job_changes_skipped_when_saving_disabled(as_conf, mock
 
     mocked_save.assert_not_called()
     mocked_edges.assert_not_called()
+
+
+def test_refresh_checkpoint_steps_uses_parent_checkpoint_files(as_conf, mocker):
+    """The parent checkpoint counter advances by checking its own checkpoint files."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    parent = Job("parent", 1, Status.RUNNING, 0)
+    parent.max_checkpoint_step = 3
+    parent.current_checkpoint_step = 0
+    platform = mocker.MagicMock()
+    platform.connected = True
+    platform.serial_platform = platform
+    platform.check_file_exists.side_effect = lambda name, **_: name in {
+        "parent_CHECKPOINT_0_1", "parent_CHECKPOINT_0_2"
+    }
+    parent.platform = platform
+    job_list.graph.add_node(parent.name, job=parent)
+
+    assert job_list._refresh_checkpoint_steps() is True
+    assert parent.current_checkpoint_step == 2
+    assert platform.check_file_exists.call_args_list[0].args[0] == "parent_CHECKPOINT_0_1"
+
+    assert job_list._refresh_checkpoint_steps() is False
+
+
+@pytest.mark.parametrize(
+    "edges",
+    [
+        None,
+        [{"e_from": "parent", "e_to": "missing_child", "from_step": 3,
+          "accepted_statuses": "RUNNING"}],
+    ],
+    ids=["from-graph", "from-raw-edges-with-unloaded-child"],
+)
+def test_recompute_checkpoint_limits(as_conf, edges):
+    """max_checkpoint_step is derived from outgoing edges, including edges to unloaded children."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    parent = Job("parent", 1, Status.RUNNING, 0)
+    child = Job("child", 2, Status.WAITING, 0)
+    job_list.graph.add_node(parent.name, job=parent)
+    if edges is None:
+        job_list.graph.add_node(child.name, job=child)
+        job_list.graph.add_edge(parent.name, child.name, accepted_statuses="RUNNING", from_step=3)
+    parent.max_checkpoint_step = None
+
+    job_list._recompute_checkpoint_limits(edges)
+
+    assert parent.max_checkpoint_step == 3
+    if edges is None:
+        assert child.max_checkpoint_step == 0
+
+
+def test_retry_resets_parent_checkpoint_step(mocker):
+    """A retried parent starts its checkpoint counter from zero again."""
+    as_conf = mocker.MagicMock()
+    as_conf.jobs_data = {"SIM": {}}
+    as_conf.get_retrials.return_value = 1
+    as_conf.get_delay_retry_time.return_value = "0"
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    parent = Job("parent", 1, Status.FAILED, 0)
+    parent.section = "SIM"
+    parent.fail_count = 0
+    parent.retrials = 1
+    parent.current_checkpoint_step = 2
+    parent.max_checkpoint_step = 2
+    job_list.graph.add_node(parent.name, job=parent)
+    mocker.patch.object(job_list, "get_failed", return_value=[parent])
+    mocker.patch.object(job_list, "is_wrapper_still_running", return_value=False)
+    reset = mocker.patch.object(job_list.dbmanager, "reset_outgoing_edges_satisfied")
+
+    job_list._update_failed_jobs(as_conf)
+
+    assert parent.current_checkpoint_step == 0
+    assert parent.checkpoint_attempt == 1
+    reset.assert_called_once_with("parent")
+
+
+def test_update_list_dry_run_does_not_write_edges(mocker):
+    """persist_edges=False must not touch the edge satisfaction tables."""
+    as_conf = mocker.MagicMock()
+    as_conf.jobs_data = {"SIM": {}}
+    as_conf.get_retrials.return_value = 1
+    as_conf.get_delay_retry_time.return_value = "0"
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    parent = Job("parent", 1, Status.FAILED, 0)
+    parent.section = "SIM"
+    parent.fail_count = 0
+    parent.retrials = 1
+    job_list.graph.add_node(parent.name, job=parent)
+    update = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_satisfied")
+    reset = mocker.patch.object(job_list.dbmanager, "reset_outgoing_edges_satisfied")
+
+    job_list.update_list(as_conf, from_set_status=True, persist_edges=False)
+
+    update.assert_not_called()
+    reset.assert_not_called()
 
 
 def test_update_from_file_returns_false_without_update_file(as_conf, tmp_path):
@@ -1159,10 +1299,10 @@ def test_collect_update_changes_duplicate_lines_last_wins(as_conf, mocker):
         ["DUP COMPLETED", "dup WAITING", "DUP FAILED"]
     )
 
-    assert len(pairs) == 1
+    assert pairs == []
     assert len(unloaded_pairs) == 1
-    assert pairs[0][0] is not None
-    assert pairs[0][1] == Status.FAILED
+    assert unloaded_pairs[0][0] is not None
+    assert unloaded_pairs[0][1] == Status.FAILED
 
 
 @pytest.fixture
