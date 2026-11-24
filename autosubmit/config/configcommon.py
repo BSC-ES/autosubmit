@@ -996,7 +996,7 @@ class AutosubmitConfig:
             dict_keys_type = self.check_dict_keys_type(parameters)
 
         while len(dynamic_variables) > 0 and max_deep > 0:
-            validate_dependencies(parameters)
+            validate_dependencies(parameters, self.default_parameters)
             dynamic_variables_, parameters = self._process_dynamic_variables(
                 dynamic_variables,
                 parameters,
@@ -2176,15 +2176,25 @@ class AutosubmitConfig:
         """Sets the default parameters for the experiment."""
         self.default_parameters: dict = {
             "d": "%d%",
-            "d_": "%d_%",
             "d-": "%d-%",
+            "d_": "%d_%",
+            "D": "%d_%",
+            "D-": "%d%",
+            "D_": "%d-%",
+            "y": "%Y%",
+            "y-": "%Y-%",
+            "y_": "%Y_%",
             "Y": "%Y%",
-            "Y_": "%Y_%",
             "Y-": "%Y-%",
+            "Y_": "%Y_%",
             "M": "%M%",
+            "M-": "%M-%",
             "M_": "%M_%",
             "m": "%m%",
+            "m-": "%m-%",
             "m_": "%m_%",
+            "H-": "%H-%",
+            "h-": "%h-%",
         }
         user_defined = self.experiment_data.get("CONFIG", {}).get(
             "SAFE_PLACEHOLDERS", []

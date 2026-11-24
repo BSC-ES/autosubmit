@@ -271,34 +271,14 @@ def build_dependency_graph(data) -> tuple[DiGraph, list]:
     return graph, unresolved
 
 
-def validate_dependencies(data) -> None:
-    """
-    It'll create a graph and check it cycles itself or is a valid non-cyclical dependency.
+def validate_dependencies(data, date_parameters) -> None:
+    """It'll create a graph and check it cycles itself or is a valid non-cyclical dependency.
 
+    :param date_parameters: Dict of values to be ignored in the variable substitution
     :param data: Dictionary containing the parameters to be substituted. If None, it will use self.experiment_data.
     """
-    date_parameters: set = {
-        "d-",
-        "d",
-        "d_",
-        "D-",
-        "D",
-        "D_",
-        "Y-",
-        "Y",
-        "Y_",
-        "y-",
-        "y",
-        "y_",
-        "M-",
-        "M",
-        "M_",
-        "m-",
-        "m",
-        "m_",
-    }
     graph, unresolved = build_dependency_graph(data)
-    unresolved = [elem for elem in unresolved if elem[1] not in date_parameters]
+    unresolved = [elem for elem in unresolved if elem[1] not in date_parameters.keys()]
     if not nx.is_directed_acyclic_graph(graph):
         cycle = nx.find_cycle(graph)
         chain = " -> ".join([u for u, v, *_ in cycle] + [cycle[-1][1]])
