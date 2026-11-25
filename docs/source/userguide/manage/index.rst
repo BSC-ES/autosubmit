@@ -201,7 +201,9 @@ Mandatory arguments:
 
 Optional filter arguments (combine multiple for granular selection):
 
-* ``-fl``: space-separated list of job names
+* ``-fl``: space-separated list of exact, case-sensitive job names. If a name
+  no longer exists after a workflow change, check current names with
+  ``autosubmit monitor <EXPID>`` before retrying.
 
 ::
 

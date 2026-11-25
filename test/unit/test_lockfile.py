@@ -18,7 +18,7 @@
 import pytest
 from portalocker.exceptions import BaseLockException
 
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, AutosubmitUserError
 from autosubmit.scripts._args import exit_from_error
 
 
@@ -105,6 +105,19 @@ def test_exit_from_error_logs_autosubmit_critical_trace(mocker):
     assert result == exception.code
     assert mocked_log.critical.call_count == 3
     mocked_log.critical.assert_any_call("Trace: a trace")
+
+
+def test_exit_from_error_logs_user_error_traceback_only_at_debug(mocker):
+    mocked_log = mocker.patch("autosubmit.scripts._args.Log")
+
+    try:
+        raise AutosubmitUserError("Job not found", 7011)
+    except AutosubmitUserError as error:
+        assert exit_from_error(error) == 7011
+
+    mocked_log.critical.assert_called_once_with("Job not found [eCode=7011]")
+    mocked_log.debug.assert_called_once()
+    assert "Traceback" in mocked_log.debug.call_args.args[0]
 
 
 def test_exit_from_error_logs_portalocker_warning(mocker):
