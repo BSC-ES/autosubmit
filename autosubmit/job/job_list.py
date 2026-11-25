@@ -4097,8 +4097,9 @@ class JobList:
 
             def _parse_value(value, fallback):
                 # "0" means the timestamp is not available yet (not submitted,
-                # not started, or not finished). Falling back avoids building
-                # queuing/running deltas from the epoch.
+                # not started, or not finished). parse_date() cannot parse "0",
+                # and the broad except used to overwrite start/finish with now,
+                # so substitute only the missing field and keep the valid ones.
                 if value == "0":
                     return fallback
                 return parse_date(value)
