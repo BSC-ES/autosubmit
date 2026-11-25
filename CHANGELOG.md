@@ -57,6 +57,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `Log.set_file` failing (after retrying) when the log directory had missing parent directories or
   when given a bare file name; the directory is now created with its parents #3240 (thanks @anyingiit)
 - Ensure Autosubmit deletes PostgreSQL database schemas when deleting an experiment #3383
+- Report unknown job names in `setstatus -fl` and `recovery -fl` without a traceback at the default console log level #3382
 
 **New Features:**
 

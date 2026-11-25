@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job_common import Status, separate_section_entries
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitUserError
 from autosubmit.utils import create_json
 
 if TYPE_CHECKING:
@@ -74,43 +74,31 @@ def _validate_list(as_conf: AutosubmitConfig, job_list: 'JobList', filter_list: 
     :param filter_list: string with the jobs separated by space
     :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
     """
-    job_validation_error = False
-    job_error = False
-    job_not_found_list = []
-    job_validation_message = "\n## Job Validation Message ##"
-    jobs = []
     count_start = filter_list.count("[")
     count_end = filter_list.count("]")
     if count_start > 1 or count_end > 1:
-        job_validation_error = True
-        job_validation_message += "\n\tList of jobs has a format error. Perhaps you were trying to use -fc instead."
-
-    if job_validation_error is False:
-        for job in job_list.get_job_list():
-            jobs.append(job.name)
-        if len(str(filter_list).strip()) > 0:
-            if len(filter_list.split()) > 0:
-                for sentJob in filter_list.split():
-                    # Provided job does not exist, or it is not the keyword 'Any'
-                    if sentJob not in jobs and (sentJob.upper() != "ANY"):
-                        job_error = True
-                        job_not_found_list.append(sentJob)
-        else:
-            job_validation_error = True
-            job_validation_message += "\n\tEmpty input. No changes performed."
-
-    if job_validation_error is True or job_error is True:
-        if job_error is True:
-            job_validation_message += (
-                "\n\tSpecified job(s) : ["
-                + str(job_not_found_list)
-                + "] not found in the experiment "
-                + str(as_conf.expid)
-                + ". \n\tProcess stopped. Review the format of the provided input. Comparison is case sensitive."
-                + "\n\tRemember that this option expects job names separated by a blank space as input."
-            )
         raise AutosubmitCritical(
-            "Error in the supplied input for -fl.", 7011, job_validation_message
+            "Error in the supplied input for -fl.",
+            7011,
+            "List of jobs has a format error. Perhaps you were trying to use -fc instead.",
+        )
+
+    requested_jobs = filter_list.split()
+    if not requested_jobs:
+        raise AutosubmitCritical(
+            "Error in the supplied input for -fl.", 7011, "Empty input. No changes performed."
+        )
+
+    known_jobs = {job.name for job in job_list.get_job_list()}
+    missing_jobs = [
+        name for name in requested_jobs if name.upper() != "ANY" and name not in known_jobs
+    ]
+    if missing_jobs:
+        raise AutosubmitUserError(
+            f"Job(s) not found in experiment {as_conf.expid}: {', '.join(missing_jobs)}.",
+            7011,
+            f"Use 'autosubmit monitor {as_conf.expid}' to review current job names. "
+            "The -fl filter requires exact, case-sensitive names.",
         )
 
 

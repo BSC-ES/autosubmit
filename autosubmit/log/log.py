@@ -82,6 +82,10 @@ class AutosubmitCritical(Exception):
         return msg
 
 
+class AutosubmitUserError(AutosubmitCritical):
+    """Expected user input error whose traceback belongs in debug logs."""
+
+
 class LogFormatter(logging.Formatter):
     """
     Class to format log output.

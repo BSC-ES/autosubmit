@@ -28,7 +28,12 @@ from typing import Any, TypeVar, cast, get_type_hints
 
 from portalocker.exceptions import BaseLockException
 
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.log.log import (
+    AutosubmitCritical,
+    AutosubmitError,
+    AutosubmitUserError,
+    Log,
+)
 from autosubmit.profiler.profiler import Profiler
 
 __all__ = [
@@ -337,9 +342,13 @@ def exit_from_error(e: BaseException) -> int:
     err_code = 1
     trace = traceback.format_exc()
     try:
-        Log.critical(trace)
+        if isinstance(e, AutosubmitUserError):
+            Log.debug(trace)
+        else:
+            Log.critical(trace)
     except Exception:
-        print(trace)
+        if not isinstance(e, AutosubmitUserError):
+            print(trace)
 
     is_portalocker_error = isinstance(e, BaseLockException)
     is_autosubmit_error = isinstance(e, (AutosubmitCritical, AutosubmitError))

@@ -28,7 +28,7 @@ from autosubmit.database.managers.history import (
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import load_job_list
 from autosubmit.job.manage import set_status
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitUserError
 
 if TYPE_CHECKING:
     from integration.conftest import AutosubmitExperiment
@@ -464,7 +464,15 @@ def test_set_status_filter_chunks_invalid_section_raises_validation_error(as_exp
         )
 
 
-def test_set_status_invalid_job_in_list_raises_validation_error(as_exp):
+@pytest.mark.parametrize(
+    "invalid_job_pattern",
+    [
+        "9999_20200101_fc0_1_1_LOCALJOB",
+        "{expid}_20200101_fc9_1_1_LOCALJOB",
+        "{expid}_20200101_fc0_99_1_LOCALJOB",
+    ],
+)
+def test_set_status_invalid_job_in_list_raises_validation_error(as_exp, invalid_job_pattern):
     """Invalid job IDs ``-fl`` raises AutosubmitCritical."""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
         as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
@@ -474,16 +482,25 @@ def test_set_status_invalid_job_in_list_raises_validation_error(as_exp):
     reset(as_exp, "WAITING")
 
     valid_job = f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB"
-    invalid_expid_job = "9999_20200101_fc0_1_1_LOCALJOB"
-    filter_list = f"{valid_job} {invalid_expid_job}"
+    invalid_job = invalid_job_pattern.format(expid=as_exp.expid)
+    filter_list = f"{valid_job} {invalid_job}"
 
-    with pytest.raises(AutosubmitCritical):
+    with pytest.raises(AutosubmitUserError) as exc_info:
         do_setstatus(
             as_exp,
             fl=filter_list,
             fs="WAITING",
             target="COMPLETED",
         )
+
+    error = exc_info.value
+    assert error.code == 7011
+    assert error.message == f"Job(s) not found in experiment {as_exp.expid}: {invalid_job}."
+    assert f"autosubmit monitor {as_exp.expid}" in error.trace
+    job_list = load_job_list(
+        as_exp.expid, as_exp.as_conf, new=False, full_load=True, check_failed_jobs=True
+    )
+    assert next(job.status for job in job_list.get_job_list() if job.name == valid_job) == Status.WAITING
 
 
 def test_set_status_combined_any_tokens_do_nothing(as_exp):
