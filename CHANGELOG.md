@@ -155,6 +155,11 @@ several bug fixes and enhancements to improve the overall user experience.
 - Updated project coverage replacing pass statements by ... #2585 (thanks @Vietpr)
 - Tidy the "Stopping the experiment" documentation section #3423 (thanks @Muhtasim-Munif-Fahim)
 
+**Deprecations:**
+
+- The `HELD` job status is deprecated and will be removed in a future release. It is kept for backward
+  compatibility and is not reset during wrapper reconciliation.
+
 ### 4.1.17.2: Bug fixes and enhancements (port of #3309)
 
 **Bug fixes:**

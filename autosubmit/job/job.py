@@ -3422,6 +3422,8 @@ class WrapperJob(Job):
             self._clear_inner_wait(inner_job)
             return inner_job.status
 
+        # The inner job is not in a terminal state (memory). Check remote stat content
+        # and update the status accordingly
         confirmed = self._status_from_confirmed_stat(inner_job, stat)
         if confirmed is not None:
             return confirmed
@@ -3479,6 +3481,8 @@ class WrapperJob(Job):
         :param fallback: Status to use when an in-wrapper parent is still pending.
         :return: The new status for the inner job.
         """
+        # The wrapper finished. We know that the job failed but it is possible
+        # that it completed in a retry for which the stat has not been updated yet
         if (
             inner_job.status == Status.FAILED
             and wrapper_is_done
@@ -3489,8 +3493,10 @@ class WrapperJob(Job):
 
         # The most recent status for the job is running
         if stat == Status.RUNNING:
+            # The wrapper is done, so wait until the status gets updated
             if wrapper_is_done:
                 return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.FAILED)
+            # The wrapper did not complete yet. Update the status in memory
             return stat
 
         if not self._inner_job_can_run(inner_job, self.job_list):
