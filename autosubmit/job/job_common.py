@@ -79,7 +79,7 @@ class Status:
     QUEUING = 3
     RUNNING = 4
     COMPLETED = 5
-    HELD = 6
+    HELD = 6  # Deprecated, will be removed in a future release.
     PREPARED = 7
     SKIPPED = 8
     FAILED = -1

@@ -333,14 +333,17 @@ class DbManager(SchemaVersionedManager):
     def select_latest_inner_jobs(
             self,
             innerjobs_table: Table,
-            job_names: list[str] | None = None
+            job_names: list[str] | None = None,
+            run_id: int | None = None
     ) -> list[dict[str, object]]:
         """
         Select the row with the latest timestamp for each job_name from the inner jobs table.
         If job_names is provided, filter only those job_names.
+        If run_id is provided, filter only the rows of that experiment run.
 
         :param innerjobs_table: SQLAlchemy Table object for the inner jobs.
         :param job_names: Optional list of job_name values to filter by.
+        :param run_id: Optional experiment run ID to filter the inner jobs by.
         :return: List of dictionaries with the latest row per job_name.
         """
         row_number = func.row_number().over(
@@ -351,6 +354,8 @@ class DbManager(SchemaVersionedManager):
         stmt = select(*innerjobs_table.c, row_number)
         if job_names:
             stmt = stmt.where(innerjobs_table.c.job_name.in_(job_names))
+        if run_id is not None:
+            stmt = stmt.where(innerjobs_table.c.run_id == run_id)
         subquery = stmt.alias('subq')
         query = select(*(col for col in subquery.c if col.name != 'row_number')).where(subquery.c.row_number == 1)
         with self._get_engine(innerjobs_table.name).connect() as conn:

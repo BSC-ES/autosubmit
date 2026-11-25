@@ -27,8 +27,10 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.managers.job_list import JobsDbManager
 from autosubmit.database.models.tables import WrapperJobsTable
 from autosubmit.experiment.manage import create
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, _InnerJobState
+from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
+from autosubmit.job.job_utils import check_wrappers
 
 raw_job_list = [
     {
@@ -588,6 +590,45 @@ def test_select_latest_inner_jobs(
 
     no_results = db_manager.select_latest_inner_jobs(innerjobs_table, ["null"])
     assert len(no_results) == 0
+
+
+@pytest.mark.postgres
+def test_select_latest_inner_jobs_filters_by_run_id(
+    tmp_path: Path, as_db: str, autosubmit_exp
+):
+    """Inner jobs of other experiment runs must not leak into the latest-per-job result."""
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
+
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg_run_1", 11)], [_inner_job(11, "pkg_run_1", "j1", timestamp="2023-01-01T00:00:00")])],
+        preview=False,
+        run_id=1,
+    )
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg_run_2", 12)], [_inner_job(12, "pkg_run_2", "j1", timestamp="2023-01-02T00:00:00")])],
+        preview=False,
+        run_id=2,
+    )
+
+    innerjobs_table = db_manager.table_registry.get(WrapperJobsTable.name)
+
+    unfiltered = db_manager.select_latest_inner_jobs(innerjobs_table)
+    assert len(unfiltered) == 1
+    assert unfiltered[0]["timestamp"] == "2023-01-02T00:00:00"
+
+    run_1 = db_manager.select_latest_inner_jobs(innerjobs_table, run_id=1)
+    assert len(run_1) == 1
+    assert run_1[0]["timestamp"] == "2023-01-01T00:00:00"
+    assert run_1[0]["run_id"] == 1
+
+    run_2 = db_manager.select_latest_inner_jobs(innerjobs_table, run_id=2)
+    assert len(run_2) == 1
+    assert run_2[0]["timestamp"] == "2023-01-02T00:00:00"
+    assert run_2[0]["run_id"] == 2
+
+    missing_run = db_manager.select_latest_inner_jobs(innerjobs_table, run_id=3)
+    assert missing_run == []
 
 
 @pytest.mark.postgres
@@ -1629,13 +1670,14 @@ def _inner_job(
     package_name: str,
     job_name: str,
     timestamp: str = "2023-01-01T00:00:00",
+    run_id: int | None = None,
 ) -> dict[str, Any]:
     return {
         "package_id": package_id,
         "package_name": package_name,
         "job_name": job_name,
         "timestamp": timestamp,
-        "run_id": None,
+        "run_id": run_id,
     }
 
 
@@ -1707,12 +1749,87 @@ def test_get_wrappers_id_from_db(tmp_path: Path, as_db: str, autosubmit_exp):
     db_manager.save_wrappers([(wrapper_info, inner_jobs)], preview=False)
 
     ids = db_manager.get_wrappers_id_from_db()
-    assert len(ids) == 2
-    for entry in ids:
-        assert isinstance(entry, tuple)
-        col, val = entry
-        assert col == "id"
-        assert val in [1, 2]
+    assert sorted(ids) == [1, 2]
+
+
+@pytest.mark.postgres
+def test_wrapper_ids_are_scoped_to_run_id(tmp_path: Path, as_db: str, autosubmit_exp):
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
+
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg_a", 1)], [_inner_job(1, "pkg_a", "j1")])],
+        preview=False,
+        run_id=1,
+    )
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg_b", 1)], [_inner_job(1, "pkg_b", "j2")])],
+        preview=False,
+        run_id=2,
+    )
+
+    assert len(db_manager.get_wrappers_id_from_db()) == 2
+    assert len(db_manager.get_wrappers_id_from_db(run_id=1)) == 1
+    assert len(db_manager.get_wrappers_id_from_db(run_id=2)) == 1
+
+
+@pytest.mark.postgres
+def test_update_wrapper_status_scoped_to_run(tmp_path: Path, as_db: str, autosubmit_exp):
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
+
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg_a", 1, status=1)], [_inner_job(1, "pkg_a", "j1")])],
+        preview=False,
+        run_id=1,
+    )
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg_b", 1, status=1)], [_inner_job(1, "pkg_b", "j2")])],
+        preview=False,
+        run_id=2,
+    )
+
+    db_manager.update_wrapper_status([{"id": 1, "status": 5}], run_id=1)
+
+    run_1, _ = db_manager.load_wrappers(preview=False, run_id=1)
+    run_2, _ = db_manager.load_wrappers(preview=False, run_id=2)
+    assert dict(run_1[0])["status"] == 5
+    assert dict(run_2[0])["status"] == 1
+
+
+@pytest.mark.postgres
+def test_load_wrappers_replaces_run(tmp_path: Path, as_db: str, autosubmit_exp):
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
+    first, second = job_list.job_list[0], job_list.job_list[1]
+    first.id = 1
+    second.id = 2
+    job_list.save_jobs()
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg_run_1", 1, status=Status.COMPLETED)], [_inner_job(1, "pkg_run_1", first.name)])],
+        preview=False,
+        run_id=1,
+    )
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg_run_2", 2, status=Status.COMPLETED)], [_inner_job(2, "pkg_run_2", second.name)])],
+        preview=False,
+        run_id=2,
+    )
+
+    reloaded = JobList("dummy-expid", as_exp.as_conf, YAMLParserFactory(), run_mode=True)
+    reloaded.dbmanager = db_manager
+    reloaded.load_job_by_name(first.name)
+    reloaded.load_job_by_name(second.name)
+    reloaded.run_id = 1
+    reloaded.load_wrappers(preview=False)
+    assert set(reloaded.job_package_map) == {1}
+
+    reloaded.run_id = 2
+    reloaded.load_wrappers(preview=False)
+
+    assert set(reloaded.job_package_map) == {2}
+    assert "pkg_run_1" not in reloaded.packages_dict
 
 
 @pytest.mark.postgres
@@ -1769,3 +1886,121 @@ def test_save_wrappers_integrity_error_logged(
     info, jobs = db_manager.load_wrappers(preview=False)
     assert len(info) == 1
     assert len(jobs) == 1
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize(
+    "wrapper_type",
+    ["vertical", "horizontal", "vertical-horizontal", "horizontal-vertical", None],
+    ids=["vertical", "horizontal", "vertical-horizontal", "horizontal-vertical", "none"],
+)
+def test_load_wrappers_restores_wrapper_type(tmp_path: Path, as_db: str, autosubmit_exp, wrapper_type):
+    """load_wrappers must restore the persisted wrapper kind into WrapperJob.wrapper_type."""
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
+    inner = job_list.job_list[0]
+    inner.id = 1
+    job_list.save_jobs()
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg", 1, type=wrapper_type)], [_inner_job(1, "pkg", inner.name)])],
+        preview=False,
+        run_id=1,
+    )
+
+    reloaded = JobList("dummy-expid", as_exp.as_conf, YAMLParserFactory(), run_mode=True)
+    reloaded.dbmanager = db_manager
+    reloaded.run_id = 1
+    reloaded.load_wrappers(preview=False)
+
+    assert reloaded.job_package_map[1].wrapper_type == wrapper_type
+
+
+@pytest.mark.postgres
+def test_db_completed_reload_reconcile(
+    tmp_path: Path, as_db: str, autosubmit_exp, mocker
+):
+    """A COMPLETED wrapper loaded from the DB must reconcile a stale inner as COMPLETED."""
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
+    job = job_list.job_list[0]
+    job.id = 1
+    job.status = Status.RUNNING
+    job_list.save_jobs()
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg", 1, type="vertical", status=Status.COMPLETED)], [_inner_job(1, "pkg", job.name)])],
+        preview=False,
+        run_id=1,
+    )
+
+    reloaded = JobList("dummy-expid", as_exp.as_conf, YAMLParserFactory(), run_mode=True)
+    reloaded.dbmanager = db_manager
+    reloaded.run_id = 1
+    reloaded.load_wrappers(preview=False)
+    wrapper = reloaded.job_package_map[1]
+    wrapper.platform = mocker.MagicMock()
+    wrapper.platform.serial_platform = wrapper.platform
+    wrapper.platform.IO_SAFE_WAIT = 5
+    wrapper.platform.confirm_done_jobs_via_stat.return_value = {
+        wrapper.job_list[0].name: Status.RUNNING
+    }
+    wrapper._inner_states.setdefault(wrapper.job_list[0].name, _InnerJobState()).wait_started = 1000
+    mocker.patch("autosubmit.job.job.time.time", return_value=1010)
+    mocker.patch("autosubmit.job.job.get_last_run_id", return_value=None)
+
+    wrapper.reconcile_finished_wrapper(as_exp.as_conf)
+
+    assert wrapper.job_list[0].new_status == Status.COMPLETED
+    assert wrapper.job_list[0].status == Status.COMPLETED
+    db_manager.save_jobs(wrapper.job_list)
+    assert db_manager.load_job_by_name(wrapper.job_list[0].name)["status"] == "COMPLETED"
+
+
+@pytest.mark.postgres
+def test_db_check_wrappers_end_to_end(
+    tmp_path: Path, as_db: str, autosubmit_exp, mocker
+):
+    """A finished wrapper reconciles and persists the last retry STAT through _manage_wrapper_job."""
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
+    job = job_list.job_list[0]
+    job.id = 1
+    job.status = Status.FAILED
+    job.retrials = 1
+    job.fail_count = 0
+    job_list.save_jobs()
+    db_manager.save_wrappers(
+        [([_wrapper_info("pkg", 1, type="vertical", status=Status.FAILED)], [_inner_job(1, "pkg", job.name)])],
+        preview=False,
+        run_id=1,
+    )
+
+    reloaded = JobList(as_exp.expid, as_exp.as_conf, YAMLParserFactory(), run_mode=True)
+    reloaded.dbmanager = db_manager
+    reloaded.run_id = 1
+    reloaded.load_wrappers(preview=False)
+    wrapper = reloaded.job_package_map[1]
+    fake = mocker.MagicMock()
+    fake.serial_platform = fake
+    fake.IO_SAFE_WAIT = 5
+
+    def _confirm(jobs):
+        return {
+            job.name: Status.COMPLETED if job.fail_count > 0 else Status.FAILED
+            for job in jobs
+        }
+
+    fake.confirm_done_jobs_via_stat.side_effect = _confirm
+    wrapper.platform = fake
+    mocker.patch("autosubmit.job.job.get_last_run_id", return_value=None)
+
+    check_wrappers(as_exp.as_conf, reloaded, as_exp.expid)
+    assert wrapper.id in reloaded.job_package_map
+
+    check_wrappers(as_exp.as_conf, reloaded, as_exp.expid)
+
+    assert wrapper.id not in reloaded.job_package_map
+    row = db_manager.load_job_by_name(wrapper.job_list[0].name)
+    assert row["status"] == "COMPLETED"

@@ -879,18 +879,21 @@ def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
     assert not any("t000_MISSING_STAT_0" in c for c in downloaded)
 
 
-@pytest.mark.parametrize("check_output_behaviour,expected_value", [
-    ("failure", None),
-    ("success", Status.COMPLETED),
-])
+@pytest.mark.parametrize("check_output_behaviour,stat_content,expected_value", [
+    ("failure", None, None),
+    ("success", "COMPLETED\n", Status.COMPLETED),
+    ("success", "1715769600\n", Status.QUEUING),
+    ("success", "", None),
+], ids=["download-failure", "completed", "queuing", "empty"])
 def test_confirm_done_jobs_via_stat_handles_download_outcomes(
     ec_platform: EcPlatform,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     check_output_behaviour: str,
+    stat_content: str | None,
     expected_value: Status | None,
 ) -> None:
-    """Verify confirm_done_jobs_via_stat handles both download failure and success correctly."""
+    """Verify confirm_done_jobs_via_stat handles download failure, queuing, empty, and completed STAT files."""
     ec_platform.host = "hpc"
     ec_platform.remote_log_dir = Path("/scratch/t000/LOG_t000")
     ec_platform.tmp_path = tmp_path
@@ -906,7 +909,7 @@ def test_confirm_done_jobs_via_stat_handles_download_outcomes(
         if check_output_behaviour == "failure":
             raise subprocess.CalledProcessError(255, cmd)
         local_file = cmd.split()[-1]
-        Path(local_file).write_text("COMPLETED\n")
+        Path(local_file).write_text(stat_content)
         return b""
 
     monkeypatch.setattr(subprocess, "check_output", _check_output)
@@ -943,6 +946,9 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
         ec_platform._ssh_output = (
             "t000_INI_STAT_0|size  5550\n"
             "t000_SIM_STAT_0|size  5550\n"
+            "t000_BAD_STAT_0|size  5550\n"
+            "t000_ONE_STAT_0|size  5550\n"
+            "t000_FAIL_STAT_0|size  5550\n"
         )
         return True
 
@@ -954,7 +960,14 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     def _check_output(cmd: str, **_) -> bytes:
         downloaded.append(cmd)
         local_file = cmd.split()[-1]
-        Path(local_file).write_text("1715769500\n1715769600\n")
+        if "FAIL" in local_file:
+            raise subprocess.CalledProcessError(255, cmd)
+        if "BAD" in local_file:
+            Path(local_file).write_text("not-a-number\nnot-a-number\n")
+        elif "ONE" in local_file:
+            Path(local_file).write_text("1715769500\n")
+        else:
+            Path(local_file).write_text("1715769500\n1715769600\n")
         return b""
 
     monkeypatch.setattr(subprocess, "check_output", _check_output)
@@ -968,17 +981,29 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     job_ini = MockJob("t000_INI", 0)
     job_sim = MockJob("t000_SIM", 0)
     job_missing = MockJob("t000_MISSING", 0)
-    ec_platform.set_start_time_from_remote_stat_file([job_ini, job_sim, job_missing])
+    job_bad = MockJob("t000_BAD", 0)
+    job_one = MockJob("t000_ONE", 0)
+    job_fail = MockJob("t000_FAIL", 0)
+    ec_platform.set_start_time_from_remote_stat_file(
+        [job_ini, job_sim, job_missing, job_bad, job_one, job_fail]
+    )
 
     # start_time_timestamp comes from line 1 (L1) = 1715769600
     expected_timestamp = datetime.datetime.fromtimestamp(1715769600).strftime("%Y%m%d%H%M%S")
     assert job_ini.start_time_timestamp == expected_timestamp
     assert job_sim.start_time_timestamp == expected_timestamp
     assert job_missing.start_time_timestamp is None
+    assert job_bad.start_time_timestamp is None
+    assert job_one.start_time_timestamp is None
+    assert job_fail.start_time_timestamp is None
 
     assert any("t000_INI_STAT_0" in c for c in downloaded)
     assert any("t000_SIM_STAT_0" in c for c in downloaded)
+    assert any("t000_BAD_STAT_0" in c for c in downloaded)
+    assert any("t000_ONE_STAT_0" in c for c in downloaded)
+    assert any("t000_FAIL_STAT_0" in c for c in downloaded)
     assert not any("t000_MISSING_STAT_0" in c for c in downloaded)
+    assert not any(tmp_path.glob("*_STAT_*"))
 
 
 @pytest.mark.parametrize(

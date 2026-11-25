@@ -18,7 +18,7 @@
 from getpass import getuser
 
 import pytest
-from psutil import ZombieProcess
+from psutil import NoSuchProcess, ZombieProcess
 
 from autosubmit.helpers.processes import process_id, retrieve_expids
 
@@ -72,19 +72,30 @@ def test_retrieve_expids(mocker, expids: list[str], expected_retrieved: int, use
     assert len(found) == expected_retrieved
 
 
-def test_retrieve_expids_but_there_are_zombies_during_listing(mocker):
-    """Test that when we see a ``ZombieProcess`` error during the listing the function returns as expected."""
+@pytest.mark.parametrize(
+    'error',
+    [ZombieProcess, NoSuchProcess],
+    ids=['zombie', 'no-such-process'],
+)
+def test_retrieve_expids_skips_disappearing_processes(error, mocker):
+    """Test that a process that ends during the listing is skipped instead of raising."""
     mocked_process = mocker.MagicMock()
-    mocked_process.username.side_effect = ZombieProcess(0)
+    mocked_process.username.side_effect = error(0)
     mocker.patch('autosubmit.helpers.processes.process_iter', return_value=[mocked_process])
     expids = retrieve_expids()
     assert type(expids) is list and len(expids) == 0
 
 
-def test_retrieve_expids_but_cmdline_raises_zombies(mocker):
+@pytest.mark.parametrize(
+    'error',
+    [ZombieProcess, NoSuchProcess],
+    ids=['zombie', 'no-such-process'],
+)
+def test_retrieve_expids_skips_vanished_cmdline(error, mocker):
+    """Test that a process ending before the cmdline read does not hide the other processes."""
     a000 = _create_process(mocker, 'a000', getuser())
     a001 = _create_process(mocker, 'a001', getuser())
-    a001.cmdline.side_effect = ZombieProcess(1984)
+    a001.cmdline.side_effect = error(1984)
     processes = [
         a000,
         a001
@@ -136,12 +147,34 @@ def test_process_id_multiple_found(mocker):
     assert mocked_log.warning.call_count == 1
 
 
-def test_process_id_but_there_are_zombies(mocker):
-    """Test that if the listing of process crashes due to zombies, we get an empty list."""
+@pytest.mark.parametrize(
+    'error',
+    [ZombieProcess, NoSuchProcess],
+    ids=['zombie', 'no-such-process'],
+)
+def test_process_id_skips_disappearing_processes(error, mocker):
+    """Test that a process that ends during the listing is skipped instead of raising."""
     mocked_process = mocker.MagicMock()
-    mocked_process.username.side_effect = ZombieProcess(0)
-    mocker.patch('autosubmit.helpers.processes.process_iter', return_value=mocked_process)
+    mocked_process.username.side_effect = error(0)
+    mocker.patch('autosubmit.helpers.processes.process_iter', return_value=[mocked_process])
 
     pid_found = process_id('a000')
 
     assert pid_found is None
+
+
+@pytest.mark.parametrize(
+    'error',
+    [ZombieProcess, NoSuchProcess],
+    ids=['zombie', 'no-such-process'],
+)
+def test_process_id_skips_vanished_cmdline(error, mocker):
+    """Test that a process ending before the cmdline read does not hide the other processes."""
+    a000 = _create_process(mocker, 'a000', pid=1)
+    a001 = _create_process(mocker, 'a001', pid=2)
+    a001.cmdline.side_effect = error(2)
+    mocker.patch('autosubmit.helpers.processes.process_iter', return_value=[a000, a001])
+
+    pid_found = process_id('a000')
+
+    assert pid_found == 1

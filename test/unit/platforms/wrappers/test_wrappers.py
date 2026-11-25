@@ -21,6 +21,7 @@ import tempfile
 from collections import OrderedDict
 from pathlib import Path
 from random import randrange
+from types import SimpleNamespace
 from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
@@ -2186,6 +2187,20 @@ def setup(autosubmit_config, tmpdir):
     yield job_packager, vertical_package
 
 
+def test_vertical_package_passes_wrapper_data_for_fail_counts(setup):
+    """The vertical package exposes its jobs to the builder instead of duplicating fail counts."""
+    _, vertical_package = setup
+    vertical_package.jobs[0].fail_count = 2
+    vertical_package.jobs[1].fail_count = 1
+    vertical_package._wrapper_factory = mock.MagicMock()
+
+    vertical_package._common_script_content()
+
+    kwargs = vertical_package._wrapper_factory.get_wrapper.call_args.kwargs
+    assert kwargs["wrapper_data"] is vertical_package
+    assert "fail_counts" not in kwargs
+
+
 @pytest.mark.parametrize("any_simple_packages, not_wrappeable_package_info, built_packages_tmp, expected", [
     (False, ["dummy-1", "dummy-2", "dummy-3"], ["dummy-1", "dummy-2", "dummy-3"], False),
     (True, ["dummy-1", "dummy-2", "dummy-3"], ["dummy-1", "dummy-2", "dummy-3"], False),
@@ -2533,6 +2548,37 @@ def test_vertical_job_thread_uses_fail_count(wrapper_builder: PythonVerticalWrap
     assert "'timeout', '-k'" in thread, (
         "The inner job must be force-killed on timeout (timeout -k), otherwise a "
         "model that ignores SIGTERM would outlive its wallclock."
+    )
+
+
+def test_vertical_launcher_starts_at_inner_fail_count() -> None:
+    """The vertical launcher must continue STAT and log suffixes from the real attempt."""
+    job1 = Job("job1", 1, Status.READY, 0)
+    job1.fail_count = 1
+    job2 = Job("job2", 2, Status.READY, 0)
+    job2.fail_count = 3
+    builder = PythonVerticalWrapperBuilder(
+        retrials=2,
+        header_directive='',
+        jobs_scripts=['job1.cmd', 'job2.cmd'],
+        threads=1,
+        num_processors=1,
+        num_processors_value=1,
+        expid='a000',
+        name='test_wrapper',
+        working_dir='/tmp',
+        wrapper_data=SimpleNamespace(jobs=[job1, job2]),
+        wallclock_by_level='3600',
+    )
+
+    launcher = builder.build_sequential_threads_launcher(
+        'scripts', 'JobThread(scripts[i], i, retrials, fail_count)', footer=True
+    )
+
+    assert "fail_counts = {'job1.cmd': 1, 'job2.cmd': 3}" in launcher
+    assert (
+        "fail_count = fail_counts.get(scripts[i], 0) if isinstance(scripts[i], str) else 0"
+        in launcher
     )
 
 

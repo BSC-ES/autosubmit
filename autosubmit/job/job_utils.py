@@ -620,11 +620,20 @@ def check_non_wrapped_jobs(
     :param as_conf: AutosubmitConfig object containing the configuration of the experiment.
     :param expid: Experiment identifier.
     """
+    retained_inner_names = {
+        inner_job.name
+        for wrapper_job in job_list.job_package_map.values()
+        if wrapper_job.status in (Status.COMPLETED, Status.FAILED)
+        and wrapper_job.has_inner_jobs_to_reconcile()
+        for inner_job in wrapper_job.job_list
+    }
     for p in platforms_to_test:
+        wrapper_ids = set(job_list.get_wrappers_id_from_db())
         platform_jobs = [
             job
             for job in job_list.get_in_queue(p)
-            if job.id not in job_list.get_wrappers_id_from_db()
+            if job.id not in wrapper_ids
+            and job.name not in retained_inner_names
         ]
         if len(platform_jobs) == 0:
             continue
@@ -645,11 +654,12 @@ def check_non_wrapped_jobs(
 
 
 def _manage_wrapper_job(as_conf: "AutosubmitConfig", job_list: "JobList", wrapper_job: "WrapperJob") -> "WrapperJob":
-    """ Function that checks the wrapper job status and updates it if necessary, and returns the wrapper job with the updated status.
-    :param as_conf: Autosubmit configuration
-    :param job_list: job_list object
-    :param wrapper_job: wrapper object
-    :return:  wrapper job with the updated status
+    """Check and update a wrapper job and reconcile it once it is finished.
+
+    :param as_conf: Autosubmit configuration.
+    :param job_list: JobList object.
+    :param wrapper_job: Wrapper job to check.
+    :return: The wrapper job with the updated status.
     """
     save = False
     check_wrapper_jobs_sleeptime = as_conf.get_wrapper_check_time()
@@ -660,9 +670,18 @@ def _manage_wrapper_job(as_conf: "AutosubmitConfig", job_list: "JobList", wrappe
             inner_job.prev_status = inner_job.status
     check_wrapper = True
     if wrapper_job.status == Status.RUNNING:
-        check_wrapper = timedelta.total_seconds(datetime.now(
-        ) - wrapper_job.checked_time) >= check_wrapper_jobs_sleeptime
-    if check_wrapper:
+        elapsed = timedelta.total_seconds(datetime.now() - wrapper_job.checked_time)
+        check_wrapper = elapsed >= check_wrapper_jobs_sleeptime
+    if wrapper_job.status in [Status.COMPLETED, Status.FAILED]:
+        elapsed = timedelta.total_seconds(datetime.now() - wrapper_job.checked_time)
+        if elapsed >= check_wrapper_jobs_sleeptime and wrapper_job.has_inner_jobs_to_reconcile():
+            Log.debug(f'Reconciling inner jobs of finished wrapper {str(wrapper_job.id)}')
+            wrapper_job.checked_time = datetime.now()
+            save |= wrapper_job.reconcile_finished_wrapper(as_conf)
+            if save:
+                job_list.update_db_wrappers()
+                job_list.save_jobs()
+    elif check_wrapper:
         Log.debug(f'Checking Wrapper {str(wrapper_job.id)}')
         wrapper_job.checked_time = datetime.now()
         save |= wrapper_job.check_and_update_status(as_conf)
@@ -676,25 +695,16 @@ def check_wrappers(
         as_conf: "AutosubmitConfig",
         job_list: "JobList",
         expid: str,
-) -> tuple[dict[str, list[list["Job"]]], dict[str, tuple[Status, Status]]]:
-    """Check wrappers and inner jobs status, and collect non-wrapped jobs to check.
+) -> None:
+    """Check wrappers and inner jobs status, and update them in place.
 
     :param as_conf: a AutosubmitConfig object
     :param job_list: a JobList object
     :param expid: a string with the experiment id
     """
-    jobs_to_check: dict[str, list[list["Job"]]] = defaultdict(list)
-    job_changes_tracker: dict[str, tuple[Status, Status]] = {}
-
     for active_wrapper in list(job_list.job_package_map.values()):
         wrapper_job = _manage_wrapper_job(as_conf, job_list, active_wrapper)
         wrapper_notify(as_conf, expid, wrapper_job)
-        if active_wrapper.status in [Status.FAILED, Status.COMPLETED]:
+        if active_wrapper.status in [Status.FAILED, Status.COMPLETED] and not active_wrapper.has_inner_jobs_to_reconcile():
             job_list.job_package_map.pop(active_wrapper.id, None)
             job_list.packages_dict.pop(active_wrapper.name, None)
-
-    for job in job_list.get_job_list():
-        if job.id not in job_list.job_package_map and job.status != Status.FAILED:
-            jobs_to_check[job.platform_name].append([job, job.status])
-
-    return jobs_to_check, job_changes_tracker

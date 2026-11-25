@@ -20,7 +20,7 @@ from contextlib import suppress
 from getpass import getuser
 from pathlib import Path
 
-from psutil import ZombieProcess, process_iter
+from psutil import NoSuchProcess, ZombieProcess, process_iter
 
 from autosubmit.log.log import Log
 
@@ -148,9 +148,11 @@ def retrieve_expids() -> list[str]:
     user: str = getuser()
     expids: list[str] = []
     # NOTE: psutil may raise ``ZombieProcess`` in some cases, even when other exceptions happen in the
-    #       case when a process is a zombie (e.g. got a IO error, but the process is zombie)
+    #       case when a process is a zombie (e.g. got a IO error, but the process is zombie).
+    #       ``NoSuchProcess`` is raised when a process ends between the listing and the attribute
+    #       reads, a common race on busy machines. Both cases skip the process.
     for process in process_iter(['pid', 'cmdline', 'username']):
-        with suppress(ZombieProcess):
+        with suppress(ZombieProcess, NoSuchProcess):
             if process.username() == user:
                 expid = _match_autosubmit_cmdline(process.cmdline())
                 if expid:
@@ -173,8 +175,10 @@ def process_id(expid: str, command="run") -> int | None:
     processes = []
     for process in process_iter(['pid', 'cmdline', 'username']):
         # NOTE: psutil may raise ``ZombieProcess`` in some cases, even when other exceptions happen in the
-        #       case when a process is a zombie (e.g. got a IO error, but the process is zombie)
-        with suppress(ZombieProcess):
+        #       case when a process is a zombie (e.g. got a IO error, but the process is zombie).
+        #       ``NoSuchProcess`` is raised when a process ends between the listing and the attribute
+        #       reads, a common race on busy machines. Both cases skip the process.
+        with suppress(ZombieProcess, NoSuchProcess):
             if process.username() == user and _match_autosubmit_cmdline(process.cmdline(), command, expid):
                 processes.append(process)
 
