@@ -1,0 +1,13 @@
+JOBS:
+  SIM:
+    SCRIPT: 'sleep 0'
+    RUNNING: date
+
+  POST:
+    SCRIPT: 'sleep 0'
+    RUNNING: date
+    DEPENDENCIES:
+      SIM:
+        DATES_FROM:
+          '[19600101:19650101]':
+            DATES_TO: all
