@@ -243,13 +243,23 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
     project_backup_path = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid / f'proj_{int(time())}')
     git_path = as_conf.get_project_dir()
 
-    # Making proj backup
-    if force:
-        if os.path.exists(project_path):
+    if force and os.path.exists(project_path):
+        backup_enabled = as_conf.get_git_project_backup()
+        if backup_enabled:
             Log.info(f"Making a backup of your current proj folder at {project_backup_path}")
             shutil.move(project_path, project_backup_path)
-        # shutil.make_archive(project_backup_path, 'zip', project_path)
-        # project_backup_path = project_backup_path + ".zip"
+        else:
+            # Pre-flight: refuse to destroy uncommitted or unpushed work.
+            proj_git_dir = Path(project_path) / project_destination
+            if proj_git_dir.is_dir() and (proj_git_dir / '.git').is_dir():
+                if _get_uncommitted_code(proj_git_dir):
+                    raise AutosubmitCritical(
+                        "Refusing to refresh: the project has uncommitted changes. Commit and push them, "
+                        "or enable GIT.PROJECT_BACKUP.", 7013)
+                if _get_code_not_pushed(proj_git_dir):
+                    raise AutosubmitCritical(
+                        "Refusing to refresh: the project has unpushed commits. Push them, "
+                        "or enable GIT.PROJECT_BACKUP.", 7064)
 
     if os.path.exists(os.path.join(project_path, project_destination)):
         Log.info("Using project folder: {0}", project_path)
@@ -358,7 +368,10 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
         raise AutosubmitCritical(
             f'Cannot clone {clone_description} into {project_path}', 7065)
     if submodule_failure:
-        Log.info(f"Some Submodule failures have been detected. Backup {project_backup_path} will not be removed.")
+        if os.path.exists(project_backup_path):
+            Log.info(f"Some Submodule failures have been detected. Backup {project_backup_path} will not be removed.")
+        else:
+            Log.info("Some Submodule failures have been detected.")
         return False
 
     if os.path.exists(project_backup_path):

@@ -81,6 +81,7 @@ several bug fixes and enhancements to improve the overall user experience.
   process is unavailable, default `true`) #3342
 - Add `[database] backup` option to `autosubmitrc` to disable SQLite backups #3129
 - Support database-based locking for experiments, as alternative to the portalocker file lock #1392
+- Git project backups on `autosubmit refresh` are now opt-in; refresh aborts on uncommitted or unpushed changes. Enable with `git_project_backup = True` in `.autosubmitrc` or `GIT.PROJECT_BACKUP: True` in the experiment YAML. #2633
 
 **Migration from `job_list.pkl` to Database**
 
