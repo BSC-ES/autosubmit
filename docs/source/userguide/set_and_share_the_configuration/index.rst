@@ -207,6 +207,39 @@ file loaded later overrides the parameters it shares with the ones before it. Ot
 Subfolders are not loaded: only the first level of the folder is read. To include a subfolder, add it as
 a path of its own, for example ``PRE: "%PROJDIR%/conf/model,%PROJDIR%/conf/model/platforms"``.
 
+Example: Override shared defaults for a local test
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A project can ship shared defaults in ``PRE``, let each experiment override
+those defaults in its ``conf`` directory, and use ``POST`` for a temporary
+local test. For example, a climate workflow might use two chunks by default,
+three for a particular experiment, and four for a local test that exercises an
+additional chunk. No climate model, remote platform or credentials are needed
+to try the configuration layering.
+
+Place the layer settings under ``DEFAULT.CUSTOM_CONFIG`` in the experiment's
+configuration. Replace the example paths with your own:
+
+.. code-block:: yaml
+
+   DEFAULT:
+     CUSTOM_CONFIG:
+       PRE: /path/to/shared.yml
+       POST: /path/to/local.yml
+   EXPERIMENT:
+     NUMCHUNKS: 3
+
+In ``shared.yml``, set ``EXPERIMENT.NUMCHUNKS`` to ``2``. Set the same key
+to ``4`` in ``local.yml``. The experiment configuration overrides ``PRE``;
+``POST`` overrides both. Drop the ``POST`` entry when the local override is
+no longer needed, and the effective value returns to ``3``.
+
+The :download:`standalone example <config_layers.py>` creates these files in a
+temporary directory and reads the effective value with Autosubmit:
+
+.. runcmd:: python config_layers.py
+   :working-directory: source/userguide/set_and_share_the_configuration
+
 Advanced configuration - Full dummy example (reproducible)
 ----------------------------------------------------------
 
