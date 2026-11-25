@@ -1683,7 +1683,7 @@ class Job:
         if not self.start_time_timestamp:  # Fallback, this should not happen as start_time_timestamp is set when the job is running
             Log.warning(f"Job {self.name} does not have start time timestamp, trying to set it from remote stat file")
             self.platform.set_start_time_from_remote_stat_file([self])
-        if not self.start_time_timestamp:
+        if not self.start_time_timestamp:  # In case the job still does not have the timestamp
             Log.warning(f"Job {self.name} has no start time timestamp, skipping wallclock check")
             return False
         elapsed = datetime.datetime.now() - datetime.datetime.strptime(str(self.start_time_timestamp), "%Y%m%d%H%M%S")
@@ -3303,6 +3303,8 @@ class WrapperJob(Job):
             if normalized_wrapper_type in _KNOWN_WRAPPER_TYPES
             else None
         )
+        # Only the vertical type changes how inner jobs are reconciled, so it is
+        # the only type worth inferring when the wrapper type is unknown.
         if not self.wrapper_type and any(
             normalize_wrapper_type(job.wrapper_type) == "vertical"
             for job in self.job_list
@@ -3412,29 +3414,71 @@ class WrapperJob(Job):
         :param wrapper_is_done: Whether the wrapper job is in a done state (COMPLETED or FAILED).
         :return: The new status for the inner job.
         """
-        fallback = Status.WAITING if wrapper_is_done else Status.SUBMITTED
+        stat, fallback = self._resolve_inner_stat(inner_job, stat_statuses, wrapper_is_done)
 
-        stat = stat_statuses.get(inner_job.name, fallback)
-        state = self._inner_states.setdefault(inner_job.name, _InnerJobState())
-        state.stat = stat
-        state.stat_attempt = inner_job.fail_count
-
+        # Check if the inner job (memory) is in a terminal state. SKIPPED is a
+        # final status too, so it must not be overwritten by a later STAT.
         if inner_job.status in (Status.COMPLETED, Status.SKIPPED):
             self._clear_inner_wait(inner_job)
             return inner_job.status
 
-        wrapper_completed = wrapper_is_done and self.new_status == Status.COMPLETED
+        confirmed = self._status_from_confirmed_stat(inner_job, stat)
+        if confirmed is not None:
+            return confirmed
 
+        # The wrapper succeeded but inner stats are still missing or running
+        wrapper_completed = wrapper_is_done and self.new_status == Status.COMPLETED
+        if wrapper_completed:
+            return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.COMPLETED)
+
+        return self._status_from_unconfirmed_stat(
+            inner_job, stat, wrapper_is_done, wrapper_completed, fallback
+        )
+
+    def _resolve_inner_stat(self, inner_job: Job, stat_statuses: dict, wrapper_is_done: bool) -> tuple[int, int]:
+        """Resolve the remote STAT and remember it for later reconciliations.
+
+        :param inner_job: The inner job to resolve.
+        :param stat_statuses: A dictionary mapping job names to their statuses as determined by platform stat checks.
+        :param wrapper_is_done: Whether the wrapper job is in a done state.
+        :return: The remote STAT (or fallback) and the fallback status.
+        """
+        fallback = Status.WAITING if wrapper_is_done else Status.SUBMITTED
+        stat = stat_statuses.get(inner_job.name, fallback)
+        state = self._inner_states.setdefault(inner_job.name, _InnerJobState())
+        state.stat = stat
+        state.stat_attempt = inner_job.fail_count
+        return stat, fallback
+
+    def _status_from_confirmed_stat(self, inner_job: Job, stat: int) -> int | None:
+        """Return the status for a STAT that already confirms a final result.
+
+        :param inner_job: The inner job to update.
+        :param stat: The status read from the remote STAT.
+        :return: COMPLETED or FAILED when the STAT is final, otherwise ``None``.
+        """
         if stat == Status.COMPLETED:
             self._clear_inner_wait(inner_job)
             return Status.COMPLETED
-
-        elif stat == Status.FAILED:
+        if stat == Status.FAILED:
             self._clear_inner_wait(inner_job)
             if self.wrapper_type == "vertical" and inner_job.fail_count < inner_job.retrials:
                 inner_job.inc_fail_count()
             return Status.FAILED
+        return None
 
+    def _status_from_unconfirmed_stat(
+            self, inner_job: Job, stat: int, wrapper_is_done: bool, wrapper_completed: bool,
+            fallback: int) -> int:
+        """Return the status for a STAT that does not confirm a final result.
+
+        :param inner_job: The inner job to update.
+        :param stat: The status read from the remote STAT.
+        :param wrapper_is_done: Whether the wrapper job is in a done state.
+        :param wrapper_completed: Whether the wrapper completed successfully.
+        :param fallback: Status to use when an in-wrapper parent is still pending.
+        :return: The new status for the inner job.
+        """
         if (
             inner_job.status == Status.FAILED
             and wrapper_is_done
@@ -3443,9 +3487,7 @@ class WrapperJob(Job):
         ):
             return self._apply_io_safe_wait(inner_job, Status.FAILED, Status.FAILED)
 
-        if wrapper_completed:
-            return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.COMPLETED)
-
+        # The most recent status for the job is running
         if stat == Status.RUNNING:
             if wrapper_is_done:
                 return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.FAILED)
