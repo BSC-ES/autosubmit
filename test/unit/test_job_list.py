@@ -1247,6 +1247,40 @@ def test_update_list_dry_run_does_not_write_edges(mocker):
     reset.assert_not_called()
 
 
+def test_update_list_reconciles_final_job_with_unloaded_children(as_conf):
+    """A final job updates its DB edges even when its children are not in the graph."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job = Job("parent", 1, Status.COMPLETED, 0)
+    job_list.graph.add_node(job.name, job=job)
+    job_list.dbmanager.save_edges([{
+        "e_from": "parent", "e_to": "child",
+        "accepted_statuses": DEFAULT_START_CONDITION, "from_step": 0, "is_satisfied": False,
+    }])
+    structure = job_list.dbmanager.table_registry.get(ExperimentStructureTable.name)
+
+    job_list.update_list(as_conf, store_change=False, from_set_status=True)
+
+    edge = job_list.dbmanager.select_where_with_columns(structure, {"e_from": "parent"})[0]
+    assert dict(edge)["is_satisfied"] is True
+
+
+def test_refresh_reconciles_running_job_with_unloaded_children(as_conf):
+    """A RUNNING parent updates its DB edges even when its children are not in the graph."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job = Job("parent", 1, Status.RUNNING, 0)
+    job_list.graph.add_node(job.name, job=job)
+    job_list.dbmanager.save_edges([{
+        "e_from": "parent", "e_to": "child",
+        "accepted_statuses": "RUNNING", "from_step": 0, "is_satisfied": False,
+    }])
+    structure = job_list.dbmanager.table_registry.get(ExperimentStructureTable.name)
+
+    job_list._refresh_checkpoint_steps()
+
+    edge = job_list.dbmanager.select_where_with_columns(structure, {"e_from": "parent"})[0]
+    assert dict(edge)["is_satisfied"] is True
+
+
 def test_update_from_file_returns_false_without_update_file(as_conf, tmp_path):
     """update_from_file returns False and changes nothing when no update file exists."""
     job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)

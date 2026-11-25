@@ -3217,7 +3217,9 @@ class JobList:
             if step != previous_step:
                 job.current_checkpoint_step = step
                 changed = True
-            if persist and not self.disable_save and self.graph.out_degree(job.name) > 0:
+            # Reconcile every RUNNING/FAILED parent, even when its children are not loaded.
+            # On a partial load the in-memory graph has no edge to them, but the DB does.
+            if persist and not self.disable_save:
                 pending.append((job.name, Status.VALUE_TO_KEY.get(job.status, ''), step))
         if pending:
             self.dbmanager.update_outgoing_edges_satisfied_batch(pending)
@@ -3338,12 +3340,13 @@ class JobList:
             job.set_ready_date()
 
         if persist_edges and not self.disable_save:
+            # Reconcile every final job, even when its children are not loaded. On a partial
+            # load the in-memory graph has no edge to them, but the DB edge must be updated or
+            # the child stays blocked and is never scheduled after a resume.
             pending = [
                 (job.name, Status.VALUE_TO_KEY.get(job.status, ''), job.current_checkpoint_step)
                 for job in self.job_list
                 if job.status in (Status.COMPLETED, Status.FAILED, Status.SKIPPED)
-                and self.graph.has_node(job.name)
-                and self.graph.out_degree(job.name) > 0
             ]
             if pending:
                 self.dbmanager.update_outgoing_edges_satisfied_batch(pending)
