@@ -1111,7 +1111,7 @@ class JobPackagerVertical:
 
     @staticmethod
     def _order_key(job: Job) -> tuple[str, str, int, int, str]:
-        """Deterministic tie-break used to pick the next job of the wrapper.
+        """Set of deterministic values on a job used to decide on a tie-break to pick the next job of the wrapper.
 
         :param job: Job to compute the key for.
         :return: Sort key ``(date, member, chunk, split, name)``.
@@ -1152,6 +1152,9 @@ class JobPackagerVertical:
         a deterministic priority queue. Each level runs one job and every added job
         only depends on jobs already inside the wrapper or already COMPLETED,
         across date, member, split and chunk boundaries.
+
+        The seed is trusted as the chain root. The caller selects it from
+        ``get_ready``, so it is always READY and its own parents are not re-checked here.
 
         Runtime parameters are materialised with ``update_parameters`` before any
         attribute used by the limits (``wallclock``, ``processors`` and the other

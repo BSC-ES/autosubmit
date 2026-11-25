@@ -332,13 +332,19 @@ def test_vertical_chain_skips_already_packed_child():
     assert result == [seed]
 
 
-def test_vertical_chain_skips_non_wrappable_child():
-    """A child that is already SUBMITTED is not a wrappable candidate."""
+@pytest.mark.parametrize("status", [
+    Status.SUBMITTED,
+    Status.HELD,
+    Status.SUSPENDED,
+    Status.UNKNOWN,
+], ids=["submitted", "held", "suspended", "unknown"])
+def test_vertical_chain_skips_non_wrappable_child(status):
+    """A child in a non-wrappable status is not a candidate for the chain."""
     completed = _vertical_job("PREV_DONE", Status.COMPLETED)
     seed = _vertical_job("SIM_1", Status.READY, parents=[completed])
-    submitted = _vertical_job("SIM_2", Status.SUBMITTED, parents=[seed])
+    candidate = _vertical_job("SIM_2", status, parents=[seed])
 
-    result = _build_vertical_chain(seed, [submitted])
+    result = _build_vertical_chain(seed, [candidate])
 
     assert result == [seed]
 
