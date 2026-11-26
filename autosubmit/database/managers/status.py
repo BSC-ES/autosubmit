@@ -18,6 +18,7 @@
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.schema import CreateTable
 
 import autosubmit.history.utils as HUtils
@@ -81,31 +82,58 @@ class SqlAlchemyExperimentStatusDbManager:
             _insert_fn = pg_insert
         else:
             _insert_fn = sqlite_insert
-        query = (
+        values = {
+            "exp_id": exp_id,
+            "name": expid,
+            "status": status,
+            "seconds_diff": 0,
+            "modified": HUtils.get_current_datetime(),
+        }
+        try:
+            with self.status_engine.begin() as conn:
+                result = conn.execute(self._upsert_statement(_insert_fn, values, expid, status))
+        except OperationalError:
+            # Legacy as_times.db files created before ``exp_id`` became a primary
+            # key have no unique index on it, so SQLite rejects ON CONFLICT.
+            # Fall back to an explicit update-then-insert for those databases.
+            with self.status_engine.begin() as conn:
+                existing = conn.execute(
+                    select(ExperimentStatusTable.c.exp_id).
+                    where(ExperimentStatusTable.c.exp_id == exp_id)  # type: ignore
+                ).first()
+                if existing:
+                    conn.execute(
+                        update(ExperimentStatusTable).
+                        where(ExperimentStatusTable.c.exp_id == exp_id).  # type: ignore
+                        values(
+                            name=expid,
+                            status=status,
+                            seconds_diff=0,
+                            modified=values["modified"],
+                        )
+                    )
+                else:
+                    conn.execute(_insert_fn(ExperimentStatusTable).values(**values))
+                return 1
+        # SQLAlchemy may expose ``rowcount`` as an int or a callable depending on the driver.
+        row_count = result.rowcount() if callable(result.rowcount) else result.rowcount
+        return row_count
+
+    @staticmethod
+    def _upsert_statement(_insert_fn, values: dict, expid: str, status: str):
+        return (
             _insert_fn(ExperimentStatusTable)
-            .values(
-                exp_id=exp_id,
-                name=expid,
-                status=status,
-                seconds_diff=0,
-                modified=HUtils.get_current_datetime(),
-            )
+            .values(**values)
             .on_conflict_do_update(
                 index_elements=[ExperimentStatusTable.c.exp_id],  # type: ignore
                 set_={
                     "name": expid,
                     "status": status,
                     "seconds_diff": 0,
-                    "modified": HUtils.get_current_datetime(),
+                    "modified": values["modified"],
                 },
             )
         )
-        with self.status_engine.connect() as conn:
-            with conn.begin():
-                result = conn.execute(query)
-                # SQLAlchemy may expose ``rowcount`` as an int or a callable depending on the driver.
-                row_count = result.rowcount() if callable(result.rowcount) else result.rowcount
-        return row_count
 
     def update_exp_status(self, expid: str, status: str = "RUNNING") -> None:
         query = (
