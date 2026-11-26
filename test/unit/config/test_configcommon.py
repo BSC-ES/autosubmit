@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.utils import ini_to_yaml
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
@@ -130,6 +131,44 @@ def test_get_submodules(autosubmit_config: 'AutosubmitConfigFactory'):
     assert isinstance(submodules_list, list)
     assert len(submodules_list) == 4
     assert "sub_b" in submodules_list
+
+
+@pytest.mark.parametrize(
+    "submodules,expected",
+    [
+        (False, "False"),
+        ("sub_a sub_b", "sub_a sub_b"),
+    ],
+)
+def test_parse_githooks_non_string_parameters(
+        submodules, expected, autosubmit_config: 'AutosubmitConfigFactory', tmp_path: Path, monkeypatch
+) -> None:
+    """Githook templates are rendered next to the template even when a parameter is not a string.
+
+    ``PROJECT_SUBMODULES: false`` disables the submodules and used to make
+    ``parse_githooks`` fail with ``TypeError``. See issue #2533.
+    """
+    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={
+        'PROJECT': {'PROJECT_TYPE': 'git', 'PROJECT_DESTINATION': 'model'},
+        'GIT': {'PROJECT_SUBMODULES': submodules, 'FETCH_SINGLE_BRANCH': True},
+        'EXPERIMENT': {'NUMCHUNKS': 2},
+    })
+    githooks_dir = Path(BasicConfig.LOCAL_ROOT_DIR, 'a000', BasicConfig.LOCAL_PROJ_DIR, 'model', '.githooks')
+    githooks_dir.mkdir(parents=True)
+    (githooks_dir / 'pre-commit.tmpl').write_text(
+        'submodules=%GIT.PROJECT_SUBMODULES%\n'
+        'single_branch=%GIT.FETCH_SINGLE_BRANCH%\n'
+        'chunks=%EXPERIMENT.NUMCHUNKS%\n'
+    )
+    monkeypatch.chdir(tmp_path)
+
+    as_conf.parse_githooks()
+
+    assert (githooks_dir / 'pre-commit').read_text() == (
+        f'submodules={expected}\n'
+        'single_branch=True\n'
+        'chunks=2\n'
+    )
 
 
 def test_clean_dynamic_variables(autosubmit_config: 'AutosubmitConfigFactory') -> None:
