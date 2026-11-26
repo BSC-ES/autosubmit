@@ -2125,6 +2125,21 @@ def test_update_check_variables(autosubmit_config, experiment_data):
         assert job.check_warnings is True
 
 
+@pytest.mark.parametrize(
+    ("initial", "expected"),
+    [({}, "LOCAL"), ({"CURRENT_ARCH": "custom"}, "custom")],
+)
+def test_current_arch_on_implicit_local_platform(autosubmit_config, initial, expected):
+    as_conf = autosubmit_config(_EXPID, experiment_data={"JOBS": {"TEST": {}}})
+    job = Job("test", 1, Status.READY, 0)
+    job.section = "TEST"
+    job.platform_name = "LOCAL"
+    job.submitter = ParamikoSubmitter(as_conf)
+    job.platform = job.submitter.platforms["LOCAL"]
+
+    assert job.update_current_parameters(as_conf, initial)["CURRENT_ARCH"] == expected
+
+
 def test_update_parameters(autosubmit_config, experiment_data):
     job = Job('test_job', 1, Status.READY, 0)
     job.section = 'TEST_JOB'
