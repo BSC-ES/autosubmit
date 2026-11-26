@@ -92,8 +92,8 @@ class LocalPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Updates commands for platforms."""
-        self.root_dir = Path(self.config.get("LOCAL_ROOT_DIR", BasicConfig.LOCAL_ROOT_DIR)) / self.expid
-        self.remote_log_dir = self.root_dir / "tmp" / f"LOG_{self.expid}"
+        self.root_dir = str(Path(self.config.get("LOCAL_ROOT_DIR", BasicConfig.LOCAL_ROOT_DIR)) / self.expid)
+        self.remote_log_dir = Path(self.root_dir) / "tmp" / f"LOG_{self.expid}"
         self.cancel_cmd = "kill -2"
         self._checkhost_cmd = "echo 1"
         self.put_cmd = "cp -p"
@@ -291,7 +291,7 @@ class LocalPlatform(ParamikoPlatform):
         # This function has a short sleep as the files are locally
         sleeptime = 1
         for i in range(max_retries):
-            if Path(self.get_files_path(), src).is_file():
+            if (self.get_files_path() / src).is_file():
                 return True
             sleep(sleeptime)
         return False
@@ -316,8 +316,9 @@ class LocalPlatform(ParamikoPlatform):
         :param dest: destination name.
         :param must_exist: ignore if file exist or not.
         """
+        path_root = Path("")
         try:
-            path_root = Path(self.get_files_path())
+            path_root = self.get_files_path()
             (path_root / src).rename(path_root / dest)
             return True
         except OSError as e:
@@ -328,11 +329,11 @@ class LocalPlatform(ParamikoPlatform):
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exist', 6004, str(e))
+                raise AutosubmitError(f'File {self.get_files_path() / src} does not exist', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exist", 6004, str(e))
+                raise AutosubmitError(f"File {self.get_files_path() / src} does not exist", 6004, str(e))
             else:
-                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
+                Log.printlog(f"Log file couldn't be moved: {self.get_files_path() / src}", 5001)
                 return False
 
     def get_ssh_output(self):
@@ -358,7 +359,7 @@ class LocalPlatform(ParamikoPlatform):
             Log.debug(f"Error reading file {src}: {str(e)}")
         return None
 
-    def compress_file(self, file_path: str) -> None:
+    def compress_file(self, file_path: Path) -> None:
         Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
         try:
             compression_level = self.compression_level

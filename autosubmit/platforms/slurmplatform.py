@@ -123,8 +123,8 @@ class SlurmPlatform(ParamikoPlatform):
 
     def update_cmds(self) -> None:
         """Updates commands for platforms. """
-        self.root_dir = Path(self.scratch) / self.project_dir / self.user / self.expid
-        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
+        self.root_dir = str(Path(self.scratch) / self.project_dir / self.user / self.expid)
+        self.remote_log_dir = Path(self.root_dir) / f"LOG_{self.expid}"
         self.cancel_cmd = "scancel"
         self._submit_cmd = f'sbatch --no-requeue -D {self.remote_log_dir} '
         self._submit_command_name = "sbatch"

@@ -164,7 +164,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
 
 def test_ps_get_multi_submit_cmd(ps_platform):
     platform, _ = ps_platform
-    platform.remote_log_dir = str(platform.root_dir)
+    platform.remote_log_dir = Path(platform.root_dir)
 
     package = type("DummyPackage", (), {
         "export": "",
@@ -405,7 +405,7 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
     mocked_ftp_channel = mocker.MagicMock()
     mocked_ftp_channel.remove.side_effect = error
     paramiko_platform._ftpChannel = mocked_ftp_channel
-    mocker.patch.object(paramiko_platform, 'get_files_path', return_value=str(tmp_path))
+    mocker.patch.object(paramiko_platform, 'get_files_path', return_value=tmp_path)
 
     if expected_error_or_return_value is AutosubmitCritical:
         with pytest.raises(expected_error_or_return_value):  # type: ignore
