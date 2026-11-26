@@ -1173,7 +1173,6 @@ class AutosubmitConfig:
             if "." in key_parts and dict_keys_type != "long"
             else [key_parts[start_long:-1]]
         )
-        key_parts = key_parts if match not in default_parameters else default_parameters[match]
 
         for k in key_parts:
             k = k.strip("^")
