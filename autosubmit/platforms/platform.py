@@ -653,24 +653,6 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_checkpoint_files(self, job: 'Job'):
-        """Get all the checkpoint files of a job.
-
-        :param job: Get the checkpoint files
-        """
-        if not job.current_checkpoint_step:
-            job.current_checkpoint_step = 0
-        if not job.max_checkpoint_step:
-            job.max_checkpoint_step = 0
-        if job.current_checkpoint_step < job.max_checkpoint_step:
-            remote_checkpoint_path = f'{self.get_files_path()}/CHECKPOINT_'
-            self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
-            while self.check_file_exists(
-                    f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}') and job.current_checkpoint_step < job.max_checkpoint_step:
-                self.remove_checkpoint_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}')
-                job.current_checkpoint_step += 1
-                self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
-
     def remove_stat_file(self, job: 'Job') -> bool:
         """Removes STAT files from remote.
 
@@ -699,16 +681,18 @@ class Platform(ABC):
             return True
         return False
 
-    def remove_checkpoint_file(self, filename):
-        """Removes *CHECKPOINT* files from remote.
+    def remove_checkpoint_file(self, filename: str, warn_missing: bool = True) -> bool:
+        """Remove a checkpoint file from the platform.
 
-        :param filename: file name to delete.
-        :return: True if successful, False otherwise
+        :param filename: Name of the checkpoint file.
+        :param warn_missing: Whether to log a warning when the file is missing.
+        :return: True if the file was removed, False otherwise.
         """
-        if self.check_file_exists(filename):
-            self.delete_file(filename)
+        if self.check_file_exists(filename, warn_missing=warn_missing):
+            return self.delete_file(filename)
+        return False
 
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3):
+    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, warn_missing=True):
         return True
 
     def get_stat_file(self, job, attempt: int):

@@ -103,127 +103,34 @@ def init_jobs(setup_job_list: tuple[Any, Any, dict[str, Any]]) -> tuple[Job, Job
     return job_list, job_a, job_b, job_c
 
 
-# TODO: missing scenarios
-# 1) Cases when job_c.status remains in WAITING.
-# 2) Cases when job_a or job_b status doesn't match the edge_info target status.
-# 3) fail_ok edges and their handling.
-# 4) From step higher than 0. (update job.checkpoint)
 @pytest.mark.parametrize(
-    'job_a_edge_info,job_b_edge_info',
+    "reached_steps,expected",
     [
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
-
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"}),
+        ({1, 2}, Status.READY),
+        ({1}, Status.WAITING),
     ],
-    ids=[
-        "1. JOB A COMPLETED, JOB B RUNNING",
-        "2. JOB A RUNNING, JOB B COMPLETED",
-        "3. JOB A RUNNING, JOB B RUNNING",
-        "4. JOB A COMPLETED, JOB B COMPLETED",
-        "5. JOB A COMPLETED, JOB B WAITING",
-        "6. JOB A WAITING, JOB B COMPLETED",
-        "7. JOB A WAITING, JOB B RUNNING",
-        "8. JOB A WAITING, JOB B WAITING",
-        "9. JOB A FAILED, JOB B WAITING",
-        "10. JOB A WAITING, JOB B FAILED",
-        "11. JOB A FAILED, JOB B RUNNING",
-        "12. JOB A RUNNING, JOB B FAILED",
-        "13. JOB A FAILED, JOB B COMPLETED",
-        "14. JOB A COMPLETED, JOB B FAILED",
-        "15. JOB A FAILED, JOB B COMPLETED",
-        "16. JOB A FAILED, JOB B FAILED",
-    ]
+    ids=["step-reached", "step-pending"],
 )
-def test_handle_special_checkpoint_jobs_matching_parent_status_with_target_and_not_optional(
-        job_a_edge_info: dict[str, Any],
-        job_b_edge_info: dict[str, Any],
-        init_jobs: tuple[JobList, Any, Any, Any]
-) -> None:
-    """
-    Test special checkpoint job handling for various parent job status combinations.
-
-    :param job_a_edge_info: Edge info dictionary for job A.
-    :type job_a_edge_info: Dict[str, Any]
-    :param job_b_edge_info: Edge info dictionary for job B.
-    :type job_b_edge_info: Dict[str, Any]
-    :param init_jobs: Fixture providing initialized jobs and job list.
-    :type init_jobs: Tuple[JobList, Job, Job, Job]
-    :return: None
-    :rtype: None
-    """
+def test_checkpoint_job_waits_for_parent_step(init_jobs, reached_steps, expected):
+    """A child runs when its parent reaches FROM_STEP and stays WAITING before that."""
     job_list, job_a, job_b, job_c = init_jobs
 
-    def get_completed_status(status_key: str) -> str:
-        """
-        Determine the completed status for the edge based on the status key.
-
-        :param status_key: Status key from edge info.
-        :type status_key: str
-        :return: Completed status value.
-        :rtype: str
-        """
-        if status_key in (Status.VALUE_TO_KEY[Status.COMPLETED], Status.VALUE_TO_KEY[Status.WAITING]):
-            return status_key
-        return Status.VALUE_TO_KEY[Status.RUNNING]
+    job_a.status = Status.COMPLETED
+    job_b.status = Status.RUNNING
+    job_b.max_checkpoint_step = 2
+    job_b.current_checkpoint_step = 0
+    job_b.platform.check_file_exists.side_effect = lambda name, **_: int(
+        name.rsplit("_", 1)[1]
+    ) in reached_steps
 
     job_list.graph.edges[job_a.name, job_c.name].update(
-        min_trigger_status=job_a_edge_info["MIN_TRIGGER_STATUS"],
-        from_step=job_a_edge_info["FROM_STEP"],
-        fail_ok=False,
-        completion_status=get_completed_status(job_a_edge_info["COMPLETION_STATUS"])
+        accepted_statuses="COMPLETED", from_step=0
     )
     job_list.graph.edges[job_b.name, job_c.name].update(
-        min_trigger_status=job_b_edge_info["MIN_TRIGGER_STATUS"],
-        from_step=job_b_edge_info["FROM_STEP"],
-        fail_ok=False,
-        completion_status=get_completed_status(job_b_edge_info["COMPLETION_STATUS"])
+        accepted_statuses="RUNNING", from_step=2
     )
 
-    job_a.status = Status.KEY_TO_VALUE[job_a_edge_info["COMPLETION_STATUS"]]
-    job_b.status = Status.KEY_TO_VALUE[job_b_edge_info["COMPLETION_STATUS"]]
-    job_list._handle_special_checkpoint_jobs()
-    assert job_c.status == Status.READY
+    job_list._refresh_checkpoint_steps()
+    job_list._update_waiting_and_delayed_jobs()
+
+    assert job_c.status == expected

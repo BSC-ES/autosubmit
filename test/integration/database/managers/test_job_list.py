@@ -128,28 +128,25 @@ raw_job_list = [
 
 raw_graph_edges = [
     {
-        "completion_status": "WAITING",
+        "is_satisfied": False,
         "e_from": "a01f_REMOTE_SETUP",
         "e_to": "a01f_20000101_fc0_INI",
         "from_step": 0,
-        "fail_ok": True,
-        "min_trigger_status": "COMPLETED",
+        "accepted_statuses": "COMPLETED",
     },
     {
-        "completion_status": "WAITING",
+        "is_satisfied": False,
         "e_from": "a01f_LOCAL_SETUP",
         "e_to": "a01f_REMOTE_SETUP",
         "from_step": 0,
-        "fail_ok": True,
-        "min_trigger_status": "COMPLETED",
+        "accepted_statuses": "COMPLETED",
     },
     {
-        "completion_status": "WAITING",
+        "is_satisfied": False,
         "e_from": "a01f_20000101_fc0_INI",
         "e_to": "a01f_SIM",
         "from_step": 0,
-        "fail_ok": True,
-        "min_trigger_status": "COMPLETED",
+        "accepted_statuses": "COMPLETED",
     },
 ]
 
@@ -278,9 +275,8 @@ def generate_job_list(as_conf, db_manager) -> JobList:
                 edge["e_from"],
                 edge["e_to"],
                 from_step=edge["from_step"],
-                min_trigger_status=edge["min_trigger_status"],
-                completion_status=edge["completion_status"],
-                fail_ok=edge["fail_ok"],
+                accepted_statuses=edge["accepted_statuses"],
+                is_satisfied=edge["is_satisfied"],
             )
     return job_list
 
@@ -319,16 +315,39 @@ def test_db_job_list_edges(full_load: bool, as_db: str, autosubmit_exp):
             "e_from",
             "e_to",
             "from_step",
-            "min_trigger_status",
-            "completion_status",
-            "fail_ok",
+            "accepted_statuses",
+            "is_satisfied",
         }
         assert edge["e_from"] == raw_graph_edges_local[i]["e_from"]
         assert edge["e_to"] == raw_graph_edges_local[i]["e_to"]
         assert edge["from_step"] == raw_graph_edges_local[i]["from_step"]
         assert (
-            edge["min_trigger_status"] == raw_graph_edges_local[i]["min_trigger_status"]
+            edge["accepted_statuses"] == raw_graph_edges_local[i]["accepted_statuses"]
         )
+        assert edge["is_satisfied"] == raw_graph_edges_local[i]["is_satisfied"]
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize("full_load", [True, False])
+def test_db_job_list_edges_round_trip(full_load: bool, as_db: str, autosubmit_exp):
+    """Multi-status start conditions and from_step survive the DB round-trip."""
+    as_exp = autosubmit_exp(include_jobs=False)
+    db_manager = JobsDbManager(schema=as_exp.expid)
+    edges = [{
+        "e_from": "a01f_LOCAL_SETUP",
+        "e_to": "a01f_REMOTE_SETUP",
+        "accepted_statuses": "RUNNING,COMPLETED,SKIPPED,FAILED",
+        "is_satisfied": True,
+        "from_step": 3,
+    }]
+
+    db_manager.save_edges(edges)
+    loaded = db_manager.load_edges(raw_job_list, full_load=full_load)
+
+    assert len(loaded) == 1
+    assert loaded[0]["accepted_statuses"] == "RUNNING,COMPLETED,SKIPPED,FAILED"
+    assert loaded[0]["is_satisfied"] is True
+    assert loaded[0]["from_step"] == 3
 
 
 @pytest.mark.postgres
@@ -367,6 +386,7 @@ def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmi
             "local_logs_err",
             "local_logs_out",
             "max_checkpoint_step",
+            "checkpoint_attempt",
             "name",
             "packed",
             "platform_name",
@@ -469,6 +489,7 @@ def test_db_job_list_jobs_and_edges_together(
             "local_logs_err",
             "local_logs_out",
             "max_checkpoint_step",
+            "checkpoint_attempt",
             "name",
             "packed",
             "platform_name",
@@ -502,9 +523,8 @@ def test_db_job_list_jobs_and_edges_together(
             "e_from",
             "e_to",
             "from_step",
-            "min_trigger_status",
-            "completion_status",
-            "fail_ok",
+            "accepted_statuses",
+            "is_satisfied",
         }
 
 

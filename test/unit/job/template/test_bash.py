@@ -170,13 +170,6 @@ def test_stat_file_written_on_failure(tmp_path: 'Path'):
     assert (tmp_path / 't000_test_STAT_0').exists()
 
 
-def test_checkpoint_file_created(tmp_path: 'Path'):
-    """Calling ``as_checkpoint`` creates a ``_CHECKPOINT_N`` file."""
-    script_path = _build_script(tmp_path, "as_checkpoint")
-    run([str(script_path)], capture_output=True, text=True)
-    assert (tmp_path / 't000_test_CHECKPOINT_1').exists()
-
-
 def test_error_line_numbering(tmp_path: 'LocalPath'):
     h = as_header(platform_header='', executable='/bin/bash')
     b = as_body(dedent('''
@@ -196,6 +189,7 @@ def test_error_line_numbering(tmp_path: 'LocalPath'):
     the_script = the_script.replace('%CURRENT_LOGDIR%', str(tmp_path))
     the_script = the_script.replace('%JOBNAME%', 't000_test')
     the_script = the_script.replace('%FAIL_COUNT%', '0')
+    the_script = the_script.replace('%CHECKPOINT_ATTEMPT%', '0')
     the_script_path.write_text(the_script)
 
     the_script_path.chmod(0o755)

@@ -403,7 +403,7 @@ class PBSPlatform(ParamikoPlatform):
         Log.warning("Permission denied: Not enough permission to execute the command that sets the allocated nodes of the wrapper")
 
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5,
-                          max_retries: int = 3) -> bool:
+                          max_retries: int = 3, warn_missing: bool = True) -> bool:
         """Check if a file exists on the FTP server.
 
         :param src: The name of the file to check.
@@ -414,6 +414,8 @@ class PBSPlatform(ParamikoPlatform):
         :type sleeptime: int
         :param max_retries: Maximum number of retries. Defaults to 3.
         :type max_retries: int
+        :param warn_missing: Whether to log a warning when the file is missing.
+        :type warn_missing: bool
         :return: True if the file exists, False otherwise
         :rtype: bool
         """
@@ -435,6 +437,6 @@ class PBSPlatform(ParamikoPlatform):
                     retries = retries + 1
                 else:
                     raise
-        if not file_exist:
+        if not file_exist and warn_missing:
             Log.warning(f"File {src} couldn't be found")
         return file_exist

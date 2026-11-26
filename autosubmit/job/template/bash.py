@@ -161,7 +161,8 @@ trap as_exit_handler EXIT
 # Creates a new checkpoint file upon call based on the current numbers of calls to the function
 function as_checkpoint {
     AS_CHECKPOINT_CALLS=$((AS_CHECKPOINT_CALLS+1))
-    touch "${job_name_ptrn}_CHECKPOINT_${AS_CHECKPOINT_CALLS}"
+    # %CHECKPOINT_ATTEMPT% is needed to count the current try
+    touch "${job_name_ptrn}_CHECKPOINT_%CHECKPOINT_ATTEMPT%_${AS_CHECKPOINT_CALLS}"
 }
 AS_CHECKPOINT_CALLS=0
 

@@ -530,24 +530,6 @@ def test_wrapper_package(setup_wrappers, autosubmit_config):
         assert 'cluster_' + wrapper_job.name in graph.obj_dict['subgraphs']
 
 
-# TODO wip
-# def test_wrapper_package_with_job_edges(setup_wrappers, autosubmit_config):
-#     _, _, job_list, packages = setup_wrappers
-#     test = job_list.graph_dict
-#     job_edges = job_list.graph_dict_by_job_name
-#     job_edges['expid_d1_m1_1_SIM'] = [{'e_to': 'expid_d1_m1_2_SIM', 'from_step': 0, 'min_trigger_status': 'COMPLETED',
-#                                        'completion_status': 'WAITING', 'fail_ok': True}]
-#     job_edges['expid_d2_m2_1_SIM'] = [{'e_to': 'expid_d2_m2_2_SIM', 'from_step': 1, 'min_trigger_status': 'RUNNING',
-#                                        'completion_status': 'WAITING', 'fail_ok': True}]
-#
-#     monitor = Monitor(job_edges)
-#
-#     graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), packages, dict())
-#     assert not graph.obj_dict['strict']
-#     for wrapper_job in packages:
-#         assert 'cluster_' + wrapper_job.name in graph.obj_dict['subgraphs']
-
-
 def test_synchronize_member_group_member(job_list):
     for date in ['d1', 'd2']:
         for chunk in [1, 2]:

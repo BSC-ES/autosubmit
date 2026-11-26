@@ -32,6 +32,7 @@ covered at the end.
    :maxdepth: 1
    :caption: Running and managing
 
+   /userguide/upgrading
    /userguide/run/index
    /userguide/retries/retries.rst
    /userguide/modifying_workflow/index

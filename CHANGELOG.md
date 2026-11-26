@@ -57,6 +57,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `Log.set_file` failing (after retrying) when the log directory had missing parent directories or
   when given a bare file name; the directory is now created with its parents #3240 (thanks @anyingiit)
 - Ensure Autosubmit deletes PostgreSQL database schemas when deleting an experiment #3383
+- Fixed `updated_list_<EXPID>.txt` skipping status changes for jobs that were not loaded in memory #3275
 
 **New Features:**
 
@@ -82,10 +83,10 @@ several bug fixes and enhancements to improve the overall user experience.
 - Add `[database] backup` option to `autosubmitrc` to disable SQLite backups #3129
 - Support database-based locking for experiments, as alternative to the portalocker file lock #1392
 
-**Migration from `job_list.pkl` to Database**
+**Upgrading from 4.1 to 4.2:**
 
-- All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted
-  in significant changes to the code.
+- See the "Upgrading from 4.1" section in the user guide (`docs/source/userguide/upgrading.rst`)
+  for the `STATUS` start-condition migration, the database changes and the full upgrade procedure. #3275
 
 **Memory and Performance Improvements**:
 

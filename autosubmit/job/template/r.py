@@ -71,7 +71,7 @@ _AS_R_HEADER = dedent("""\
         AS_CHECKPOINT_CALLS = 0
         as_checkpoint <- function() {
             AS_CHECKPOINT_CALLS <<- AS_CHECKPOINT_CALLS + 1
-            fileConn<-file(paste(job_name_ptrn,"_CHECKPOINT_",AS_CHECKPOINT_CALLS, sep = ''),"w")
+            fileConn<-file(paste(job_name_ptrn,"_CHECKPOINT_%CHECKPOINT_ATTEMPT%_",AS_CHECKPOINT_CALLS, sep = ''),"w")
             close(fileConn)
         }
         %EXTENDED_HEADER% 

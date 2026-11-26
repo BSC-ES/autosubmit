@@ -227,7 +227,7 @@ def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> dict[str, An
 
     :param wrapper_type: The type of wrapper to use ['vertical', 'horizontal', 'vertical-horizontal', 'horizontal-vertical']
     :type wrapper_type: str
-    :param structure: The structure of the wrapper [min_trigger_status, from_step]
+    :param structure: The structure of the wrapper [accepted_statuses, from_step]
     :type structure: dict
     :param size: The size limits of the wrapper [MAX_V, MAX_H, MIN_V, MIN_H]
     :param size: dict
@@ -295,7 +295,7 @@ def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> dict[str, An
                               "sleep 0",
                     'DEPENDENCIES': {
                         'JOB': {
-                            'STATUS': structure['min_trigger_status'],
+                            'STATUS': structure['accepted_statuses'],
                             'FROM_STEP': structure['from_step'],
                         },
                         'COMPLEX_WRAPPER-1': {},

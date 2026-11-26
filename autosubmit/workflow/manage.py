@@ -1125,12 +1125,15 @@ def recover(
                 job.updated_stats = 0
                 job.log_recovery_call_count = 0
                 job.wrapper_type = None
+                job.begin_new_attempt()
+                if save:
+                    job_list.reset_outgoing_edges_satisfied(job.name)
                 Log.info(f"CHANGED job '{job.name}' status to WAITING")
 
-        job_list.check_completed_jobs_after_recovery()
+        job_list.check_completed_jobs_after_recovery(persist=save)
 
         Log.info("Updating the jobs list")
-        job_list.update_list(as_conf)
+        job_list.update_list(as_conf, store_change=save, persist_edges=save)
 
         if save:
             job_list.recover_last_data()

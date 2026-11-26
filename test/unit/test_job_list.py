@@ -25,9 +25,9 @@ import pytest
 from sqlalchemy import create_engine
 
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.managers.job_list import _edge_satisfied
+from autosubmit.database.models.tables import ExperimentStructureTable
 from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status
+from autosubmit.job.job_common import DEFAULT_START_CONDITION, Status, is_edge_satisfied
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_packages import JobPackageThread
@@ -65,33 +65,29 @@ def setup_job_list(as_conf):
             "e_to": "job2",
             "e_from": "job1",
             "from_step": "0",
-            "min_trigger_status": "COMPLETED",
-            "completion_status": "WAITING",
-            "fail_ok": False
+            "accepted_statuses": "COMPLETED",
+            "is_satisfied": False
         },
         {
             "e_to": "job3",
             "e_from": "job2",
             "from_step": "0",
-            "min_trigger_status": "COMPLETED",
-            "completion_status": "WAITING",
-            "fail_ok": False
+            "accepted_statuses": "COMPLETED",
+            "is_satisfied": False
         },
         {
             "e_to": "job5",
             "e_from": "job4",
             "from_step": "0",
-            "min_trigger_status": "COMPLETED",
-            "completion_status": "WAITING",
-            "fail_ok": False
+            "accepted_statuses": "COMPLETED",
+            "is_satisfied": False
         },
         {
             "e_to": "job6",
             "e_from": "job5",
             "from_step": "0",
-            "min_trigger_status": "COMPLETED",
-            "completion_status": "WAITING",
-            "fail_ok": False
+            "accepted_statuses": "COMPLETED",
+            "is_satisfied": False
         }
     ]
     for job in jobs:
@@ -109,6 +105,43 @@ def test_save_jobs(as_conf, setup_job_list, tmp_path):
     db_edges = job_list.dbmanager.select_edges(db_jobs)
     assert len(db_jobs) == len(jobs)
     assert len(db_edges) == len(job_list.graph.edges)
+
+
+def test_save_jobs_persists_current_checkpoint_step(as_conf):
+    """The parent checkpoint counter is persisted and loaded from the jobs table."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job = Job("cp", 1, Status.RUNNING, 0)
+    job.current_checkpoint_step = 2
+    job.max_checkpoint_step = 3
+    job.checkpoint_attempt = 4
+    job_list.dbmanager.save_jobs([job])
+
+    row = job_list.dbmanager.load_job_by_name("cp")
+
+    assert row["current_checkpoint_step"] == 2
+    assert row["max_checkpoint_step"] == 3
+    assert row["checkpoint_attempt"] == 4
+
+
+def test_sync_completed_jobs_resets_outgoing_edges(as_conf):
+    """A COMPLETED job that goes back to WAITING resets its outgoing edges."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job = Job("sync", 1, Status.COMPLETED, 0)
+    job.synchronize = "true"
+    parent = Job("parent", 2, Status.RUNNING, 0)
+    job.parents.add(parent)
+    job_list.graph.add_node(job.name, job=job)
+    job_list.graph.add_node(parent.name, job=parent)
+    job_list.dbmanager.save_edges([{
+        "e_from": "sync", "e_to": "child",
+        "accepted_statuses": DEFAULT_START_CONDITION, "from_step": 0, "is_satisfied": True,
+    }])
+    structure = job_list.dbmanager.table_registry.get(ExperimentStructureTable.name)
+
+    assert job_list._sync_completed_jobs() is True
+
+    edge = job_list.dbmanager.select_where_with_columns(structure, {"e_from": "sync"})[0]
+    assert dict(edge)["is_satisfied"] is False
 
 
 def test_get_status_counts(as_conf, setup_job_list, tmp_path):
@@ -169,12 +202,11 @@ def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool,
                 if child.name in {j.name for j in view_original}:
                     continue
                 edge = job_list.graph.edges.get((job.name, child.name), {})
-                if _edge_satisfied(
+                if is_edge_satisfied(
                     parent_status=Status.VALUE_TO_KEY.get(job.status, ''),
-                    min_trigger_status=edge.get("min_trigger_status", "COMPLETED"),
-                    fail_ok=bool(edge.get("fail_ok", False)) if edge.get("fail_ok") is not None else False,
+                    accepted_statuses=edge.get("accepted_statuses", DEFAULT_START_CONDITION),
                     from_step=edge.get("from_step", 0),
-                    child_checkpoint_step=child.current_checkpoint_step or 0,
+                    parent_checkpoint_step=job.current_checkpoint_step or 0,
                 ):
                     childs.append(child)
         view_original = list(set(view_original) | set(childs))
@@ -313,25 +345,22 @@ def test_find_and_delete_redundant_relations(setup_job_list):
         {"e_to": "job1",
          "e_from": "job2",
          "from_step": "0",
-         "min_trigger_status": "COMPLETED",
-         "completion_status": "WAITING",
-         "fail_ok": False
+         "accepted_statuses": "COMPLETED",
+         "is_satisfied": False
          },
         {
             "e_to": "job1",
             "e_from": "job3",
             "from_step": "0",
-            "min_trigger_status": "COMPLETED",
-            "completion_status": "WAITING",
-            "fail_ok": False
+            "accepted_statuses": "COMPLETED",
+            "is_satisfied": False
         },
         {
             "e_to": "job2",
             "e_from": "job3",
             "from_step": "0",
-            "min_trigger_status": "COMPLETED",
-            "completion_status": "WAITING",
-            "fail_ok": False
+            "accepted_statuses": "COMPLETED",
+            "is_satisfied": False
         },
     ]
     for edge in redundant:
@@ -624,40 +653,78 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
 
 
 @pytest.mark.parametrize(
-    "parent_statuses,fail_ok,expected",
+    "parent_statuses,accepted_statuses,expected",
     [
-        ([], False, True),
-        ([Status.COMPLETED], False, True),
-        ([Status.COMPLETED, Status.COMPLETED], False, True),
-        ([Status.COMPLETED, Status.SKIPPED], False, True),
-        ([Status.FAILED], True, True),
-        ([Status.FAILED, Status.COMPLETED], True, True),
-        ([Status.FAILED], False, False),
-        ([Status.FAILED, Status.RUNNING], True, False),
-        ([Status.COMPLETED, Status.FAILED], True, True),
-        ([Status.COMPLETED, Status.FAILED], False, False),
+        ([], "COMPLETED", True),
+        ([Status.COMPLETED], "COMPLETED", True),
+        ([Status.COMPLETED, Status.COMPLETED], "COMPLETED", True),
+        ([Status.COMPLETED, Status.SKIPPED], "COMPLETED", False),
+        ([Status.COMPLETED, Status.SKIPPED], "SUCCEEDED", True),
+        ([Status.FAILED], "COMPLETED", False),
+        ([Status.FAILED, Status.COMPLETED], "COMPLETED", False),
+        ([Status.FAILED], "FINISHED", True),
+        ([Status.FAILED], "FAILED,COMPLETED", True),
+        ([Status.SKIPPED], "COMPLETED,FAILED", False),
+        ([Status.RUNNING], "RUNNING", True),
+        ([Status.COMPLETED], "RUNNING", False),
+        ([Status.COMPLETED], "RUNNING,SUCCEEDED", True),
+        ([Status.SKIPPED], "RUNNING", False),
+        ([Status.SKIPPED], "RUNNING,SUCCEEDED", True),
+        ([Status.FAILED], "RUNNING", False),
+        ([Status.FAILED], "RUNNING,SUCCEEDED", False),
+        ([Status.QUEUING], "RUNNING", False),
+        ([Status.READY], "RUNNING", False),
+        ([Status.QUEUING], "QUEUING", True),
+        ([Status.COMPLETED], "QUEUING", False),
+        ([Status.COMPLETED], "QUEUING,SUCCEEDED", True),
+        ([Status.RUNNING], "QUEUING", False),
+        ([Status.FAILED], "FAILED", True),
+        ([Status.COMPLETED], "FAILED", False),
+        ([Status.COMPLETED], "FAILED,SUCCEEDED", True),
+        ([Status.RUNNING], "RUNNING,FAILED", True),
+        ([Status.FAILED], "RUNNING,FAILED", True),
+        ([Status.COMPLETED], "RUNNING,FAILED", False),
     ],
     ids=[
         "no_parents",
         "all_completed",
         "all_completed_multiple",
-        "all_completed_or_skipped",
-        "single_failed_fail_ok",
-        "mixed_failed_fail_ok_and_completed",
-        "single_failed_no_fail_ok",
-        "all_failed_fail_ok",
-        "mixed_fail_ok",
-        "mixed_no_fail_ok_blocks",
+        "completed_and_skipped_block_strict",
+        "completed_and_skipped_meet_succeeded",
+        "single_failed_strict",
+        "mixed_failed_strict",
+        "failed_parent_meets_finished",
+        "failed_parent_meets_failed_or_completed",
+        "skipped_parent_blocks_failed_or_completed",
+        "running_parent_strict",
+        "completed_parent_blocks_strict_running",
+        "completed_parent_meets_relaxed_running",
+        "skipped_parent_blocks_strict_running",
+        "skipped_parent_meets_relaxed_running",
+        "failed_parent_blocks_strict_running",
+        "failed_parent_blocks_relaxed_running",
+        "queuing_parent_blocks_running",
+        "ready_parent_blocks_running",
+        "queuing_parent_strict",
+        "completed_parent_blocks_strict_queuing",
+        "completed_parent_meets_relaxed_queuing",
+        "running_parent_blocks_queuing",
+        "failed_parent_meets_failed",
+        "completed_parent_blocks_strict_failed",
+        "completed_parent_meets_failed_or_succeeded",
+        "running_parent_meets_running_or_failed",
+        "failed_parent_meets_running_or_failed",
+        "completed_parent_blocks_running_or_failed",
     ]
 )
 def test_update_waiting_and_delayed_jobs(
     as_conf,
     tmp_path,
     parent_statuses: Any,
-    fail_ok: bool,
+    accepted_statuses: str,
     expected: bool,
 ) -> None:
-    """Test _update_waiting_and_delayed_jobs with different parent/fail_ok combinations."""
+    """Test _update_waiting_and_delayed_jobs with different parent/edge combinations."""
     job_list = JobList("a000", as_conf, YAMLParserFactory())
     job_list.graph = networkx.DiGraph()
     child = Job("child", 99, Status.WAITING, 0)
@@ -666,7 +733,9 @@ def test_update_waiting_and_delayed_jobs(
     for i, status in enumerate(parent_statuses):
         parent = Job(f"parent{i}", i, status, 0)
         job_list.add_job(parent)
-        job_list.graph.add_edge(parent.name, child.name, fail_ok=fail_ok)
+        job_list.graph.add_edge(
+            parent.name, child.name, accepted_statuses=accepted_statuses
+        )
 
     job_list.fill_parents_children()
     job_list._update_waiting_and_delayed_jobs()
@@ -675,6 +744,71 @@ def test_update_waiting_and_delayed_jobs(
         assert child.status == Status.READY
     else:
         assert child.status == Status.WAITING
+
+
+@pytest.mark.parametrize(
+    "parents,expected",
+    [
+        pytest.param(
+            [("COMPLETED", "COMPLETED"), ("RUNNING", "RUNNING")],
+            True,
+            id="all_conditions_met",
+        ),
+        pytest.param(
+            [("COMPLETED", "COMPLETED"), ("QUEUING", "RUNNING")],
+            False,
+            id="one_condition_not_met",
+        ),
+        pytest.param(
+            [("RUNNING", "RUNNING"), ("FAILED", "FAILED")],
+            True,
+            id="running_and_failed_edges_met",
+        ),
+        pytest.param(
+            [("RUNNING", "RUNNING"), ("FAILED", "COMPLETED")],
+            False,
+            id="failed_parent_blocks_completed_edge",
+        ),
+        pytest.param(
+            [("COMPLETED", "RUNNING,SUCCEEDED"), ("SKIPPED", "QUEUING,SUCCEEDED")],
+            True,
+            id="relaxed_completed_and_skipped_satisfy",
+        ),
+        pytest.param(
+            [("COMPLETED", "RUNNING,SUCCEEDED"), ("SKIPPED", "QUEUING")],
+            False,
+            id="strict_edge_not_met_blocks",
+        ),
+        pytest.param(
+            [("COMPLETED", "COMPLETED"), ("SKIPPED", "COMPLETED")],
+            False,
+            id="skipped_parent_blocks_strict_completed",
+        ),
+        pytest.param(
+            [("COMPLETED", "SUCCEEDED"), ("SKIPPED", "SUCCEEDED")],
+            True,
+            id="succeeded_edge_accepts_both_success_endings",
+        ),
+    ],
+)
+def test_update_waiting_and_delayed_jobs_mixed_conditions(as_conf, tmp_path, parents, expected):
+    """A job starts only when every parent satisfies its own edge condition."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job_list.graph = networkx.DiGraph()
+    child = Job("child", 99, Status.WAITING, 0)
+    job_list.add_job(child)
+
+    for i, (status, accepted_statuses) in enumerate(parents):
+        parent = Job(f"parent{i}", i, getattr(Status, status), 0)
+        job_list.add_job(parent)
+        job_list.graph.add_edge(
+            parent.name, child.name, accepted_statuses=accepted_statuses
+        )
+
+    job_list.fill_parents_children()
+    job_list._update_waiting_and_delayed_jobs()
+
+    assert child.status == (Status.READY if expected else Status.WAITING)
 
 
 def test_recover_last_data_on_old_schema(tmp_path, as_conf):
@@ -912,20 +1046,22 @@ def test_update_from_file_applies_change_to_job_stored_only_in_database(as_conf,
     per-attempt state for re-runnable targets and does not load them into the graph."""
     mocker.patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
     job_list = JobList("a000", as_conf, YAMLParserFactory())
-    stored = Job("STOREDJOB", 9, Status.COMPLETED, 0)
+    stored = Job("a000_STOREDJOB", 9, Status.COMPLETED, 0)
+    stored.checkpoint_attempt = 3
     job_list.dbmanager.save_jobs([stored])
     update_path = tmp_path / "updated_list_a000.txt"
     job_list._update_file_path = update_path
-    update_path.write_text("storedjob WAITING\n", encoding="utf-8")
+    update_path.write_text("a000_STOREDJOB WAITING\n", encoding="utf-8")
 
     assert job_list.update_from_file() is True
 
-    row = job_list.dbmanager.load_job_by_name("STOREDJOB")
+    row = job_list.dbmanager.load_job_by_name("a000_STOREDJOB")
     assert row["status"] == "WAITING"
     assert row["id"] is None
     assert row["fail_count"] == 0
     assert row["updated_log"] == 0
-    assert job_list.get_job_by_name("STOREDJOB") is None
+    assert row["checkpoint_attempt"] == 4
+    assert job_list.get_job_by_name("a000_STOREDJOB") is None
     assert not update_path.exists()
 
 
@@ -937,14 +1073,14 @@ def test_update_from_file_applies_change_to_job_stored_only_in_database(as_conf,
         ("# a comment", None),
         ("   # indented comment", None),
         ("job1", None),
-        ("job1 COMPLETED trailing", ("JOB1", "COMPLETED")),
-        ("myjob waiting", ("MYJOB", "WAITING")),
+        ("job1 COMPLETED trailing", ("job1", "COMPLETED")),
+        ("myjob waiting", ("myjob", "WAITING")),
     ],
     ids=["blank", "whitespace", "comment", "indented-comment", "missing-status",
-         "extra-tokens", "uppercased"],
+         "extra-tokens", "keeps-name-case"],
 )
 def test_parse_update_line(line, expected):
-    """_parse_update_line strips, uppercases and ignores blank/comment/malformed lines."""
+    """_parse_update_line strips, uppercases the status and ignores blank/comment/malformed lines."""
     assert JobList._parse_update_line(line, "updated_list_a000.txt") == expected
 
 
@@ -984,7 +1120,8 @@ def test_persist_unloaded_job_changes_splits_reset_and_edge_updates(as_conf, moc
     the DB edges of final targets, keeping everything else untouched."""
     job_list = JobList("a000", as_conf, YAMLParserFactory())
     mocked_save = mocker.patch.object(job_list.dbmanager, "save_jobs")
-    mocked_edges = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_completion")
+    mocked_edges = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_satisfied")
+    mocked_reset = mocker.patch.object(job_list.dbmanager, "reset_outgoing_edges_satisfied")
     rerunnable = Job("RERUN", None, Status.READY, 0)
     final = Job("DONE", 5, Status.COMPLETED, 0)
     other = Job("UNKNOWN_STATE", None, Status.UNKNOWN, 0)
@@ -996,19 +1133,152 @@ def test_persist_unloaded_job_changes_splits_reset_and_edge_updates(as_conf, moc
         mocker.call([rerunnable], reset_log_counters=True),
         mocker.call([final, other], reset_log_counters=False),
     ])
-    mocked_edges.assert_called_once_with("DONE", "COMPLETED")
+    mocked_reset.assert_has_calls([
+        mocker.call("RERUN"),
+        mocker.call("UNKNOWN_STATE"),
+    ])
+    mocked_edges.assert_called_once_with("DONE", "COMPLETED", 0)
 
 
 def test_persist_unloaded_job_changes_skipped_when_saving_disabled(as_conf, mocker):
     """Unloaded changes are not persisted when saving is disabled."""
     job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
     mocked_save = mocker.patch.object(job_list.dbmanager, "save_jobs")
-    mocked_edges = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_completion")
+    mocked_edges = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_satisfied")
 
     job_list._persist_unloaded_job_changes([(Job("X", None, Status.COMPLETED, 0), Status.COMPLETED)])
 
     mocked_save.assert_not_called()
     mocked_edges.assert_not_called()
+
+
+def test_refresh_checkpoint_steps_uses_parent_checkpoint_files(as_conf, mocker):
+    """The parent checkpoint counter advances by checking its own checkpoint files."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    parent = Job("parent", 1, Status.RUNNING, 0)
+    parent.max_checkpoint_step = 3
+    parent.current_checkpoint_step = 0
+    platform = mocker.MagicMock()
+    platform.connected = True
+    platform.serial_platform = platform
+    platform.check_file_exists.side_effect = lambda name, **_: name in {
+        "parent_CHECKPOINT_0_1", "parent_CHECKPOINT_0_2"
+    }
+    parent.platform = platform
+    job_list.graph.add_node(parent.name, job=parent)
+
+    assert job_list._refresh_checkpoint_steps() is True
+    assert parent.current_checkpoint_step == 2
+    assert platform.check_file_exists.call_args_list[0].args[0] == "parent_CHECKPOINT_0_1"
+
+    assert job_list._refresh_checkpoint_steps() is False
+
+
+@pytest.mark.parametrize(
+    "edges",
+    [
+        None,
+        [{"e_from": "parent", "e_to": "missing_child", "from_step": 3,
+          "accepted_statuses": "RUNNING"}],
+    ],
+    ids=["from-graph", "from-raw-edges-with-unloaded-child"],
+)
+def test_recompute_checkpoint_limits(as_conf, edges):
+    """max_checkpoint_step is derived from outgoing edges, including edges to unloaded children."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    parent = Job("parent", 1, Status.RUNNING, 0)
+    child = Job("child", 2, Status.WAITING, 0)
+    job_list.graph.add_node(parent.name, job=parent)
+    if edges is None:
+        job_list.graph.add_node(child.name, job=child)
+        job_list.graph.add_edge(parent.name, child.name, accepted_statuses="RUNNING", from_step=3)
+    parent.max_checkpoint_step = None
+
+    job_list._recompute_checkpoint_limits(edges)
+
+    assert parent.max_checkpoint_step == 3
+    if edges is None:
+        assert child.max_checkpoint_step == 0
+
+
+def test_retry_resets_parent_checkpoint_step(mocker):
+    """A retried parent starts its checkpoint counter from zero again."""
+    as_conf = mocker.MagicMock()
+    as_conf.jobs_data = {"SIM": {}}
+    as_conf.get_retrials.return_value = 1
+    as_conf.get_delay_retry_time.return_value = "0"
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    parent = Job("parent", 1, Status.FAILED, 0)
+    parent.section = "SIM"
+    parent.fail_count = 0
+    parent.retrials = 1
+    parent.current_checkpoint_step = 2
+    parent.max_checkpoint_step = 2
+    job_list.graph.add_node(parent.name, job=parent)
+    mocker.patch.object(job_list, "get_failed", return_value=[parent])
+    mocker.patch.object(job_list, "is_wrapper_still_running", return_value=False)
+    reset = mocker.patch.object(job_list.dbmanager, "reset_outgoing_edges_satisfied")
+
+    job_list._update_failed_jobs(as_conf)
+
+    assert parent.current_checkpoint_step == 0
+    assert parent.checkpoint_attempt == 1
+    reset.assert_called_once_with("parent")
+
+
+def test_update_list_dry_run_does_not_write_edges(mocker):
+    """persist_edges=False must not touch the edge satisfaction tables."""
+    as_conf = mocker.MagicMock()
+    as_conf.jobs_data = {"SIM": {}}
+    as_conf.get_retrials.return_value = 1
+    as_conf.get_delay_retry_time.return_value = "0"
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    parent = Job("parent", 1, Status.FAILED, 0)
+    parent.section = "SIM"
+    parent.fail_count = 0
+    parent.retrials = 1
+    job_list.graph.add_node(parent.name, job=parent)
+    update = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_satisfied")
+    reset = mocker.patch.object(job_list.dbmanager, "reset_outgoing_edges_satisfied")
+
+    job_list.update_list(as_conf, from_set_status=True, persist_edges=False)
+
+    update.assert_not_called()
+    reset.assert_not_called()
+
+
+def test_update_list_reconciles_final_job_with_unloaded_children(as_conf):
+    """A final job updates its DB edges even when its children are not in the graph."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job = Job("parent", 1, Status.COMPLETED, 0)
+    job_list.graph.add_node(job.name, job=job)
+    job_list.dbmanager.save_edges([{
+        "e_from": "parent", "e_to": "child",
+        "accepted_statuses": DEFAULT_START_CONDITION, "from_step": 0, "is_satisfied": False,
+    }])
+    structure = job_list.dbmanager.table_registry.get(ExperimentStructureTable.name)
+
+    job_list.update_list(as_conf, store_change=False, from_set_status=True)
+
+    edge = job_list.dbmanager.select_where_with_columns(structure, {"e_from": "parent"})[0]
+    assert dict(edge)["is_satisfied"] is True
+
+
+def test_refresh_reconciles_running_job_with_unloaded_children(as_conf):
+    """A RUNNING parent updates its DB edges even when its children are not in the graph."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job = Job("parent", 1, Status.RUNNING, 0)
+    job_list.graph.add_node(job.name, job=job)
+    job_list.dbmanager.save_edges([{
+        "e_from": "parent", "e_to": "child",
+        "accepted_statuses": "RUNNING", "from_step": 0, "is_satisfied": False,
+    }])
+    structure = job_list.dbmanager.table_registry.get(ExperimentStructureTable.name)
+
+    job_list._refresh_checkpoint_steps()
+
+    edge = job_list.dbmanager.select_where_with_columns(structure, {"e_from": "parent"})[0]
+    assert dict(edge)["is_satisfied"] is True
 
 
 def test_update_from_file_returns_false_without_update_file(as_conf, tmp_path):
@@ -1063,10 +1333,10 @@ def test_collect_update_changes_duplicate_lines_last_wins(as_conf, mocker):
         ["DUP COMPLETED", "dup WAITING", "DUP FAILED"]
     )
 
-    assert len(pairs) == 1
+    assert pairs == []
     assert len(unloaded_pairs) == 1
-    assert pairs[0][0] is not None
-    assert pairs[0][1] == Status.FAILED
+    assert unloaded_pairs[0][0] is not None
+    assert unloaded_pairs[0][1] == Status.FAILED
 
 
 @pytest.fixture
@@ -1203,9 +1473,8 @@ def _job_list_with_stale_parent_edge(as_conf) -> JobList:
         "e_from": "op4",
         "e_to": "app4",
         "from_step": 0,
-        "min_trigger_status": "COMPLETED",
-        "completion_status": "WAITING",
-        "fail_ok": False,
+        "accepted_statuses": "COMPLETED",
+        "is_satisfied": False,
     }])
 
     job_list.add_job(parent)
@@ -1228,7 +1497,7 @@ def test_wrappable_child_loaded_when_parent_completed_in_memory(
     """Load a wrappable child when its parent is COMPLETED in memory, not only in the DB.
 
     Regression test for the DestinE vertical-wrapper race: the parent job is
-    already COMPLETED in memory, but its edge ``completion_status`` has not been
+    already COMPLETED in memory, but its edge ``is_satisfied`` has not been
     persisted yet (``update_list`` runs after the packager). Neither loader may
     skip the child in that window.
     """

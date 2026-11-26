@@ -105,6 +105,8 @@ PERSISTENT_ATTRIBUTES = (
     "date",
     "date_split",
     "max_checkpoint_step",
+    "current_checkpoint_step",
+    "checkpoint_attempt",
     "start_time_timestamp",
     "submit_time_timestamp",
     "finish_time_timestamp",
@@ -253,6 +255,7 @@ class Job:
         'additional_files',
         'check',
         'check_warnings',
+        'checkpoint_attempt',
         'current_checkpoint_step',
         'date',
         'date_format',
@@ -354,6 +357,8 @@ class Job:
     def __getstate__(self):
         """Serialize the job state for persistence."""
         job_data = {k: getattr(self, k, None) for k in PERSISTENT_ATTRIBUTES}
+        for attribute in ("checkpoint_attempt", "current_checkpoint_step", "max_checkpoint_step"):
+            job_data[attribute] = int(getattr(self, attribute, 0) or 0)
         job_data["status"] = Status.VALUE_TO_KEY[self.status]
         # TODO why this is needed in the recovery test?
         if not isinstance(self.local_logs, tuple):
@@ -459,6 +464,7 @@ class Job:
         # internal
         self.current_checkpoint_step = 0
         self.max_checkpoint_step = 0
+        self.checkpoint_attempt = 0
         self.reservation = ""
         self.delete_when_edgeless = False
         # hetjobs
@@ -632,8 +638,6 @@ class Job:
         self.stat_file = f"{self.script_name[:-4]}_STAT_"
         self.processors_per_node = ""
         self.reservation = ""
-        self.current_checkpoint_step = 0
-        self.max_checkpoint_step = 0
         self.exclusive = ""
         self.export = ""
         self.local_logs = ('', '')
@@ -718,10 +722,6 @@ class Job:
     def checkpoint(self):
         """Generates a checkpoint step for this job based on job.type."""
         return self.type.checkpoint
-
-    def get_checkpoint_files(self):
-        """Check if there is a file on the remote host that contains the checkpoint"""
-        return self.platform.get_checkpoint_files(self)
 
     @property  # type: ignore
     @autosubmit_parameter(name='sdate')
@@ -2372,6 +2372,7 @@ class Job:
 
         parameters['JOBNAME'] = self.name
         parameters['FAIL_COUNT'] = str(self.fail_count)
+        parameters['CHECKPOINT_ATTEMPT'] = str(self.checkpoint_attempt or 0)
         parameters['SDATE'] = self.sdate
         parameters['MEMBER'] = self.member
         parameters['SPLIT'] = self.split
@@ -2431,6 +2432,36 @@ class Job:
         self.updated_log = 0
         self.updated_stats = 0
 
+    def begin_new_attempt(self) -> None:
+        """Reset the per-attempt checkpoint state for a new run.
+
+        The checkpoint files of the previous attempt are removed when the platform is
+        reachable, so a retry or rerun does not leave stale checkpoints behind.
+        """
+        previous_attempt = int(self.checkpoint_attempt or 0)
+        self.current_checkpoint_step = 0
+        self.checkpoint_attempt = previous_attempt + 1
+        self._remove_checkpoint_files(previous_attempt)
+
+    def _remove_checkpoint_files(self, attempt: int) -> None:
+        """Remove the checkpoint files of a previous attempt.
+
+        :param attempt: Attempt number whose checkpoint files are removed.
+        """
+        platform = getattr(self, "platform", None)
+        max_step = int(self.max_checkpoint_step or 0)
+        if platform is None or max_step <= 0 or not getattr(platform, "connected", False):
+            return
+        for step in range(1, max_step + 1):
+            try:
+                platform.remove_checkpoint_file(
+                    f"{self.name}_CHECKPOINT_{attempt}_{step}", warn_missing=False
+                )
+            except Exception as error:
+                Log.debug(
+                    f"Could not remove checkpoint {self.name} attempt {attempt} step {step}: {error}"
+                )
+
     def apply_status(self, status: int) -> None:
         """Apply a new status, resetting the per-attempt state when the job will run again.
 
@@ -2448,6 +2479,7 @@ class Job:
             self.log_recovery_call_count = 0
             self.wrapper_type = None
             self.id = None
+            self.begin_new_attempt()
 
     @staticmethod
     def update_placeholders(as_conf: 'AutosubmitConfig', parameters: dict, replace_by_empty=False) -> dict:

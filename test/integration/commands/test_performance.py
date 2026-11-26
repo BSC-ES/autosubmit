@@ -156,12 +156,10 @@ def prepare_yml(members, chunks, splits) -> dict:
                     "OPA_ENERGYTDIG2": {
                         "STATUS": "FAILED",
                         "SPLITS_FROM": {"ALL": {"SPLITS_TO": "[1:auto]*\\1"}},
-                        "ANY_FINAL_STATUS_IS_VALID": False,
                     },
                     "OPA_ENERGYTDIG1": {
                         "STATUS": "FAILED",
                         "SPLITS_FROM": {"ALL": {"SPLITS_TO": "[1:auto]*\\1"}},
-                        "ANY_FINAL_STATUS_IS_VALID": False,
                     },
                     "APP_ENERGY_INDICATORS": {
                         "SPLITS_FROM": {"ALL": {"SPLITS_TO": "previous"}}
@@ -176,7 +174,7 @@ def prepare_yml(members, chunks, splits) -> dict:
                     "OPA_ENERGYTDIG1": {
                         "SPLITS_FROM": {"ALL": {"SPLITS_TO": "previous"}}
                     },
-                    "OPA_ENERGYTDIG1-1": {"STATUS": "FAILED?"},
+                    "OPA_ENERGYTDIG1-1": {"STATUS": "FINISHED"},
                 },
                 "SCRIPT": "sleep 0",
                 "RUNNING": "chunk",

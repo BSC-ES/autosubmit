@@ -183,6 +183,7 @@ JobsTable = Table(
     Column("wallclock", String),
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
+    Column("checkpoint_attempt", Integer, nullable=False, default=0),
     Column("platform_name", String),
     Column("created", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
     Column("modified", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
@@ -194,10 +195,9 @@ ExperimentStructureTable = Table(
     metadata_obj,
     Column("e_from", String, nullable=False, primary_key=True, index=True),
     Column("e_to", String, nullable=False, primary_key=True, index=True),
-    Column("min_trigger_status", String),
-    Column("completion_status", String),
+    Column("accepted_statuses", String),
+    Column("is_satisfied", Boolean, nullable=False, default=False),
     Column("from_step", Integer),
-    Column("fail_ok", Boolean),
     UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
 )
 
@@ -211,10 +211,9 @@ StructureDataTable = Table(
     Column("run_id", Integer, ForeignKey("experiment_run.run_id"), nullable=False, primary_key=True, index=True),
     Column("e_from", String, nullable=False, primary_key=True, index=True),
     Column("e_to", String, nullable=False, primary_key=True, index=True),
-    Column("min_trigger_status", String),
-    Column("completion_status", String),
+    Column("accepted_statuses", String),
+    Column("is_satisfied", Boolean, nullable=False, default=False),
     Column("from_step", Integer),
-    Column("fail_ok", Boolean),
     UniqueConstraint("run_id", "e_from", "e_to", name="unique_structure_data_run_id_e_from_and_e_to"),
 )
 

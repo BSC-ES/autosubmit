@@ -80,7 +80,6 @@ JOBS:
     DEPENDENCIES:
       LOCAL_SEND_EMISSIONS:
         STATUS: FAILED
-        OPTIONAL: false
     RUNNING: chunk
     SYNCHRONIZE: member
     WALLCLOCK: 00:30
@@ -122,7 +121,6 @@ JOBS:
     DEPENDENCIES:
       LOCAL_SEND_CHEM:
         STATUS: FAILED
-        OPTIONAL: false
     RUNNING: chunk
     SYNCHRONIZE: member
     WALLCLOCK: 00:30

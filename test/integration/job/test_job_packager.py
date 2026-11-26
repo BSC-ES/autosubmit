@@ -315,7 +315,7 @@ def test_build_packages_loads_wrappable_child_with_stale_edge(
     """A vertical wrapper must not hit a false deadlock while a child is only in the DB.
 
     Regression test for the DestinE vertical-wrapper race: the parent is
-    COMPLETED in memory, but its edge ``completion_status`` is still ``WAITING``
+    COMPLETED in memory, but its edge ``is_satisfied`` is still false
     in the database (``update_list`` runs after the packager). When
     ``parent_completed_in_db`` is False the parent status is stale too, which is
     the exact state that produced the ``strict`` policy 7014 in CI. The child
@@ -323,7 +323,7 @@ def test_build_packages_loads_wrappable_child_with_stale_edge(
     """
     job_list = wrappable_packager._jobs_list
 
-    # Keep the persisted edge completion status stale, as update_list has not run.
+    # Keep the persisted edge satisfaction state stale, as update_list has not run.
     job_list.save_edges()
 
     operators = _jobs_in_section(job_list, "OPERATOR")

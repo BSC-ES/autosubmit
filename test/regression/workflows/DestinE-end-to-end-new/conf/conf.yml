@@ -47,8 +47,7 @@ JOBS:
     FILE: hidden
     DEPENDENCIES:
       SIM:
-        STATUS: RUNNING
-        OPTIONAL: true
+        STATUS: RUNNING,SUCCEEDED
       DN:
         SPLITS_FROM:
           ALL:

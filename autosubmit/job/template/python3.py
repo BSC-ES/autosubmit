@@ -64,7 +64,7 @@ _AS_PY3_HEADER = dedent("""\
             global AS_CHECKPOINT_CALLS
             global job_name_ptrn
             AS_CHECKPOINT_CALLS = AS_CHECKPOINT_CALLS + 1
-            open(job_name_ptrn + '_CHECKPOINT_' + str(AS_CHECKPOINT_CALLS), 'w').close()      
+            open(job_name_ptrn + '_CHECKPOINT_%CHECKPOINT_ATTEMPT%_' + str(AS_CHECKPOINT_CALLS), 'w').close()      
         %EXTENDED_HEADER%
 
 """)

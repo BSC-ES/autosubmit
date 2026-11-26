@@ -100,9 +100,6 @@ parameters:
 For dependencies to jobs running in previous chunks, members or start-dates, use ``-(DISTANCE)``. For example, for a job
 ``SIM`` waiting for the previous ``SIM`` job to finish, you have to add ``DEPENDENCIES: SIM-1``.
 
-For dependencies that are not mandatory for the normal workflow behaviour, you must add the char ``?`` at the end of the
-dependency.
-
 For jobs running in HPC platforms, usually you have to provide information about processors, wallclock times and more.
 To do this, use:
 

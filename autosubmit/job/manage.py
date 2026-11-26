@@ -211,6 +211,9 @@ def set_status(
         performed_changes = change_status(
             final, final_status, final_list, save, definitive_platforms
         )
+        if performed_changes and save and final_status not in job_list._FINAL_STATUSES:
+            for job_name in performed_changes:
+                job_list.reset_outgoing_edges_satisfied(job_name)
 
         if performed_changes:
             if detail:
@@ -228,7 +231,7 @@ def set_status(
         else:
             Log.warning("No changes were performed.")
         Log.info(f"Updating JobList for experiment {expid}...")
-        job_list.update_list(as_conf, False, True)
+        job_list.update_list(as_conf, False, True, persist_edges=save)
         start = time.time()
         if save:
             if final_status in job_list._FINAL_STATUSES:

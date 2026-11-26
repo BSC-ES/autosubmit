@@ -2146,8 +2146,7 @@ JOBS:
             SPLITS_TO: previous
       DN-1: { }
       REMOTE_SETUP:
-        MIN_TRIGGER_STATUS: COMPLETED
-        FAIL_OK: False
+        ACCEPTED_STATUSES: COMPLETED
     FILE: templates/dn.sh
     PLATFORM: MARENOSTRUM5-LOGIN
     RETRIALS: 3
