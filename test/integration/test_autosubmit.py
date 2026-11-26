@@ -19,6 +19,7 @@
 
 import time
 from contextlib import nullcontext as does_not_raise
+from getpass import getuser
 from os import R_OK, W_OK
 from typing import TYPE_CHECKING
 
@@ -581,6 +582,61 @@ def test_prepare_run_returns_tuple_with_recover(autosubmit_exp):
     assert submitter is not None
     assert exp_history is None
     assert recover is True
+
+
+def test_prepare_run_recover_sets_run_id_for_wrappers(autosubmit_exp, mocker):
+    """Recovery loads the last run id before loading the wrappers.
+
+    Wrappers are loaded with the run id, so recovery must set it from the last
+    completed run instead of opening a new one.
+    """
+    experiment_data = {
+        "DEFAULT": {"HPCARCH": "TEST_SLURM"},
+        "PLATFORMS": {
+            "TEST_SLURM": {
+                "TYPE": "slurm",
+                "ADD_PROJECT_TO_HOST": "False",
+                "HOST": "127.0.0.1",
+                "MAX_WALLCLOCK": "48:00",
+                "PROJECT": "group",
+                "QUEUE": "gp_debug",
+                "SCRATCH_DIR": "/tmp/scratch",
+                "TEMP_DIR": "",
+                "USER": getuser(),
+                "PROCESSORS": "1",
+                "MAX_PROCESSORS": "128",
+                "PROCESSORS_PER_NODE": "128",
+            },
+        },
+        "WRAPPERS": {
+            "SIMPLE_WRAPPER": {
+                "TYPE": "vertical",
+                "JOBS_IN_WRAPPER": "SIM",
+                "MAX_WRAPPED_V": 4,
+                "MIN_WRAPPED_V": 2,
+            },
+        },
+    }
+    exp = autosubmit_exp(
+        experiment_data=experiment_data,
+        include_jobs=True,
+        create=True,
+    )
+    mocker.patch("autosubmit.workflow.manage.get_last_run_id", return_value=7)
+
+    (
+        job_list,
+        _submitter,
+        exp_history,
+        _host,
+        _as_conf,
+        _platforms_to_test,
+        recover,
+    ) = _prepare_run(exp.expid, check_scripts=False, recover=True)
+
+    assert recover is True
+    assert exp_history is None
+    assert job_list.run_id == 7
 
 
 def test_stop_sets_exit_flag(autosubmit_exp, mocker):

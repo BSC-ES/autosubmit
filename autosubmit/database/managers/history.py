@@ -204,7 +204,8 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
                 running=experiment_run_dc.running,
                 submitted=experiment_run_dc.submitted,
                 suspended=experiment_run_dc.suspended,
-                metadata=experiment_run_dc.metadata
+                metadata=experiment_run_dc.metadata,
+                pending_create=experiment_run_dc.pending_create
             )
         )
         with self.engine.connect() as conn, conn.begin():
@@ -227,6 +228,7 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
                 running=experiment_run_dc.running,
                 submitted=experiment_run_dc.submitted,
                 suspended=experiment_run_dc.suspended,
+                pending_create=experiment_run_dc.pending_create,
                 modified=HUtils.get_current_datetime()
             )
         )

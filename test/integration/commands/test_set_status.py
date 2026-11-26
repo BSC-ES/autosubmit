@@ -25,6 +25,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.managers.history import (
     SqlAlchemyExperimentHistoryDbManager,
 )
+from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import load_job_list
 from autosubmit.job.manage import set_status
@@ -704,3 +705,42 @@ def test_set_status_recovery_only_for_final_targets(
     do_setstatus(as_exp, fl="Any", target=target)
 
     assert mock_recover_last_data.called is recovery_expected
+
+
+def test_set_status_does_not_create_a_run(as_exp):
+    """set_status must not open the pending run. Only run does."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+    assert db_manager.get_experiment_run_dc_with_max_id_or_none() is None
+
+    do_setstatus(
+        as_exp,
+        fl=f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB",
+        target="COMPLETED",
+    )
+
+    assert db_manager.get_experiment_run_dc_with_max_id_or_none() is None
+
+
+def test_set_status_keeps_the_pending_run_pending(as_exp):
+    """A pending create is opened by run, not by set_status."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+    pending_run = db_manager.register_experiment_run_dc(
+        ExperimentRun(0, pending_create=1)
+    )
+
+    do_setstatus(
+        as_exp,
+        fl=f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB",
+        target="COMPLETED",
+    )
+
+    current_run = db_manager.get_experiment_run_dc_with_max_id_or_none()
+    assert current_run is not None
+    assert current_run.run_id == pending_run.run_id
+    assert current_run.pending_create == 1

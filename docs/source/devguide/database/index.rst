@@ -77,7 +77,14 @@ Databases in the ``$AS_METADATA`` directory
      - Used by the GUI to display edge lists. Populated by an API worker.
    * - ``job_data_<EXPID>.db``
      - ``$HOME/autosubmit/metadata/data/job_data_<EXPID>.db``
-     - Stores experiment metrics and historical information. Populated by Autosubmit.
+     - Stores experiment metrics and historical information. ``structure_data``
+       keeps the last edge snapshot per ``run_id``; read the highest ``run_id``
+       for the current structure.
+
+The ``experiment_run`` table uses ``pending_create`` to decide when a new run
+must be opened. ``create`` only marks the current run as pending; ``run`` opens
+the new run, a second ``run`` resumes it, and ``recovery --save`` clears the
+marker so the following ``run`` resumes the current run as well.
 
 Databases in each experiment directory
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

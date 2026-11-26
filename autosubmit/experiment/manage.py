@@ -938,21 +938,15 @@ def create(
         as_conf.save()
 
         groups_dict = {}
-        # Setting up job historical database header. Must create a new run.
-        # Historical Database: Setup new run
+        # Setting up the job historical database header (tables and schema).
+        # A new run must NOT be registered here: it is created when the
+        # experiment is actually run. Mark the current run as pending_create so
+        # the next run opens a new run id (a recovery run afterwards clears the
+        # marker and resumes it).
         try:
             exp_history = ExperimentHistory(expid)
             exp_history.initialize_database()
-
-            # exp_history.create_new_experiment_run(as_conf.get_chunk_size_unit(), as_conf.get_chunk_size(), as_conf.get_full_config_as_json(), job_list.get_job_list())
-            run_dc = exp_history.process_status_changes(
-                job_list.get_job_list(),
-                chunk_unit=as_conf.get_chunk_size_unit(),
-                chunk_size=as_conf.get_chunk_size(),
-                current_config=as_conf.get_full_config_as_json(),
-                create=True,
-            )
-            job_list.run_id = run_dc.run_id if run_dc else None
+            exp_history.set_pending_create(1)
             database_backup(expid)
         except Exception:
             Log.warning(
