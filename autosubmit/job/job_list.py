@@ -634,23 +634,38 @@ class JobList:
         Log.info("Saving sections...")
         self.dbmanager.save_sections_data(self.build_sections_data_to_store())
 
-    def load_inner_jobs_by_section(self, inner_sections: list[str]) -> list[Job]:
+    def load_inner_jobs_by_section(self, inner_sections: list[str],
+                                   loaded_tracker: set[str] | None = None) -> None:
+        """Load non-completed jobs of the given sections whose external parents are COMPLETED.
+
+        Jobs are added to the graph and their parents are loaded so the packager can
+        evaluate their dependencies in memory.
+
+        :param inner_sections: Section names to load jobs from.
+        :param loaded_tracker: Optional set updated with the names of the jobs loaded
+            from the database, so the caller can unload them later.
+        """
         if not self.disable_save:
             already_loaded = {n for n in self.graph.nodes
                              if self.graph.nodes[n]['job'].status != Status.COMPLETED}
             candidates = self.dbmanager.select_loadable_inner_jobs(inner_sections, already_loaded)
             for candidate in candidates:
                 candidate_dict = dict(candidate)
-                self.add_job(self.load_job_by_name(candidate_dict['name']))
-        return []
+                loaded = self.load_job_by_name(candidate_dict['name'])
+                if loaded is not None:
+                    self.add_job(loaded)
+                    if loaded_tracker is not None:
+                        loaded_tracker.add(loaded.name)
 
-    def process_wrapper_jobs(self, wrapper_section: str, inner_sections: list[str]) -> None:
-        """
-        Processes wrapper jobs by loading inner jobs and creating a sorted dictionary of jobs.
+    def process_wrapper_jobs(self, wrapper_section: str, inner_sections: list[str],
+                             loaded_tracker: set[str] | None = None) -> None:
+        """Processes wrapper jobs by loading inner jobs and creating a sorted dictionary of jobs.
+
         :param wrapper_section: The section name of the wrapper job.
         :param inner_sections: List of inner section names to load jobs from.
+        :param loaded_tracker: Optional set to track the names of the jobs loaded from the database.
         """
-        self.load_inner_jobs_by_section(inner_sections)
+        self.load_inner_jobs_by_section(inner_sections, loaded_tracker)
         try:
             if inner_sections:
                 self._ordered_jobs_by_date_member[wrapper_section] = self._create_sorted_dict_jobs(
@@ -2740,6 +2755,58 @@ class JobList:
                 else:
                     jobs.append(job)
         return jobs
+
+    def get_pending_job_names(self, section_list: list[str], banned_jobs: list[str] | None = None) -> set[str]:
+        """Names of the non-completed jobs of the given sections.
+
+        Uses the database when jobs may be unloaded (real runs). Otherwise it
+        resolves them in memory (for example, the ``create -cw`` preview), where
+        the database statuses are stale because the simulation is not persisted.
+
+        :param section_list: List of sections to filter jobs by.
+        :param banned_jobs: Job names to exclude from the result.
+        :return: Set of pending job names.
+        """
+        if not self.disable_save and self.dbmanager is not None:
+            return self.get_jobs_by_section_db(section_list, banned_jobs, get_only_non_completed=True)
+        return {job.name for job in self.get_jobs_by_section(section_list, banned_jobs, get_only_non_completed=True)}
+
+    def remaining_blocked_by_package(self, remaining_names: set[str], package_names: set[str]) -> bool:
+        """Return True when no non-COMPLETED parent outside the package or the
+        remaining chain can still feed the wrapper, so no more jobs can come.
+
+        Delegates to the database when jobs may be unloaded (real runs). Otherwise
+        it resolves it in memory (for example, the ``create -cw`` preview), where
+        the database statuses are stale because the simulation is not persisted.
+
+        :param remaining_names: Names of the jobs still pending in the wrapper sections.
+        :param package_names: Names of the jobs already in the current package.
+        :return: True if the remaining jobs are blocked by the package dependencies.
+        """
+        if not self.disable_save and self.dbmanager is not None:
+            return self.dbmanager.remaining_blocked_by_package(remaining_names, package_names)
+        return self._remaining_blocked_by_package_in_memory(remaining_names, package_names)
+
+    def _remaining_blocked_by_package_in_memory(self, remaining_names: set[str], package_names: set[str]) -> bool:
+        """Requires the whole workflow to be loaded in memory.
+
+        If any pending job is not loaded, its parents are unknown and the chain
+        cannot be proven blocked, so it returns ``False`` to avoid forming an
+        under-min wrapper.
+
+        :param remaining_names: Names of the jobs still pending in the wrapper sections.
+        :param package_names: Names of the jobs already in the current package.
+        :return: True if the remaining jobs are blocked by the package dependencies.
+        """
+        allowed_names = package_names | remaining_names
+        remaining_jobs = [job for job in self.job_list if job.name in remaining_names]
+        if len({job.name for job in remaining_jobs}) != len(remaining_names):
+            return False
+        return all(
+            parent.status == Status.COMPLETED or parent.name in allowed_names
+            for job in remaining_jobs
+            for parent in job.parents
+        )
 
     def get_jobs_by_section_db(
             self,
