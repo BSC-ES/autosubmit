@@ -331,7 +331,10 @@ These are always available regardless of the raw YAML keys defined.
     * ``CURRENT_ARCH``, ``CURRENT_HOST``, ``CURRENT_TYPE``,
       ``CURRENT_SCRATCH_DIR``, ``CURRENT_ROOTDIR``,
       ``CURRENT_LOGDIR`` and ``CURRENT_HYPERTHREADING`` are
-      **automatically** filled by Autosubmit.
+      **automatically** filled by Autosubmit. The default ``CURRENT_ARCH``
+      is the uppercase platform name (``LOCAL`` for the implicit local
+      platform); an explicitly configured value takes precedence. Existing
+      templates and paths that expect lowercase ``local`` should be updated.
 
     * ``CURRENT_USER``, ``CURRENT_PROJ``, ``CURRENT_QUEUE``,
       ``CURRENT_PARTITION`` and ``CURRENT_TEMP_DIR`` are only

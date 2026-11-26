@@ -1772,7 +1772,7 @@ class Job:
         for key, value in as_conf.platforms_data.get(self.platform_name, {}).items():
             parameters[f"CURRENT_{key.upper()}"] = value
 
-        parameters['CURRENT_ARCH'] = parameters.get('CURRENT_ARCH', self.platform.name)
+        parameters['CURRENT_ARCH'] = parameters.get('CURRENT_ARCH', self.platform.name.upper())
         parameters['CURRENT_HOST'] = parameters.get('CURRENT_HOST', self.platform.host)
         parameters['CURRENT_USER'] = parameters.get('CURRENT_USER', self.platform.user)
         parameters['CURRENT_PROJ'] = parameters.get('CURRENT_PROJ', self.platform.project)
