@@ -2711,14 +2711,14 @@ class AutosubmitConfig:
 
         # find all '%(?<!%%)\w+%(?!%%)' in githook files
         for githook_file in githook_files:
-            f_name, ext = githook_file.stem, githook_file.suffix
+            f_name, ext = githook_file.with_suffix(""), githook_file.suffix
             if ext == ".tmpl":
                 with open(githook_file, 'r') as f:
                     content = f.read()
                 matches = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', content, flags=re.IGNORECASE)
                 for match in matches:
                     # replace all '%(?<!%%)\w+%(?!%%)' with parameters value
-                    content = content.replace(match, parameters.get(match[1:-1], ""))
+                    content = content.replace(match, str(parameters.get(match[1:-1], "")))
                 with open(f_name, 'w') as f:
                     f.write(content)
                     os.chmod(f_name, 0o750)

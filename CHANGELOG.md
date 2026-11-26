@@ -59,6 +59,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Ensure Autosubmit deletes PostgreSQL database schemas when deleting an experiment #3383
 - Fix the `experiment_run` lifecycle so only `run` opens a run: `create` marks it as pending and later runs continue it. This stops historical `structure_data` edges from being duplicated across run ids #3178.
 - Vertical wrappers now always wrap a single dependent lineage with one job per level, following static dependencies across dates, members, chunks and splits. Independent jobs no longer share a package #3106
+- Fix githook templates failing with `TypeError` when they reference a parameter that is not a string, such as `PROJECT_SUBMODULES: false` #2533
 
 **New Features:**
 
