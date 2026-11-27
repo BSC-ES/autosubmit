@@ -504,9 +504,9 @@ class Job:
         """Number of failed attempts to run this job. (FAIL_COUNT)"""
         self.expid: str = self.name.split('_')[0]
         BasicConfig.read()
-        self._tmp_path = os.path.join(
+        self._tmp_path = Path(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
-        self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
+        self._log_path = self._tmp_path / f"LOG_{self.expid}"
         self.updated = False
         if not loaded_data:
             self.log_recovery_call_count = copy.copy(self.updated_log)
@@ -787,12 +787,12 @@ class Job:
 
     @property  # type: ignore
     @autosubmit_parameter(name='hyperthreading')
-    def hyperthreading(self):
-        """Detects if hyperthreading is enabled or not."""
+    def hyperthreading(self) -> str | bool:
+        """Hyperthreading setting ("true"/"false") for this platform. """
         return self._hyperthreading
 
     @hyperthreading.setter
-    def hyperthreading(self, value):
+    def hyperthreading(self, value: str | bool) -> None:
         self._hyperthreading = value
 
     @property  # type: ignore
@@ -1338,8 +1338,8 @@ class Job:
         :param index: Row position to retrieve.
         :param attempt: Fail count to determine the STAT file name. Default to self.stat_file for non-wrapped jobs.
         """
-        logname = os.path.join(self._tmp_path, f"{self.stat_file}{attempt}")
-        if os.path.exists(logname):
+        logname = self._tmp_path / f"{self.stat_file}{attempt}"
+        if logname.exists():
             with open(logname) as f:
                 lines = f.readlines()
             if len(lines) >= index + 1:
@@ -1356,7 +1356,7 @@ class Job:
         :param index: column position to retrieve
         :return: list of values in column index position
         """
-        log_name = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
+        log_name = Path(self._tmp_path) / f"{self.name}_TOTAL_STATS"
         lst = []
         if log_name.exists() and log_name.stat().st_size > 0:
             with open(log_name) as f:
@@ -1392,7 +1392,7 @@ class Job:
 
         result = self._get_from_stat(2, attempt)
         if result == 0:
-            stat_file = Path(self._tmp_path) / f"{self.stat_file}{attempt}"
+            stat_file = self._tmp_path / f"{self.stat_file}{attempt}"
             if stat_file.exists():
                 stat_file.unlink()
         return result > 0
@@ -1412,9 +1412,9 @@ class Job:
 
         :return: list of dates of retrial [submit, start, finish] in datetime format
         """
-        log_name = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
+        log_name = self._tmp_path / f"{self.name}_TOTAL_STATS"
         retrials_list: list = []
-        if os.path.exists(log_name):
+        if log_name.exists():
             already_completed = False
             # Read lines of the TOTAL_STATS file starting from last
             with open(log_name) as f:
@@ -1444,10 +1444,9 @@ class Job:
             Log.printlog(f"Trace {e} \n Failed to retrieve log file for job {self.name}", 6000)
         return remote_logs
 
-    def check_remote_log_exists(self, show_logs: bool = False) -> bool:
+    def check_remote_log_exists(self) -> bool:
         """Checks if remote log file exists on remote host
 
-        :param show_logs: Whether to show logs during the check
         :return: True if remote log file exists, False otherwise
         """
         try:
@@ -1467,9 +1466,7 @@ class Job:
 
         # Compress if enabled
         for idx, remote_log in enumerate(remote_logs):
-            log_full_path = Path(
-                self.platform.get_files_path(), remote_log
-            )
+            log_full_path = self.platform.files_path / remote_log
             if self.platform.compress_remote_logs:
                 compressed_path = self.platform.compress_file(str(log_full_path))
                 remote_logs[idx] = str(Path(compressed_path).name) if compressed_path else remote_log
@@ -1575,7 +1572,7 @@ class Job:
                     result_local = self.local_logs
                     result_remote = self.remote_logs
             else:
-                remote_out = Path(self.platform.get_files_path(), self.remote_logs[0])
+                remote_out = self.platform.files_path / self.remote_logs[0]
                 parsed_id = self.platform.read_jobid_from_remote_log(str(remote_out))
                 if parsed_id is not None:
                     self.id = parsed_id
@@ -1743,9 +1740,9 @@ class Job:
         # Check if the job platform is a subclass of ParamikoPlatform
         # TODO: Every platform is an instance of Paramiko, no?
         if isinstance(self.platform, ParamikoPlatform):
-            base_path = Path(self.platform.remote_log_dir)
+            base_path = self.platform.remote_log_dir
         else:
-            base_path = Path(self.platform.root_dir).joinpath(self.expid)
+            base_path = self.platform.root_dir.joinpath(self.expid)
 
         # Get the defined metric folder from the configuration if it exists
         try:
@@ -1781,10 +1778,10 @@ class Job:
         parameters['CURRENT_EXCLUSIVITY'] = parameters.get('CURRENT_EXCLUSIVITY', self.platform.exclusivity)
         parameters['CURRENT_HYPERTHREADING'] = parameters.get('CURRENT_HYPERTHREADING', self.platform.hyperthreading)
         parameters['CURRENT_TYPE'] = parameters.get('CURRENT_TYPE', self.platform.TYPE.value)
-        parameters['CURRENT_SCRATCH_DIR'] = parameters.get('CURRENT_SCRATCH_DIR', self.platform.scratch)
-        parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', self.platform.project_dir)
+        parameters['CURRENT_SCRATCH_DIR'] = parameters.get('CURRENT_SCRATCH_DIR', str(self.platform.scratch))
+        parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', str(self.platform.project_dir))
         parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', str(self.platform.root_dir))
-        parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', str(self.platform.get_files_path()))
+        parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', str(self.platform.files_path))
 
         for key, value in as_conf.jobs_data[self.section].items():
             if isinstance(value, str) and value.strip().upper() == f"%CURRENT_{key.upper()}%":
@@ -2675,7 +2672,7 @@ class Job:
 
         script_name = f'{self.name}.cmd'
         self.script_name = script_name
-        script_path = Path(self._tmp_path) / script_name
+        script_path = self._tmp_path / script_name
         with open(script_path, 'wb') as f:
             f.write(template_content.encode(lang))
         script_path.chmod(0o755)
@@ -2799,8 +2796,7 @@ class Job:
         :param lang: Encoding language.
         :return: None
         """
-        tmp_path = Path(self._tmp_path)
-        full_path = tmp_path.joinpath(self.construct_real_additional_file_name(additional_file))
+        full_path = self._tmp_path.joinpath(self.construct_real_additional_file_name(additional_file))
         with full_path.open('wb') as f:
             f.write(content.encode(lang))
 
@@ -2825,9 +2821,9 @@ class Job:
                 '%(?<!%%)' + variable + '%(?!%%)', '', template_content, flags=re.IGNORECASE)
         template_content = template_content.replace("%%", "%")
         script_name = f'{self.name}.{wrapper_tag}.cmd'
-        with open(Path(self._tmp_path) / script_name, 'w', encoding='utf-8') as f:
+        with open(self._tmp_path / script_name, 'w', encoding='utf-8') as f:
             f.write(template_content)
-        os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
+        os.chmod(str(self._tmp_path / script_name), 0o755)
         return script_name
 
     def check_script(self, as_conf: 'AutosubmitConfig', show_logs="false") -> bool:
@@ -2883,7 +2879,7 @@ class Job:
         _aux_local_logs = list(copy.deepcopy(self.local_logs))
         for i, log_file in enumerate(self.local_logs):
             for ext in compress_ext:
-                _aux_path = Path(self._tmp_path, f"LOG_{self.expid}").joinpath(log_file + ext)
+                _aux_path = (self._tmp_path / f"LOG_{self.expid}").joinpath(log_file + ext)
                 if _aux_path.exists():
                     Log.debug(f"Found compressed log file: {_aux_path}")
                     compressed = True
@@ -2906,7 +2902,7 @@ class Job:
         else:
             value_to_write = self.status_str
 
-        path = Path(self._tmp_path) / f"{self.name}_TOTAL_STATS"
+        path = self._tmp_path / f"{self.name}_TOTAL_STATS"
         if path.exists():
             text = path.read_text(encoding='utf-8')
             lines: list[str] = text.splitlines()
@@ -2963,7 +2959,7 @@ class Job:
         """
         extensions = ["", ".gz", ".xz"]
         for log_file in self.local_logs:
-            logs_path = Path(self._tmp_path, f"LOG_{self.expid}")
+            logs_path = self._tmp_path / f"LOG_{self.expid}"
 
             for ext in extensions:
                 old_log_path = logs_path.joinpath(log_file.replace(new_timestamp, current_timestamp) + ext)
@@ -3090,11 +3086,10 @@ class Job:
         """
         return job in self.parents
 
-    def is_ancestor(self, job):
+    def is_ancestor(self, job) -> bool:
         """Check if the given job is an ancestor
         :param job: job to be checked if is an ancestor
         :return: True if job is an ancestor, false otherwise
-        :rtype bool
         """
         for parent in list(self.parents):
             if parent.is_parent(job) or parent.is_ancestor(job):
@@ -3130,7 +3125,7 @@ class Job:
     def recover_last_ready_date(self) -> None:
         """Recovers the last ready date for this job"""
         if not self.ready_date:
-            stat_file = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
+            stat_file = self._tmp_path / f"{self.name}_TOTAL_STATS"
             if stat_file.exists():
                 output_by_lines = stat_file.read_text().splitlines()
                 if output_by_lines:

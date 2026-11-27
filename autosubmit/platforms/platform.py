@@ -49,6 +49,9 @@ if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
     from autosubmit.job.job_packages import JobPackageBase
 
+_DEFAULT_2FA_TIMEOUT = 300
+"""Default number of seconds of inactivity after which Paramiko timeouts the 2FA session."""
+
 
 def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
     Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
@@ -216,15 +219,9 @@ class Platform(ABC):
         self._submit_cmd_x11 = None
         self._checkhost_cmd = None
         self.cancel_cmd = None
-        self.otp_timeout = (
-            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_TIMEOUT", 60 * 5)
-        )
-        self.two_factor_auth = (
-            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA", False)
-        )
-        self.two_factor_method = (
-            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
-        )
+        self.otp_timeout = self._get_platform_option("2FA_TIMEOUT", _DEFAULT_2FA_TIMEOUT)
+        self.two_factor_auth = self._get_platform_option("2FA", False)
+        self.two_factor_method = self._get_platform_option("2FA_METHOD", "token")
         if auth_password is not None and self.two_factor_auth:
             if isinstance(auth_password, list):
                 self.pw: str | None = auth_password[0]
@@ -251,20 +248,20 @@ class Platform(ABC):
         self.compression_level = 9
         log_queue_size = 200
         if self.config:
-            platform_config: dict = self.config.get("PLATFORMS", {}).get(self.name.upper(), {})
             log_queue_size = resolve_log_recovery_queue_size(self.config, self.name)
-            self.compress_remote_logs = platform_config.get("COMPRESS_REMOTE_LOGS", False)
-            self.remote_logs_compress_type = platform_config.get("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
-            self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
+            self.compress_remote_logs = self._get_platform_option("COMPRESS_REMOTE_LOGS", False)
+            self.remote_logs_compress_type = self._get_platform_option("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
+            self.compression_level = self._get_platform_option("COMPRESSION_LEVEL", 9)
 
         self.log_queue_size = log_queue_size
         self.remote_log_dir: Path = Path("")
         self.has_scheduler: bool = True
         self.IO_SAFE_WAIT = int(
-            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("IO_SAFE_WAIT", self.IO_SAFE_WAIT))
+            self._get_platform_option("IO_SAFE_WAIT", self.IO_SAFE_WAIT)
+        )
 
     @classmethod
-    def update_workers(cls, event_worker):
+    def update_workers(cls, event_worker: Event) -> None:
         # This is visible on all instances simultaneously. Is to send the keep alive signal.
         if event_worker is None:
             return
@@ -293,113 +290,129 @@ class Platform(ABC):
 
     @property
     @autosubmit_parameter(name='current_arch')
-    def name(self):
+    def name(self) -> str:
         """Platform name. """
         return self._name
 
     @name.setter
-    def name(self, value):
+    def name(self, value: str) -> None:
         self._name = value
 
     @property
     @autosubmit_parameter(name='current_host')
-    def host(self):
+    def host(self) -> str:
         """Platform url. """
         return self._host
 
     @host.setter
-    def host(self, value):
+    def host(self, value: str) -> None:
         self._host = value
 
     @property
     @autosubmit_parameter(name='current_user')
-    def user(self):
+    def user(self) -> str:
         """Platform user. """
         return self._user
 
     @user.setter
-    def user(self, value):
+    def user(self, value: str) -> None:
         self._user = value
 
     @property
     @autosubmit_parameter(name='current_proj')
-    def project(self):
+    def project(self) -> str:
         """Platform project. """
         return self._project
 
     @project.setter
-    def project(self, value):
+    def project(self, value: str) -> None:
         self._project = value
 
     @property
     @autosubmit_parameter(name='current_budg')
-    def budget(self):
+    def budget(self) -> str:
         """Platform budget. """
         return self._budget
 
     @budget.setter
-    def budget(self, value):
+    def budget(self, value: str) -> None:
         self._budget = value
 
     @property
     @autosubmit_parameter(name='current_reservation')
-    def reservation(self):
+    def reservation(self) -> str:
         """You can configure your reservation id for the given platform. """
         return self._reservation
 
     @reservation.setter
-    def reservation(self, value):
+    def reservation(self, value: str) -> None:
         self._reservation = value
 
     @property
     @autosubmit_parameter(name='current_exclusivity')
-    def exclusivity(self):
+    def exclusivity(self) -> str:
         """True if you want to request exclusivity nodes. """
         return self._exclusivity
 
     @exclusivity.setter
-    def exclusivity(self, value):
+    def exclusivity(self, value: str) -> None:
         self._exclusivity = value
 
     @property
     @autosubmit_parameter(name='current_hyperthreading')
-    def hyperthreading(self):
-        """True if hyperthreading is enabled on this platform. """
+    def hyperthreading(self) -> str | bool:
+        """Hyperthreading setting ("true"/"false") for this platform. """
         return self._hyperthreading
 
     @hyperthreading.setter
-    def hyperthreading(self, value):
+    def hyperthreading(self, value: str | bool) -> None:
         self._hyperthreading = value
 
     @property
     @autosubmit_parameter(name='current_scratch_dir')
-    def scratch(self):
+    def scratch(self) -> str:
         """Platform's scratch folder path. """
         return self._scratch
 
     @scratch.setter
-    def scratch(self, value):
+    def scratch(self, value: str) -> None:
         self._scratch = value
 
     @property
     @autosubmit_parameter(name='current_proj_dir')
-    def project_dir(self):
+    def project_dir(self) -> str:
         """Platform's project folder path. """
         return self._project_dir
 
     @project_dir.setter
-    def project_dir(self, value):
+    def project_dir(self, value: str) -> None:
         self._project_dir = value
 
     @property
     @autosubmit_parameter(name='current_rootdir')
-    def root_dir(self):
+    def root_dir(self) -> Path:
         """Platform's experiment folder path. """
         return self._root_dir
 
     @root_dir.setter
-    def root_dir(self, value):
-        self._root_dir = value
+    def root_dir(self, value: Path) -> None:
+        self._root_dir = Path(value)
+
+    def _get_platform_option(self, key_value: str, default_value: Any) -> Any:
+        """Return a platform configuration option, falling back to ``default``.
+
+        The value is read from ``PLATFORMS.<NAME>``, so it is resolved at call
+        time and reflects configuration reloads.
+
+        :param key_value: Name of the platform option.
+        :param default_value: Value returned when the option is not set.
+        :return: The configured value, or ``default``.
+        """
+        return (
+            self.config.get("PLATFORMS", {})
+            .get(self.name.upper(), {})
+            .get(key_value, default_value)
+        )
 
     def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
                            packages_to_submit: list['JobPackageBase'], inspect: bool = False,
@@ -431,7 +444,7 @@ class Platform(ABC):
         scripts_to_submit_by_section: dict[str, dict[str, JobPackageBase]] = {}
         x11_scripts_to_submit_by_section: dict[str, dict[str, JobPackageBase]] = {}
         for package in packages_to_submit:
-            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, as_conf)
+            self.prepare_dry_run_if_applicable(package, only_wrappers, inspect)
             if not only_wrappers:
                 package.generate_scripts(as_conf, inspect)
             if not inspect and not only_wrappers:
@@ -445,8 +458,7 @@ class Platform(ABC):
         return scripts_to_submit_by_section, x11_scripts_to_submit_by_section
 
     @staticmethod
-    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool,
-                                      inspect: bool, as_conf: 'AutosubmitConfig') -> None:
+    def prepare_dry_run_if_applicable(package: 'JobPackageBase', only_wrappers: bool, inspect: bool) -> None:
         """Dry-run preparation of a package to emulate that the package was submitted, without following the normal submission flow.
 
         :param package: Package being prepared for inspect or wrapper-only mode.
@@ -470,9 +482,7 @@ class Platform(ABC):
 
         :return: platform's object
         """
-        if self._serial_platform is None:
-            return self
-        return self._serial_platform
+        return self._serial_platform or self
 
     @serial_platform.setter
     def serial_platform(self, value: 'Platform'):
@@ -663,7 +673,7 @@ class Platform(ABC):
         if not job.max_checkpoint_step:
             job.max_checkpoint_step = 0
         if job.current_checkpoint_step < job.max_checkpoint_step:
-            remote_checkpoint_path = f'{self.get_files_path()}/CHECKPOINT_'
+            remote_checkpoint_path = f'{self.files_path}/CHECKPOINT_'
             self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
             while self.check_file_exists(
                     f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}') and job.current_checkpoint_step < job.max_checkpoint_step:
@@ -725,20 +735,18 @@ class Platform(ABC):
         Log.warning(f'{job.name}_STAT_{str(attempt)} file not found')
         return False
 
+    @property
     @autosubmit_parameter(name="current_logdir")
-    def get_files_path(self) -> Path:
+    def files_path(self) -> Path:
         """The platform's LOG directory.
 
-        :return: platform's LOG directory
-        :rtype: str
+        :autosubmit-group: JOB
         """
-        # Circular import -- bad class design, probably can be re-designed.
         if self.TYPE is PlatformType.LOCAL:
-            path = Path(
-                self.root_dir, self.config.get("LOCAL_TMP_DIR", ""), f"LOG_{self.expid}"
-            )
+            path = self.root_dir / self.config.get("LOCAL_TMP_DIR", "") / f"LOG_{self.expid}"
         else:
-            path = Path(self.remote_log_dir)
+            path = self.remote_log_dir
+
         return path
 
     def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):

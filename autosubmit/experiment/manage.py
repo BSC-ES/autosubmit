@@ -428,7 +428,7 @@ def _delete_experiment(expid: str, force: bool) -> None:
             "Ensure no processes are running in the experiment directory", 7076
         )
 
-    experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}")
+    experiment_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
     if not experiment_path.exists():
         raise AutosubmitCritical("Experiment does not exist", 7012)
 
@@ -471,11 +471,9 @@ def _delete_expid(expid_delete: str, force: bool = False) -> None:
         raise AutosubmitCritical(
             "Experiment identifier is required for deletion.", 7011
         )
-    experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid_delete}")
-    structure_db_path = Path(
-        f"{BasicConfig.STRUCTURES_DIR}/structure_{expid_delete}.db"
-    )
-    job_data_db_path = Path(f"{BasicConfig.JOBDATA_DIR}/job_data_{expid_delete}")
+    experiment_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid_delete
+    structure_db_path = Path(BasicConfig.STRUCTURES_DIR) / f"structure_{expid_delete}.db"
+    job_data_db_path = Path(BasicConfig.JOBDATA_DIR) / f"job_data_{expid_delete}"
     experiment_path = experiment_path.resolve()
     structure_db_path = structure_db_path.resolve()
     job_data_db_path = job_data_db_path.resolve()

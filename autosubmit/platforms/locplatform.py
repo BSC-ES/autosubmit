@@ -108,14 +108,14 @@ class LocalPlatform(ParamikoPlatform):
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
 
-    def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
 
-        :param raw_output: output of the submit command.
+        :param output: output of the submit command.
         :param x11: whether the job is an x11 job, which has a different output format.
         :return: job ID of the submitted job.
         """
-        return [output.strip() for output in raw_output.splitlines() if output.strip()]
+        return [line.strip() for line in output.splitlines() if line.strip()]
 
     def write_jobid(self, jobid: str, complete_path: str) -> None:
         try:
@@ -171,9 +171,7 @@ class LocalPlatform(ParamikoPlatform):
         """Restores the SSH connection to the platform.
 
         :param as_conf: The Autosubmit configuration object used to establish the connection.
-        :type as_conf: AutosubmitConfig
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
-        :type log_recovery_process: bool
         """
         self.connected = True
 
@@ -217,11 +215,8 @@ class LocalPlatform(ParamikoPlatform):
         """Sends a file to a specified location using a command.
 
         :param filename: The name of the file to send.
-        :type filename: str
         :param check: Unused in this platform.
-        :type check: bool
         :return: True if the file was sent successfully.
-        :rtype: bool
         """
         command = (f"{self.put_cmd} {self.tmp_path / Path(filename).name} "
                    f"{self.tmp_path / f'LOG_{self.expid}' / Path(filename).name}; "
@@ -242,12 +237,12 @@ class LocalPlatform(ParamikoPlatform):
         """
         # This function is a copy of the slurm one
         log_dir = self.tmp_path / f"LOG_{self.expid}"
-        multiple_delete_previous_run = Path(log_dir) / "multiple_delete_previous_run.sh"
+        multiple_delete_previous_run = log_dir / "multiple_delete_previous_run.sh"
         if log_dir.exists():
             lang = locale.getlocale()[1]
             if lang is None:
                 lang = 'UTF-8'
-            open(multiple_delete_previous_run, 'wb+').write(("rm -f" + filenames).encode(lang))
+            open(multiple_delete_previous_run, 'wb+').write(("rm -f -- " + filenames).encode(lang))
             multiple_delete_previous_run.chmod(mode=0o770)
         return ""
 
@@ -291,7 +286,7 @@ class LocalPlatform(ParamikoPlatform):
         # This function has a short sleep as the files are locally
         sleeptime = 1
         for i in range(max_retries):
-            if Path(self.get_files_path(), src).is_file():
+            if (self.files_path / src).is_file():
                 return True
             sleep(sleeptime)
         return False
@@ -316,8 +311,8 @@ class LocalPlatform(ParamikoPlatform):
         :param dest: destination name.
         :param must_exist: ignore if file exist or not.
         """
+        path_root = self.files_path
         try:
-            path_root = Path(self.get_files_path())
             (path_root / src).rename(path_root / dest)
             return True
         except OSError as e:
@@ -327,12 +322,12 @@ class LocalPlatform(ParamikoPlatform):
                 Log.debug(f"File {str(path_root)} does not exist ")
                 return False
         except Exception as e:
-            if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exist', 6004, str(e))
+            if "garbage" in str(e).lower():
+                raise AutosubmitError(f"File {self.files_path / src} does not exist", 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exist", 6004, str(e))
+                raise AutosubmitError(f"File {self.files_path / src} does not exist", 6004, str(e))
             else:
-                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
+                Log.printlog(f"Log file couldn't be moved: {self.files_path / src}", 5001)
                 return False
 
     def get_ssh_output(self):

@@ -54,9 +54,10 @@ def paramiko_platform() -> Generator[ParamikoPlatform, None, None]:
     local_root_dir = TemporaryDirectory()
     config = {
         "LOCAL_ROOT_DIR": local_root_dir.name,
-        "LOCAL_TMP_DIR": 'tmp'
+        "LOCAL_TMP_DIR": "tmp",
     }
     platform = ParamikoPlatform(expid='a000', name='local', config=config)
+    platform.TYPE = PlatformType.LOCAL
     platform.job_status = {
         'COMPLETED': [],
         'RUNNING': [],
@@ -73,7 +74,7 @@ def ps_platform(tmpdir) -> Generator[tuple[PsPlatform, Path], None, None]:
     tmpdir.owner = tmp_path.owner()
     config = {
         "LOCAL_ROOT_DIR": str(tmpdir),
-        "LOCAL_TMP_DIR": 'tmp',
+        "LOCAL_TMP_DIR": "tmp",
         "PLATFORMS": {
             "pytest-ps": {
                 "type": "ps",
@@ -164,7 +165,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
 
 def test_ps_get_multi_submit_cmd(ps_platform):
     platform, _ = ps_platform
-    platform.remote_log_dir = str(platform.root_dir)
+    platform.remote_log_dir = platform.root_dir
 
     package = type("DummyPackage", (), {
         "export": "",
@@ -396,8 +397,7 @@ def test_parse_joblist(job_list: list, expected: str, paramiko_platform: Paramik
         (ValueError("There is a garbage truck over there"), AutosubmitCritical)
     ]
 )
-def test_delete_file_errors(error, expected_error_or_return_value, paramiko_platform: ParamikoPlatform, mocker,
-                            tmp_path):
+def test_delete_file_errors(error, expected_error_or_return_value, paramiko_platform: ParamikoPlatform, mocker):
     """Test the error paths for ``delete_file``.
 
     The main execution path of that function is tested with an integration test.
@@ -405,7 +405,6 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
     mocked_ftp_channel = mocker.MagicMock()
     mocked_ftp_channel.remove.side_effect = error
     paramiko_platform._ftpChannel = mocked_ftp_channel
-    mocker.patch.object(paramiko_platform, 'get_files_path', return_value=str(tmp_path))
 
     if expected_error_or_return_value is AutosubmitCritical:
         with pytest.raises(expected_error_or_return_value):  # type: ignore
@@ -420,28 +419,40 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
     [
         (OSError("Garbage"), True, AutosubmitError),
         (OSError("garbage"), True, AutosubmitError),
-        (OSError("garbage"), False, False),
+        (OSError("DifferentIssue"), False, False),
         (Exception("Garbage"), True, AutosubmitError),
         (Exception("garbage"), True, AutosubmitError),
-        (Exception("garbage"), False, False)
+        (Exception("DifferentIssue"), False, False)
+    ],
+    ids=[
+            "OSError garbage should exists",
+            "OSError garbage optional",
+            "OSError garbage missing",
+            "Exception garbage should exists",
+            "Exception garbage optional",
+            "Exception garbage missing",
     ]
 )
 def test_move_file_errors(error, must_exist, expected_error_or_return_value, paramiko_platform: ParamikoPlatform,
-                          mocker,
-                          tmp_path):
+                          mocker, tmp_path):
     """Test the error paths for ``move_file``.
 
     The main execution path of that function is tested with an integration test.
     """
-    # The function gets called first inside the try, but it may be called again in the except block.
-    mocker.patch.object(paramiko_platform, 'get_files_path', side_effect=[error, tmp_path])
+    paramiko_platform._ftpChannel = mocker.MagicMock()
+    paramiko_platform._ftpChannel.stat.side_effect = error
+    paramiko_platform._ftpChannel.rename.side_effect = error
 
-    if type(expected_error_or_return_value) is bool:
+    if expected_error_or_return_value is AutosubmitError:
+        with pytest.raises(expected_error_or_return_value) as exc_info:  # type: ignore
+            paramiko_platform.move_file('a.txt', 'b.txt', must_exist=must_exist)
+
+        files_path = paramiko_platform.files_path
+        assert str(files_path / 'a.txt') in str(exc_info.value)
+        assert str(files_path / files_path / 'a.txt') not in str(exc_info.value)
+    else:
         r = paramiko_platform.move_file('a.txt', 'b.txt', must_exist=must_exist)
         assert r == expected_error_or_return_value
-    else:
-        with pytest.raises(expected_error_or_return_value):  # type: ignore
-            paramiko_platform.move_file('a.txt', 'b.txt', must_exist=must_exist)
 
 
 @pytest.mark.parametrize(

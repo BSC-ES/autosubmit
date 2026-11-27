@@ -117,9 +117,9 @@ def _load_ssh_config(ssh_config_path: Path) -> paramiko.SSHConfig:
 
 
 def _get_user_config_file(
-    is_current_real_user_owner: bool,
-    as_env_ssh_config_path: str | None,
-    as_env_current_user: str | None,
+        is_current_real_user_owner: bool,
+        as_env_ssh_config_path: str | None,
+        as_env_current_user: str | None,
 ) -> Path:
     """Retrieve the user SSH configuration file.
 
@@ -166,11 +166,11 @@ class ParamikoPlatform(Platform):
     """Class to manage the connections to the different platforms with the Paramiko library."""
 
     def __init__(
-        self,
-        expid: str,
-        name: str,
-        config: dict,
-        auth_password: str | list[str] | None = None,
+            self,
+            expid: str,
+            name: str,
+            config: dict,
+            auth_password: str | list[str] | None = None,
     ):
         """An SSH-enabled platform that uses the Paramiko library.
 
@@ -202,10 +202,7 @@ class ParamikoPlatform(Platform):
         self.remove_log_files_on_transfer = False
 
         if self.config:
-            platform_config = self.config.get("PLATFORMS", {}).get(
-                self.name.upper(), {}
-            )
-            self.remove_log_files_on_transfer = platform_config.get(
+            self.remove_log_files_on_transfer = self._get_platform_option(
                 "REMOVE_LOG_FILES_ON_TRANSFER", False
             )
         self._uses_local_api: bool = False
@@ -222,7 +219,6 @@ class ParamikoPlatform(Platform):
         """Header to add to job for scheduler configuration
 
         :return: header
-        :rtype: object
         """
         return self._header
 
@@ -231,7 +227,6 @@ class ParamikoPlatform(Platform):
         """Handler to manage wrappers
 
         :return: wrapper-handler
-        :rtype: object
         """
         return self._wrapper
 
@@ -248,22 +243,6 @@ class ParamikoPlatform(Platform):
         self.channels = {}
         self.poller = _init_poller()
         self._init_local_x11_display()
-
-    def _get_platform_option(self, key: str, default):
-        """Return a platform configuration option, falling back to ``default``.
-
-        The value is read from ``PLATFORMS.<NAME>``, so it is resolved at call
-        time and reflects configuration reloads.
-
-        :param key: Name of the platform option.
-        :param default: Value returned when the option is not set.
-        :return: The configured value, or ``default``.
-        """
-        return (
-            self.config.get("PLATFORMS", {})
-            .get(self.name.upper(), {})
-            .get(key, default)
-        )
 
     def _transport_stuck(self, error: BaseException) -> bool:
         """Return whether the current transport must be rebuilt after ``error``.
@@ -294,7 +273,7 @@ class ParamikoPlatform(Platform):
         try:
             self.transport.send_ignore()
         except Exception as e:
-            Log.debug(f'[{self.name}] SSH keepalive probe failed: {str(e)}')
+            Log.debug(f"[{self.name}] SSH keepalive probe failed: {str(e)}")
             return False
         return True
 
@@ -314,10 +293,7 @@ class ParamikoPlatform(Platform):
                 "MAX_TRANSPORT_RETRIALS", _DEFAULT_MAX_TRANSPORT_RETRIALS
             )
         )
-        if (
-            max_retrials > 0
-            and self._consecutive_transport_failures >= max_retrials
-        ):
+        if 0 < max_retrials <= self._consecutive_transport_failures:
             # TODO(#1448): this abort should be configurable per platform so that
             # only the primary platform stops the run while secondary platforms
             # can be skipped. See https://github.com/BSC-ES/autosubmit/issues/1448
@@ -333,7 +309,7 @@ class ParamikoPlatform(Platform):
         """Reset the consecutive transport failure counter after a success."""
         self._consecutive_transport_failures = 0
 
-    def test_connection(self, as_conf: 'AutosubmitConfig | None') -> str | None:
+    def test_connection(self, as_conf: "AutosubmitConfig | None") -> str | None:
         """Test if the connection is still alive, reconnect if not.
 
         :param as_conf: Autosubmit configuration.
@@ -343,7 +319,7 @@ class ParamikoPlatform(Platform):
         try:
             if self.connected and not self._is_connection_alive():
                 Log.warning(
-                    f'[{self.name}] SSH transport is no longer active, reconnecting...'
+                    f"[{self.name}] SSH transport is no longer active, reconnecting..."
                 )
                 self.connected = False
             if not self.connected:
@@ -352,21 +328,27 @@ class ParamikoPlatform(Platform):
                     self.restore_connection(as_conf)
                     message = "OK"
                 except Exception as e:
-                    Log.log.log(logging.DEBUG, f'SSH test connection error: {str(e)}', exc_info=e)
+                    Log.log.log(
+                        logging.DEBUG,
+                        f"SSH test connection error: {str(e)}",
+                        exc_info=e,
+                    )
                     message = str(e)
                 if message.find("t accept remote connections") == -1:
                     try:
                         transport = self._ssh.get_transport()
                         transport.send_ignore()
                     except Exception as e:
-                        Log.debug(f'Test connection error: {str(e)}')
+                        Log.debug(f"Test connection error: {str(e)}")
                         message = "Timeout connection"
                         Log.debug(str(e))
                 return message
             return None
         except EOFError as e:
             self.connected = False
-            raise AutosubmitError(f"[{self.name}] not alive. Host: {self.host}", 6002, str(e))
+            raise AutosubmitError(
+                f"[{self.name}] not alive. Host: {self.host}", 6002, str(e)
+            )
         except (OSError, AutosubmitError, AutosubmitCritical):
             self.connected = False
             raise
@@ -374,7 +356,9 @@ class ParamikoPlatform(Platform):
             self.connected = False
             raise AutosubmitCritical(str(e), 7051)
 
-    def restore_connection(self, as_conf: 'AutosubmitConfig | None', log_recovery_process: bool = False) -> None:
+    def restore_connection(
+            self, as_conf: "AutosubmitConfig | None", log_recovery_process: bool = False
+    ) -> None:
         """Restores the SSH connection to the platform.
 
         This is where the first connection to a remote platform normally starts in an Autosubmit
@@ -394,19 +378,25 @@ class ParamikoPlatform(Platform):
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
         :raises AutosubmitError: If the connection was not established even with multiple connection retries.
         """
-        Log.info('Restoring SSH connection...')
+        Log.info("Restoring SSH connection...")
         with suppress(Exception):
             self.reset()
         # TODO: Configure this https://github.com/BSC-ES/autosubmit/issues/986
         retries = 2
         for retry in range(retries):
             try:
-                self.connect(as_conf, reconnect=(retry > 0), log_recovery_process=log_recovery_process)
+                self.connect(
+                    as_conf,
+                    reconnect=(retry > 0),
+                    log_recovery_process=log_recovery_process,
+                )
                 if self.connected:
                     break
             except Exception as e:
-                Log.warning(f'Failed to open SSH connection (retry #{retry + 1} of {retries}): {str(e)}')
-                if ',' in self.host:
+                Log.warning(
+                    f"Failed to open SSH connection (retry #{retry + 1} of {retries}): {str(e)}"
+                )
+                if "," in self.host:
                     # TODO: This is confusing, here we say we will test another host, but we never test it here.
                     #       In the for loop below, in ``self.connect`` reads that (why don't we pass the host
                     #       directly?). Further to that, here we say we will test another host but at least that
@@ -417,12 +407,14 @@ class ParamikoPlatform(Platform):
                                  f"will test another host: {str(e)}", 6002)
 
         if not self.connected:
-            trace = (f'Can not create ssh or sftp connection to {self.host}: Connection could not be established'
-                     f' to platform {self.name}\n Please, check your expid on the PLATFORMS definition in YAML to'
-                     f' see if there are mistakes in the configuration\n Also Ensure that the login node listed'
-                     ' on HOST parameter is available(try to connect via ssh on a terminal)\n Also you can put'
-                     ' more than one host using a comma as separator')
-            error_message = 'Experiment cannot continue due to unexpected behaviour, Autosubmit will stop.'
+            trace = (
+                f"Can not create ssh or sftp connection to {self.host}: Connection could not be established"
+                f" to platform {self.name}\n Please, check your expid on the PLATFORMS definition in YAML to"
+                f" see if there are mistakes in the configuration\n Also Ensure that the login node listed"
+                " on HOST parameter is available(try to connect via ssh on a terminal)\n Also you can put"
+                " more than one host using a comma as separator"
+            )
+            error_message = "Experiment cannot continue due to unexpected behaviour, Autosubmit will stop."
             raise AutosubmitError(error_message, 6003, trace)
 
     def agent_auth(self, port: int) -> bool:
@@ -438,11 +430,16 @@ class ParamikoPlatform(Platform):
             for key in self._ssh._agent.get_keys():
                 if not hasattr(key, "public_blob"):
                     key.public_blob = None
-            self._ssh.connect(self._host_config['hostname'], port=port, username=self.user, timeout=60,
-                              banner_timeout=60)
+            self._ssh.connect(
+                self._host_config["hostname"],
+                port=port,
+                username=self.user,
+                timeout=60,
+                banner_timeout=60,
+            )
         except BaseException as e:
-            Log.debug(f'Failed to authenticate with ssh-agent due to {e}')
-            Log.debug('Trying to authenticate with other methods')
+            Log.debug(f"Failed to authenticate with ssh-agent due to {e}")
+            Log.debug("Trying to authenticate with other methods")
             return False
         return True
 
@@ -476,17 +473,17 @@ class ParamikoPlatform(Platform):
             self.send_command(f"head -1 {remote_path}")
             output = self.get_ssh_output()
             first_line = output.strip()
-            if first_line.startswith('[INFO] JOBID='):
-                return int(first_line.split('=', 1)[1].strip())
+            if first_line.startswith("[INFO] JOBID="):
+                return int(first_line.split("=", 1)[1].strip())
         except (ValueError, OSError, IndexError):
             ...
         return None
 
     def connect(
             self,
-            as_conf: 'AutosubmitConfig | None',
+            as_conf: "AutosubmitConfig | None",
             reconnect: bool = False,
-            log_recovery_process: bool = False
+            log_recovery_process: bool = False,
     ) -> None:
         """Establishes an SSH connection to the host.
 
@@ -502,20 +499,20 @@ class ParamikoPlatform(Platform):
             # hard-coded default (30s) to complete a rekey, which raises
             # ``SSHException: Key-exchange timed out waiting for key negotiation``.
             clear_to_send_timeout = float(
-                self._get_platform_option('CLEAR_TO_SEND_TIMEOUT', 180)
+                self._get_platform_option("CLEAR_TO_SEND_TIMEOUT", 180)
             )
             # Seconds of inactivity before Paramiko sends a keepalive packet.
             # This is a period between packets, not a connection timeout.
             ssh_keepalive = int(
-                self._get_platform_option('SSH_KEEPALIVE', _DEFAULT_SSH_KEEPALIVE)
+                self._get_platform_option("SSH_KEEPALIVE", _DEFAULT_SSH_KEEPALIVE)
             )
 
             is_current_real_user_owner = True if not as_conf else as_conf.is_current_real_user_owner
 
             ssh_config_path: Path = _get_user_config_file(
                 is_current_real_user_owner,
-                self.config.get('AS_ENV_SSH_CONFIG_PATH', None),
-                self.config.get('AS_ENV_CURRENT_USER')
+                self.config.get("AS_ENV_SSH_CONFIG_PATH", None),
+                self.config.get("AS_ENV_CURRENT_USER"),
             )
 
             self._ssh_config = _load_ssh_config(ssh_config_path)
@@ -523,25 +520,36 @@ class ParamikoPlatform(Platform):
             self._ssh = _create_ssh_client()
 
             self._host_config = self._ssh_config.lookup(self.host)
-            if "," in self._host_config['hostname']:
+            if self._host_config is not None and "," in self._host_config["hostname"]:
                 if reconnect:
-                    self._host_config['hostname'] = random.choice(
-                        self._host_config['hostname'].split(',')[1:])
+                    self._host_config["hostname"] = random.choice(
+                        self._host_config["hostname"].split(",")[1:]
+                    )
                 else:
-                    self._host_config['hostname'] = self._host_config['hostname'].split(',')[0]
-            if 'identityfile' in self._host_config:
-                self._host_config_id = self._host_config['identityfile']
-            port = int(self._host_config.get('port', 22))
+                    self._host_config["hostname"] = self._host_config["hostname"].split(
+                        ","
+                    )[0]
+            if "identityfile" in self._host_config:
+                self._host_config_id = self._host_config["identityfile"]
+            port = int(self._host_config.get("port", 22))
             if not self.two_factor_auth:
                 # Agent Auth
                 if not self.agent_auth(port):
                     # Public Key Auth
-                    if 'proxycommand' in self._host_config:
-                        self._proxy = paramiko.ProxyCommand(self._host_config['proxycommand'])
+                    if "proxycommand" in self._host_config:
+                        self._proxy = paramiko.ProxyCommand(
+                            self._host_config["proxycommand"]
+                        )
                         try:
-                            self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60,
-                                              banner_timeout=60)
+                            self._ssh.connect(
+                                self._host_config["hostname"],
+                                port,
+                                username=self.user,
+                                key_filename=self._host_config_id,
+                                sock=self._proxy,
+                                timeout=60,
+                                banner_timeout=60,
+                            )
                         except Exception as e:
                             Log.warning('SSH connect failed, will try again disabling RSA algorithms'
                                         f'sha-256 and sha-512, error: {str(e)}')
@@ -614,7 +622,7 @@ class ParamikoPlatform(Platform):
             self.connected = False
             if "refused" in str(e.strerror).lower() or "name or service not known" in str(e.strerror).lower():
                 raise SSHException(f" {self.host} doesn't accept remote connections. "
-                    f"Check if there is an typo in the hostname")
+                                   f"Check if there is an typo in the hostname")
             else:
                 raise AutosubmitError("File can't be located due an slow or timeout connection", 6016, str(e))
         except Exception as e:
@@ -637,7 +645,7 @@ class ParamikoPlatform(Platform):
     #       ``self.platform`` in ``job_package.py``.
     def remove_multiple_files(self, filenames):
         log_dir = self.tmp_path / f"LOG_{self.expid}"
-        multiple_delete_previous_run = str(Path(log_dir) / "multiple_delete_previous_run.sh")
+        multiple_delete_previous_run = str(log_dir / "multiple_delete_previous_run.sh")
         if log_dir.exists():
             lang = locale.getlocale()[1]
             if lang is None:
@@ -645,11 +653,11 @@ class ParamikoPlatform(Platform):
                 if lang is None:
                     lang = "UTF-8"
             open(multiple_delete_previous_run, "wb+").write(
-                ("rm -f" + filenames).encode(lang)
+                ("rm -f " + filenames).encode(lang)
             )
             os.chmod(multiple_delete_previous_run, 0o770)
             self.send_file(multiple_delete_previous_run, False)
-            command = str(self.get_files_path() / "multiple_delete_previous_run.sh")
+            command = str(self.files_path / "multiple_delete_previous_run.sh")
             if self.send_command(command, ignore_log=True):
                 return self._ssh_output
         return ""
@@ -657,9 +665,9 @@ class ParamikoPlatform(Platform):
     def send_file(self, filename, check=True) -> bool:
         if check:
             self.check_remote_log_dir()
-            self.delete_file(str(filename))
+            self.delete_file(filename)
         local_path = str(self.tmp_path / filename)
-        remote_path = str(self.get_files_path() / Path(filename).name)
+        remote_path = str(self.files_path / Path(filename).name)
         try:
             self._ftpChannel.put(local_path, remote_path)
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
@@ -711,12 +719,12 @@ class ParamikoPlatform(Platform):
 
     # Gets .err and .out
     def get_file(
-        self,
-        filename: str,
-        must_exist: bool = True,
-        relative_path: str = "",
-        ignore_log: bool = False,
-        wrapper_failed: bool = False,
+            self,
+            filename: str,
+            must_exist: bool = True,
+            relative_path: str = "",
+            ignore_log: bool = False,
+            wrapper_failed: bool = False,
     ) -> bool:
         """Copies a file from the current platform to experiment's tmp folder
 
@@ -727,23 +735,23 @@ class ParamikoPlatform(Platform):
         :param wrapper_failed:
         :return: True if file is copied successfully, false otherwise
         """
-        local_path = self.tmp_path / relative_path
+        local_path = Path(self.tmp_path) / relative_path
         if not local_path.exists():
             local_path.mkdir(parents=True, exist_ok=True)
 
         file_path = local_path / filename
         if file_path.exists():
             file_path.unlink()
-        remote_path = os.path.join(self.get_files_path(), filename)
+        remote_path = str(self.files_path / filename)
         try:
             self._ftpChannel.get(remote_path, str(file_path))
 
             # Remove file from remote if configured and checksum matches
             is_log_file = bool(re.match(r".*\.(out|err)(\.(xz|gz))?$", filename))
             if (
-                is_log_file
-                and self.remove_log_files_on_transfer
-                and self._checksum_validation(str(file_path), remote_path)
+                    is_log_file
+                    and self.remove_log_files_on_transfer
+                    and self._checksum_validation(str(file_path), remote_path)
             ):
                 try:
                     self._ftpChannel.remove(remote_path)
@@ -756,7 +764,7 @@ class ParamikoPlatform(Platform):
             with suppress(Exception):
                 os.remove(file_path)
             # FIXME: Huh, probably a bug here? See unit/test_paramiko_platform function test_get_file_errors
-            if str(e) in "Garbage":
+            if "garbage" in str(e).lower():
                 if not ignore_log:
                     Log.printlog(f"File {filename} seems to no exists (skipping)", 5004)
             if must_exist:
@@ -773,7 +781,7 @@ class ParamikoPlatform(Platform):
         :param filename: file name
         :return: True if successful or file does not exist
         """
-        remote_file = Path(self.get_files_path()) / filename
+        remote_file = self.files_path / filename
         try:
             self._ftpChannel.remove(str(remote_file))
             return True
@@ -787,7 +795,7 @@ class ParamikoPlatform(Platform):
             Log.error(
                 f"Could not remove file {str(remote_file)}, something went wrong with the platform", 6004, str(e),
             )
-            if str(e).lower().find("garbage") != -1:
+            if "garbage" in str(e).lower():
                 raise AutosubmitCritical(
                     "Wrong User or invalid .ssh/config. Or invalid user in the definition of PLATFORMS in "
                     "YAML or public key not set ", 7051, str(e),
@@ -801,43 +809,43 @@ class ParamikoPlatform(Platform):
         :param dest: destination name
         :param must_exist: ignore if file exist or not
         """
-        path_root = Path("")
+        src_path = ""
+        path_root = self.files_path
         try:
-            path_root = Path(self.get_files_path())
-            src = str(path_root / src)
-            dest = str(path_root / dest)
+            src_path = str(path_root / src)
+            dest_path = str(path_root / dest)
             try:
-                self._ftpChannel.stat(dest)
+                self._ftpChannel.stat(dest_path)
             except OSError:
-                self._ftpChannel.rename(src, dest)
+                self._ftpChannel.rename(src_path, dest_path)
             return True
         except OSError as e:
-            if str(e) in "Garbage":
+            if "garbage" in str(e).lower():
                 raise AutosubmitError(
-                    f"File {path_root / src} does not exist, something went "
+                    f"File {src_path} does not exist, something went "
                     f"wrong with the platform",
                     6004,
                     str(e),
                 )
             if must_exist:
                 raise AutosubmitError(
-                    f"File {path_root / src} does not exist", 6004, str(e)
+                    f"File {src_path} does not exist", 6004, str(e)
                 )
             else:
                 Log.debug(f"File {path_root} does not exist ")
                 return False
         except Exception as e:
-            if str(e) in "Garbage":
+            if "garbage" in str(e).lower():
                 raise AutosubmitError(
-                    f"File {self.get_files_path() / src} does not exist", 6004, str(e)
+                    f"File {src_path} does not exist", 6004, str(e)
                 )
             if must_exist:
                 raise AutosubmitError(
-                    f"File {self.get_files_path() / src} does not exist", 6004, str(e)
+                    f"File {src_path} does not exist", 6004, str(e)
                 )
             else:
                 Log.printlog(
-                    f"Log file couldn't be moved: {self.get_files_path() / src}", 5001
+                    f"Log file couldn't be moved: {src_path}", 5001
                 )
                 return False
 
@@ -855,16 +863,13 @@ class ParamikoPlatform(Platform):
         return self.get_ssh_output()
 
     def submit_multiple_jobs(
-        self, script_names: dict[str, "JobPackageBase"]
-    ) -> list[int]:
+            self, script_names: dict[str, 'JobPackageBase']
+    ) -> list[str] | list[int]:
         """Submit multiple scripts to the platform.
 
-        :param script_names: Script filenames to submit on the remote
-            platform.
-        :raises AutosubmitError: If the submission command fails or no submit
-            output can be parsed.
-        :raises AutosubmitCritical: If Slurm reports a critical submission
-            failure.
+        :param script_names: Script filenames to submit on the remote platform.
+        :raises AutosubmitError: If the submission command fails or no submit output can be parsed.
+        :raises AutosubmitCritical: If Slurm reports a critical submission failure.
         :return: Submitted Slurm job identifiers in submission order.
         """
 
@@ -885,11 +890,13 @@ class ParamikoPlatform(Platform):
         # Fallback to retrieving job IDs by script names if they cannot be parsed from the submission output or if the number of parsed IDs does not match the number of submitted scripts
         # This should be a rare case, and it is expected that most platforms will return the job IDs directly in the submission output, but this is a safeguard to ensure we can still track the submitted jobs even if the output format is not as expected.
         if not jobs_ids or len(jobs_ids) != len(script_names):
-            candidate_to_cancel = set(jobs_ids) if jobs_ids else set()
+            # we acknowledge the diff possible data types, TODO fix in #3448
+            candidate_to_cancel: list[str | int] = list(jobs_ids or [])
             jobs_ids = self.get_submitted_jobs_by_name(script_names)
             if not jobs_ids or len(jobs_ids) != len(script_names):
-                # Avoid having not tracked jobs if everything goes wrong
-                self.cancel_jobs(list(candidate_to_cancel | set(jobs_ids or [])))
+                # And we deduplicate to keep previous behavior
+                to_cancel = dict.fromkeys([*candidate_to_cancel, *(jobs_ids or [])])
+                self.cancel_jobs([str(job_id) for job_id in to_cancel.keys()])
                 raise AutosubmitError(
                     "Failed to retrieve job IDs for submitted jobs. Submission output: "
                     f"{self.get_ssh_output()}",
@@ -1021,7 +1028,7 @@ class ParamikoPlatform(Platform):
         return final_job_names
 
     def get_failed_job_names(
-        self, job_names_provided: list[str] | None = None
+            self, job_names_provided: list[str] | None = None
     ) -> list[str]:
         """Retrieve the names of all files ending with '_FAILED' from the remote log directory using SSH.
 
@@ -1089,12 +1096,12 @@ class ParamikoPlatform(Platform):
 
     @staticmethod
     def _resolve_stat_status(
-        job_name: str,
-        stat_status: Status,
-        scheduler_job_status: int,
-        finished_time: float | None,
-        io_safe_wait: int,
-        now: float,
+            job_name: str,
+            stat_status: Status,
+            scheduler_job_status: int,
+            finished_time: float | None,
+            io_safe_wait: int,
+            now: float,
     ) -> tuple[int, float | None]:
         """Resolve final job status from STAT file and scheduler information.
 
@@ -1141,7 +1148,7 @@ class ParamikoPlatform(Platform):
             return {}
 
         file_to_job: dict[str, str] = {
-            str(Path(self.remote_log_dir) / f"{job.name}_STAT_{job.fail_count}"): job.name
+            str(self.remote_log_dir / f"{job.name}_STAT_{job.fail_count}"): job.name
             for job in job_list
         }
         result: dict[str, str] = {job.name: "" for job in job_list}
@@ -1195,7 +1202,7 @@ class ParamikoPlatform(Platform):
         return job_list_cmd
 
     def check_all_jobs(
-        self, job_list: list["Job"], as_conf: "AutosubmitConfig", retries: int = 5
+            self, job_list: list["Job"], as_conf: "AutosubmitConfig", retries: int = 5
     ) -> None:
         """Checks jobs running status and updates job.new_status.
 
@@ -1216,8 +1223,8 @@ class ParamikoPlatform(Platform):
             remote_error = True
         if not remote_error:
             while (
-                not self._check_jobid_in_queue(self.get_ssh_output(), job_list_cmd)
-                and retries > 0
+                    not self._check_jobid_in_queue(self.get_ssh_output(), job_list_cmd)
+                    and retries > 0
             ):
                 try:
                     self.send_command(cmd)
@@ -1299,8 +1306,8 @@ class ParamikoPlatform(Platform):
                     job
                     for job in job_list
                     if not job.start_time_timestamp
-                    and job.new_status
-                    in [Status.RUNNING, Status.COMPLETED, Status.FAILED]
+                       and job.new_status
+                       in [Status.RUNNING, Status.COMPLETED, Status.FAILED]
                 ]
             )
             # Safeguard 3: Is over_wallclock?
@@ -1308,7 +1315,7 @@ class ParamikoPlatform(Platform):
                 job
                 for job in job_list
                 if job.new_status == Status.RUNNING
-                and str(job.wrapper_type).lower() == "none"
+                   and str(job.wrapper_type).lower() == "none"
             ]:
                 job_status = job.new_status
                 wallclock = job.wallclock
@@ -1338,7 +1345,7 @@ class ParamikoPlatform(Platform):
             return
 
         file_to_job: dict[str, Job] = {
-            str(Path(self.remote_log_dir) / f"{job.name}_STAT_{job.fail_count}"): job
+            str(self.remote_log_dir / f"{job.name}_STAT_{job.fail_count}"): job
             for job in job_list
         }
 
@@ -1472,10 +1479,10 @@ class ParamikoPlatform(Platform):
                             del self.channels[fd]
 
     def exec_command(
-        self, command, bufsize=-1, retries=3, x11=False
+            self, command, bufsize=-1, retries=3, x11=False
     ) -> (
-        tuple[paramiko.ChannelFile, paramiko.ChannelFile, paramiko.ChannelFile]
-        | tuple[bool, bool, bool]
+            tuple[paramiko.ChannelFile, paramiko.ChannelFile, paramiko.ChannelFile]
+            | tuple[bool, bool, bool]
     ):
         """Execute a command on the SSH server.
 
@@ -1530,10 +1537,10 @@ class ParamikoPlatform(Platform):
                     try:
                         self.restore_connection(None)
                     except (
-                        AutosubmitError,
-                        AutosubmitCritical,
-                        OSError,
-                        paramiko.SSHException,
+                            AutosubmitError,
+                            AutosubmitCritical,
+                            OSError,
+                            paramiko.SSHException,
                     ) as reconnect_error:
                         Log.warning(
                             f"Failed to restore SSH connection after error: {reconnect_error}"
@@ -1557,7 +1564,7 @@ class ParamikoPlatform(Platform):
 
         return False, False, False
 
-    def send_command(self, command: str, ignore_log: bool=False, x11: bool=False) -> bool:
+    def send_command(self, command: str, ignore_log: bool = False, x11: bool = False) -> bool:
         """Sends a given command to an HPC platform.
 
         :param command: The command to send to the HPC.
@@ -1592,9 +1599,9 @@ class ParamikoPlatform(Platform):
             x11_exit = False
 
             while (
-                not channel.closed
-                or channel.recv_ready()
-                or channel.recv_stderr_ready()
+                    not channel.closed
+                    or channel.recv_ready()
+                    or channel.recv_stderr_ready()
             ) and not x11_exit:
                 # stop if the channel was closed prematurely, and there is no data in the buffers.
                 got_chunk = False
@@ -1640,9 +1647,9 @@ class ParamikoPlatform(Platform):
                     else:
                         stderr_readlines = aux_stderr
                 must_close_channels = (
-                    stdout.channel.exit_status_ready()
-                    and not stderr.channel.recv_stderr_ready()
-                    and not stdout.channel.recv_ready()
+                        stdout.channel.exit_status_ready()
+                        and not stderr.channel.recv_stderr_ready()
+                        and not stdout.channel.recv_ready()
                 )
                 if not got_chunk and must_close_channels:
                     # indicate that we're not going to read from this channel anymore
@@ -1686,7 +1693,7 @@ class ParamikoPlatform(Platform):
             self._record_transport_failure()
             raise AutosubmitError(f"I/O issues: {str(e)}", 6016)
 
-    def get_multi_submit_cmd(self, job_scripts: dict) -> str:
+    def get_multi_submit_cmd(self, job_scripts: dict[str, 'JobPackageBase']) -> str:
         """Gets command to submit all the current active jobs on HPC
 
         :param job_scripts: dict of job names and their info (export, x11_options)
@@ -1699,12 +1706,13 @@ class ParamikoPlatform(Platform):
             cmd_list = []
 
         for job_name, package in job_scripts.items():
-            abs_path = str(Path(self.remote_log_dir) / job_name.strip(""))
+            abs_path = str(self.remote_log_dir / job_name.strip(""))
             export = package.export.strip("") + " ; " if package.export else ""
             timeout = package.timeout if package.timeout else 0
             x11_options = package.x11_options.strip("")
             command_str = self.get_call(
-                abs_path, timeout, export, x11_options=x11_options, sub_queue=package.ec_queue, fail_count=package.fail_count,
+                abs_path, timeout, export, x11_options=x11_options, sub_queue=package.ec_queue,
+                fail_count=package.fail_count,
                 executable=(package.executable if not self.has_scheduler and not self._uses_local_api else None),
                 redirect_out_err=bool(not self.has_scheduler and not self._uses_local_api and not x11_options)
             )
@@ -1731,7 +1739,7 @@ class ParamikoPlatform(Platform):
         return self._ssh_output
 
     def _construct_final_call(
-        self, script_name: str, pre: str, post: str, x11_options: str
+            self, script_name: str, pre: str, post: str, x11_options: str
     ) -> str:
         """Gets the command to submit a job, for the current platform, with the given parameters.
          This needs to be adapted to each scheduler, the default assumes that is being launched directly.
@@ -1749,15 +1757,15 @@ class ParamikoPlatform(Platform):
         )
 
     def get_call(
-        self,
-        script_name,
-        timeout: float,
-        export: str,
-        executable: str,
-        x11_options: str,
-        fail_count: int,
-        sub_queue: str,
-        redirect_out_err: bool = False,
+            self,
+            script_name,
+            timeout: float,
+            export: str,
+            executable: str,
+            x11_options: str,
+            fail_count: int,
+            sub_queue: str,
+            redirect_out_err: bool = False,
     ) -> str:
         """Gets execution command for the given job.
 
@@ -1802,7 +1810,7 @@ class ParamikoPlatform(Platform):
             f"ps -o stat= -p {job_id} 2>/dev/null | grep -qv '^Z' && echo 0 || echo 1"
         )
 
-    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str] | list[int]:
         """Parses the output of the submit command to get the job ID.
 
         :param output: output of the submit command.
@@ -1990,7 +1998,7 @@ class ParamikoPlatform(Platform):
             return self._ftpChannel.stat(src)
         return False
 
-    def read_file(self, src: str, max_size: int | None=None) -> bytes | None:
+    def read_file(self, src: str, max_size: int | None = None) -> bytes | None:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path
@@ -2049,7 +2057,7 @@ class ParamikoPlatform(Platform):
         """Updates commands for this platform. """
         # pragma: no cover
 
-    def _check_and_cancel_duplicated_job_names(self, scripts_to_submit: dict) -> None:
+    def _check_and_cancel_duplicated_job_names(self, scripts_to_submit: dict[str, 'JobPackageBase']) -> None:
         """Check for duplicated job names in the submitted packages.
 
         :param scripts_to_submit: Package script names and their info.
@@ -2097,11 +2105,11 @@ class ParamikoPlatform(Platform):
         return parsed_job_names
 
     def check_file_exists(
-        self,
-        src: str,
-        wrapper_failed: bool = False,
-        sleeptime: int = 5,
-        max_retries: int = 3,
+            self,
+            src: str,
+            wrapper_failed: bool = False,
+            sleeptime: int = 5,
+            max_retries: int = 3,
     ):
         """Checks if a file exists on the FTP server.
 
@@ -2118,7 +2126,7 @@ class ParamikoPlatform(Platform):
         while not file_exist and retries < max_retries:
             try:
                 # This return IOError if path does not exist
-                self._ftpChannel.stat(str(Path(self.get_files_path()) / src))
+                self._ftpChannel.stat(str(self.files_path / src))
                 file_exist = True
             except OSError:  # File does not exist, retry in sleeptime
                 if not wrapper_failed:
@@ -2154,13 +2162,13 @@ class ParamikoPlatform(Platform):
         raise NotImplementedError  # pragma: no cover
 
     def process_ready_jobs(
-        self, scripts_to_submit: dict[str, "JobPackageBase"]
+            self, scripts_to_submit: dict[str, 'JobPackageBase']
     ) -> None:
         """Retrieve multiple jobs identifiers.
 
         :param scripts_to_submit: Dictionary with (id => Job package) pairs to be processed.
         """
-        jobs_id: list[int] = self.submit_multiple_jobs(scripts_to_submit)
+        jobs_id: list[str] | list[int] = self.submit_multiple_jobs(scripts_to_submit)
         for jobid_index, package in enumerate(scripts_to_submit.values()):
             current_package_id = int(jobs_id[jobid_index])
             package.process_jobs_to_submit(current_package_id)

@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import datetime
 import json
 import locale
@@ -464,9 +465,9 @@ class JobPackageThread(JobPackageBase):
                 lang = 'UTF-8'
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+        with open(self._tmp_path / script_file, 'wb') as f:
             f.write(script_content.encode(lang))
-        os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
+        os.chmod(str(self._tmp_path / script_file), 0o755)
         return script_file
 
     def send_files(self):
@@ -474,15 +475,13 @@ class JobPackageThread(JobPackageBase):
         self.platform.check_remote_log_dir()
         output_filepath = 'wrapper_scripts.tar'
         if callable(self.platform.remove_multiple_files):
-            filenames = ""
-            for job in self.jobs:
-                filenames += f" {self.platform.remote_log_dir}/{job.name}.cmd"
+            filenames = " ".join([str(self.platform.remote_log_dir / f"{job.name}.cmd") for job in self.jobs])
             self.platform.remove_multiple_files(filenames)
-        tar_path = os.path.join(self._tmp_path, output_filepath)
+        tar_path = str(self._tmp_path / output_filepath)
         Log.debug("Compressing multiple_files")
         with tarfile.open(tar_path, "w") as tar:
             for job in self.jobs:
-                jfile = os.path.join(self._tmp_path, self._job_scripts[job.name])
+                jfile = str(self._tmp_path / self._job_scripts[job.name])
                 with open(jfile, 'rb') as f:
                     info = tar.gettarinfo(jfile, self._job_scripts[job.name])
                     tar.addfile(info, f)
@@ -490,7 +489,7 @@ class JobPackageThread(JobPackageBase):
         os.chmod(tar_path, 0o755)
         self.platform.send_file(tar_path, check=False)
         Log.debug("Uncompress - send_command")
-        self.platform.send_command(f"cd {self.platform.get_files_path()}; tar -xvf {output_filepath}")
+        self.platform.send_command(f"cd {self.platform.files_path}; tar -xvf {output_filepath}")
         Log.debug("Send_file: common_script")
         self.platform.send_file(self._common_script)
         for job in self.jobs:
@@ -549,9 +548,9 @@ class JobPackageThreadWrapped(JobPackageThread):
     def _create_common_script(self, filename: str = ""):
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+        with open(self._tmp_path / script_file, 'wb') as f:
             f.write(script_content)
-        os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
+        os.chmod(str(self._tmp_path / script_file), 0o755)
         return script_file
 
     def send_files(self):
