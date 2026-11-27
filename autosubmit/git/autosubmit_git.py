@@ -243,7 +243,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
     project_backup_path = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid / f'proj_{int(time())}')
     git_path = as_conf.get_project_dir()
 
-    if force and os.path.exists(project_path):
+    if force and Path(project_path).exists():
         backup_enabled = as_conf.get_git_project_backup()
         if backup_enabled:
             Log.info(f"Making a backup of your current proj folder at {project_backup_path}")
@@ -368,7 +368,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
         raise AutosubmitCritical(
             f'Cannot clone {clone_description} into {project_path}', 7065)
     if submodule_failure:
-        if os.path.exists(project_backup_path):
+        if Path(project_backup_path).exists():
             Log.info(f"Some Submodule failures have been detected. Backup {project_backup_path} will not be removed.")
         else:
             Log.info("Some Submodule failures have been detected.")

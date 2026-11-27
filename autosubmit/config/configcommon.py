@@ -2172,7 +2172,6 @@ class AutosubmitConfig:
         (from ``[config] git_project_backup`` in ``.autosubmitrc``) > ``False``.
 
         :return: whether to preserve the current ``proj/`` directory as ``proj_{timestamp}`` on refresh
-        :rtype: bool
         """
         return as_bool(self.get_section(['GIT', 'PROJECT_BACKUP'], None), 
                        BasicConfig.GIT_PROJECT_BACKUP, 'GIT.PROJECT_BACKUP')
