@@ -787,12 +787,12 @@ class Job:
 
     @property  # type: ignore
     @autosubmit_parameter(name='hyperthreading')
-    def hyperthreading(self):
-        """Detects if hyperthreading is enabled or not."""
+    def hyperthreading(self) -> str | bool:
+        """Hyperthreading setting ("true"/"false") for this platform. """
         return self._hyperthreading
 
     @hyperthreading.setter
-    def hyperthreading(self, value):
+    def hyperthreading(self, value: str | bool) -> None:
         self._hyperthreading = value
 
     @property  # type: ignore

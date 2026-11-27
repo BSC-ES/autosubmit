@@ -360,12 +360,12 @@ class Platform(ABC):
 
     @property
     @autosubmit_parameter(name='current_hyperthreading')
-    def hyperthreading(self) -> bool:
-        """True if hyperthreading is enabled on this platform. """
+    def hyperthreading(self) -> str | bool:
+        """Hyperthreading setting ("true"/"false") for this platform. """
         return self._hyperthreading
 
     @hyperthreading.setter
-    def hyperthreading(self, value: bool) -> None:
+    def hyperthreading(self, value: str | bool) -> None:
         self._hyperthreading = value
 
     @property

@@ -890,11 +890,13 @@ class ParamikoPlatform(Platform):
         # Fallback to retrieving job IDs by script names if they cannot be parsed from the submission output or if the number of parsed IDs does not match the number of submitted scripts
         # This should be a rare case, and it is expected that most platforms will return the job IDs directly in the submission output, but this is a safeguard to ensure we can still track the submitted jobs even if the output format is not as expected.
         if not jobs_ids or len(jobs_ids) != len(script_names):
-            candidate_to_cancel = jobs_ids if jobs_ids else []
+            # we acknowledge the diff possible data types, TODO fix in #3448
+            candidate_to_cancel: list[str | int] = list(jobs_ids or [])
             jobs_ids = self.get_submitted_jobs_by_name(script_names)
             if not jobs_ids or len(jobs_ids) != len(script_names):
-                # Avoid having not tracked jobs if everything goes wrong
-                self.cancel_jobs(candidate_to_cancel + (jobs_ids or []))
+                # And we deduplicate to keep previous behavior
+                to_cancel = dict.fromkeys([*candidate_to_cancel, *(jobs_ids or [])])
+                self.cancel_jobs([str(job_id) for job_id in to_cancel.keys()])
                 raise AutosubmitError(
                     "Failed to retrieve job IDs for submitted jobs. Submission output: "
                     f"{self.get_ssh_output()}",
