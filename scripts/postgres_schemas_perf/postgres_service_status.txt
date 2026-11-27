@@ -1,0 +1,27 @@
+● postgresql.service - PostgreSQL database server
+     Loaded: loaded (/usr/lib/systemd/system/postgresql.service; enabled; preset: disabled)
+    Drop-In: /etc/systemd/system/service.d
+             └─cve-2026-31431.conf
+     Active: active (running) since Mon 2026-11-23 10:31:29 UTC; 1h 24min ago
+    Process: 721633 ExecStartPre=/usr/libexec/postgresql-check-db-dir postgresql (code=exited, status=0/SUCCESS)
+   Main PID: 721635 (postgres)
+      Tasks: 11 (limit: 100224)
+     Memory: 28.7M
+        CPU: 1.012s
+     CGroup: /system.slice/postgresql.service
+             ├─721635 /usr/bin/postgres -D /var/lib/pgsql/data
+             ├─721636 "postgres: logger "
+             ├─721637 "postgres: io worker 0"
+             ├─721638 "postgres: io worker 1"
+             ├─721639 "postgres: io worker 2"
+             ├─721640 "postgres: checkpointer "
+             ├─721641 "postgres: background writer "
+             ├─721643 "postgres: walwriter "
+             ├─721644 "postgres: autovacuum launcher "
+             ├─721645 "postgres: logical replication launcher "
+             └─722466 "postgres: postgres postgres [local] idle"
+
+Nov 23 10:31:29 bsc-es-services-1.novalocal systemd[1]: Starting PostgreSQL database server...
+Nov 23 10:31:29 bsc-es-services-1.novalocal postgres[721635]: 2026-11-23 10:31:29.058 UTC [721635] LOG:  redirecting log output to logging collector process
+Nov 23 10:31:29 bsc-es-services-1.novalocal postgres[721635]: 2026-11-23 10:31:29.058 UTC [721635] HINT:  Future log output will appear in directory "log".
+Nov 23 10:31:29 bsc-es-services-1.novalocal systemd[1]: Started PostgreSQL database server.
