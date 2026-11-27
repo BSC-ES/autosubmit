@@ -863,7 +863,7 @@ class ParamikoPlatform(Platform):
         return self.get_ssh_output()
 
     def submit_multiple_jobs(
-            self, script_names: tuple[str, dict[str, 'JobPackageBase']]
+            self, script_names: dict[str, 'JobPackageBase']
     ) -> list[str] | list[int]:
         """Submit multiple scripts to the platform.
 
@@ -1691,7 +1691,7 @@ class ParamikoPlatform(Platform):
             self._record_transport_failure()
             raise AutosubmitError(f"I/O issues: {str(e)}", 6016)
 
-    def get_multi_submit_cmd(self, job_scripts: tuple[str, dict[str, 'JobPackageBase']]) -> str:
+    def get_multi_submit_cmd(self, job_scripts: dict[str, 'JobPackageBase']) -> str:
         """Gets command to submit all the current active jobs on HPC
 
         :param job_scripts: dict of job names and their info (export, x11_options)
@@ -2055,8 +2055,7 @@ class ParamikoPlatform(Platform):
         """Updates commands for this platform. """
         # pragma: no cover
 
-    def _check_and_cancel_duplicated_job_names(self,
-                                               scripts_to_submit: tuple[str, dict[str, 'JobPackageBase']]) -> None:
+    def _check_and_cancel_duplicated_job_names(self, scripts_to_submit: dict[str, 'JobPackageBase']) -> None:
         """Check for duplicated job names in the submitted packages.
 
         :param scripts_to_submit: Package script names and their info.
@@ -2161,7 +2160,7 @@ class ParamikoPlatform(Platform):
         raise NotImplementedError  # pragma: no cover
 
     def process_ready_jobs(
-            self, scripts_to_submit: tuple[str, dict[str, 'JobPackageBase']]
+            self, scripts_to_submit: dict[str, 'JobPackageBase']
     ) -> None:
         """Retrieve multiple jobs identifiers.
 

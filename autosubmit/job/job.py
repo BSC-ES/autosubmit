@@ -1356,7 +1356,7 @@ class Job:
         :param index: column position to retrieve
         :return: list of values in column index position
         """
-        log_name = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
+        log_name = Path(self._tmp_path) / f"{self.name}_TOTAL_STATS"
         lst = []
         if log_name.exists() and log_name.stat().st_size > 0:
             with open(log_name) as f:
@@ -3125,7 +3125,7 @@ class Job:
     def recover_last_ready_date(self) -> None:
         """Recovers the last ready date for this job"""
         if not self.ready_date:
-            stat_file = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
+            stat_file = self._tmp_path / f"{self.name}_TOTAL_STATS"
             if stat_file.exists():
                 output_by_lines = stat_file.read_text().splitlines()
                 if output_by_lines:

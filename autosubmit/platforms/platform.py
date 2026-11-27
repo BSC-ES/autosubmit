@@ -261,7 +261,7 @@ class Platform(ABC):
         )
 
     @classmethod
-    def update_workers(cls, event_worker):
+    def update_workers(cls, event_worker: Event) -> None:
         # This is visible on all instances simultaneously. Is to send the keep alive signal.
         if event_worker is None:
             return
@@ -290,115 +290,115 @@ class Platform(ABC):
 
     @property
     @autosubmit_parameter(name='current_arch')
-    def name(self):
+    def name(self) -> str:
         """Platform name. """
         return self._name
 
     @name.setter
-    def name(self, value):
+    def name(self, value: str) -> None:
         self._name = value
 
     @property
     @autosubmit_parameter(name='current_host')
-    def host(self):
+    def host(self) -> str:
         """Platform url. """
         return self._host
 
     @host.setter
-    def host(self, value):
+    def host(self, value: str) -> None:
         self._host = value
 
     @property
     @autosubmit_parameter(name='current_user')
-    def user(self):
+    def user(self) -> str:
         """Platform user. """
         return self._user
 
     @user.setter
-    def user(self, value):
+    def user(self, value: str) -> None:
         self._user = value
 
     @property
     @autosubmit_parameter(name='current_proj')
-    def project(self):
+    def project(self) -> str:
         """Platform project. """
         return self._project
 
     @project.setter
-    def project(self, value):
+    def project(self, value: str) -> None:
         self._project = value
 
     @property
     @autosubmit_parameter(name='current_budg')
-    def budget(self):
+    def budget(self) -> str:
         """Platform budget. """
         return self._budget
 
     @budget.setter
-    def budget(self, value):
+    def budget(self, value: str) -> None:
         self._budget = value
 
     @property
     @autosubmit_parameter(name='current_reservation')
-    def reservation(self):
+    def reservation(self) -> str:
         """You can configure your reservation id for the given platform. """
         return self._reservation
 
     @reservation.setter
-    def reservation(self, value):
+    def reservation(self, value: str) -> None:
         self._reservation = value
 
     @property
     @autosubmit_parameter(name='current_exclusivity')
-    def exclusivity(self):
+    def exclusivity(self) -> str:
         """True if you want to request exclusivity nodes. """
         return self._exclusivity
 
     @exclusivity.setter
-    def exclusivity(self, value):
+    def exclusivity(self, value: str) -> None:
         self._exclusivity = value
 
     @property
     @autosubmit_parameter(name='current_hyperthreading')
-    def hyperthreading(self):
+    def hyperthreading(self) -> bool:
         """True if hyperthreading is enabled on this platform. """
         return self._hyperthreading
 
     @hyperthreading.setter
-    def hyperthreading(self, value):
+    def hyperthreading(self, value: bool) -> None:
         self._hyperthreading = value
 
     @property
     @autosubmit_parameter(name='current_scratch_dir')
-    def scratch(self):
+    def scratch(self) -> str:
         """Platform's scratch folder path. """
         return self._scratch
 
     @scratch.setter
-    def scratch(self, value):
+    def scratch(self, value: str) -> None:
         self._scratch = value
 
     @property
     @autosubmit_parameter(name='current_proj_dir')
-    def project_dir(self):
+    def project_dir(self) -> str:
         """Platform's project folder path. """
         return self._project_dir
 
     @project_dir.setter
-    def project_dir(self, value):
+    def project_dir(self, value: str) -> None:
         self._project_dir = value
 
     @property
     @autosubmit_parameter(name='current_rootdir')
-    def root_dir(self):
+    def root_dir(self) -> Path:
         """Platform's experiment folder path. """
         return self._root_dir
 
     @root_dir.setter
-    def root_dir(self, value):
+    def root_dir(self, value: Path) -> None:
         self._root_dir = Path(value)
 
-    def _get_platform_option(self, key_value: str, default_value):
+    def _get_platform_option(self, key_value: str, default_value: Any) -> Any:
         """Return a platform configuration option, falling back to ``default``.
 
         The value is read from ``PLATFORMS.<NAME>``, so it is resolved at call
