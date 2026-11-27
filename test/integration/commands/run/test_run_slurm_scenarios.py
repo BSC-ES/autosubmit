@@ -17,7 +17,7 @@
 
 """Tests that run diverse scenarios for Autosubmit run with a ``slurm`` platform
 and checks the database for expected results."""
-
+import contextlib
 import sqlite3
 import time
 from getpass import getuser
@@ -2101,3 +2101,48 @@ def test_run_uninterrupted(
             e_msg += f"{check}: {value}\n"
     _assert_db_fields(db_check_list)
     _assert_files_recovered(files_check_list)
+
+
+def test_inspect_date(tmp_path, autosubmit_exp) -> None:
+    """Test inspect with wrappers."""
+    exp = autosubmit_exp(
+        experiment_data={
+            "EXPERIMENT": {
+                "NUMCHUNKS": "2",
+            },
+            "JOBS": {
+                "A": {
+                    "SCRIPT": "echo $(date '+%Y-%m-%d %H:%M:%S')",
+                    "RUNNING": "chunk",
+                    "DEPENDENCIES": "A-1",
+                    "WALLCLOCK": "00:01",
+                }
+            },
+        },
+        include_jobs=False,
+        create=True,
+    )
+    exp.as_conf.set_last_as_command("inspect")
+
+    # Inspect
+    inspect(
+        expid=exp.expid,
+        lst=None,  # type: ignore
+        check_wrapper=True,
+        force=True,
+        filter_chunks=None,  # type: ignore
+        filter_section=None,  # type: ignore
+        filter_status=None,  # type: ignore
+        quick=False,
+    )
+
+    templates_dir = (
+        Path(BasicConfig.LOCAL_ROOT_DIR) / exp.expid / BasicConfig.LOCAL_TMP_DIR
+    )
+    files_path = [t for t in templates_dir.glob(f"{exp.expid}*.cmd")]
+    with contextlib.ExitStack() as stack:
+        files = [stack.enter_context(open(fn)) for fn in files_path]
+        for file in files:
+            if "echo $(date '+%Y-%m-%d %H:%M:%S')" not in file.read():
+                assert False
+        

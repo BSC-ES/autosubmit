@@ -2459,7 +2459,6 @@ class Job:
         :param replace_by_empty: Flag indicating whether to replace dynamic variables with empty strings.
         :return: Parameters with placeholders substituted.
         """
-
         as_conf.deep_read_loops(parameters)
         # At this point, the ^ and not ^ is the same
         for key, value in as_conf.special_dynamic_variables.items():
@@ -3090,11 +3089,10 @@ class Job:
         """
         return job in self.parents
 
-    def is_ancestor(self, job):
+    def is_ancestor(self, job) -> bool:
         """Check if the given job is an ancestor
         :param job: job to be checked if is an ancestor
         :return: True if job is an ancestor, false otherwise
-        :rtype bool
         """
         for parent in list(self.parents):
             if parent.is_parent(job) or parent.is_ancestor(job):
@@ -3242,10 +3240,10 @@ class WrapperJob(Job):
         self.num_processors = num_processors
 
     def _queuing_reason_cancel(self, reason: str) -> bool:
-        """Function return True if a job was cancelled for a listed reason.
+        """Function return True if a job was canceled for a listed reason.
 
-        :param reason: Reason of a job to be cancelled
-        :return: True if a job was cancelled for a known reason, False otherwise
+        :param reason: Reason of a job to be canceled
+        :return: True if a job was canceled for a known reason, False otherwise
         """
         try:
             if len(reason.split('(', 1)) > 1:

@@ -22,6 +22,7 @@ import re
 import tempfile
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
+from itertools import permutations, product
 from pathlib import Path
 from textwrap import dedent
 from unittest.mock import MagicMock, Mock  # type: ignore
@@ -1888,6 +1889,134 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     assert parameters["TESTDATES.START_DATE_WITH_SPECIAL_LIST"] == "20200101"
     assert parameters["TESTDATES.START_DATE_INT"] == '[[20200101]]'
     assert parameters["TIMEFORMAT"] == "%keep_format_as_INTRODUCED%"
+
+
+def generate_datetime_formats() -> list[str]:
+    """Function to generate permutations on the format of available strftime returning all possible values"""
+    list_date: list = []
+    for year in ("%Y", "%y"):
+        for date_parts in permutations((year, "%m", "%d")):
+            for time_parts in permutations(("%H", "%M")):
+                for separators in product(("", "-", "_"), repeat=4):
+                    date_sep = separators[:2]
+                    date_time_sep = separators[2]
+                    time_sep = separators[3]
+
+                    date_format = (
+                        date_parts[0] + date_sep[0]
+                        + date_parts[1] + date_sep[1]
+                        + date_parts[2]
+                    )
+
+                    time_format = (
+                        time_parts[0] + time_sep + time_parts[1]
+                    )
+
+                    list_date.append(date_format + date_time_sep + time_format)
+    return list_date
+
+@pytest.mark.parametrize(
+    'date_formating,failure',
+    [
+        (generate_datetime_formats(), False),
+        (generate_datetime_formats()+["%m%d%H%M%Y"], True),
+        (generate_datetime_formats()+["Testm%d%H%M"], True),
+
+    ]
+)
+def test_job_parameters_resolves_for_date(date_formating, failure, autosubmit_config, monkeypatch):
+    """Test checking if any of the possible values on strftime will be substituted on the conversion"""
+    as_conf = autosubmit_config('t000', {})
+
+    additional_experiment_data = {
+        "EXPERIMENT": {
+            "CALENDAR": "standard",
+            "CHUNKSIZE": 1,
+            "CHUNKSIZEUNIT": "month",
+            "DATELIST": 20200101,
+            "MEMBERS": "fc0",
+            "NUMCHUNKS": 1,
+            "SPLITSIZEUNIT": "day",
+        },
+        "CONFIG": {
+            "SAFE_PLACEHOLDERS": ["keep_format_as_INTRODUCED"]
+        },
+        "JOBS": {
+            "TEST_JOB_2": {
+                "ADDITIONAL_FILES": ["bla"],
+                "CHECK": "on_submission",
+                "CUSTOM_DIRECTIVES": "%CURRENT_OPA_CUSTOM_DIRECTIVES%",
+                "DEPENDENCIES": {
+                    "TEST_JOB_2": {"SPLITS_FROM": {"ALL": {}}},
+                    "TEST_JOB_2-1": {},
+                },
+                "EXCLUSIVE": "%CURRENT_OPA_EXCLUSIVE%",
+                "SCRIPT": date_formating
+            },
+        },
+    }
+    as_conf.experiment_data = as_conf.experiment_data | additional_experiment_data
+    as_conf.set_default_parameters()
+    # Needed to monkeypatch reload to avoid overwriting experiment_data ( the files does not exist in a unit-test)
+    monkeypatch.setattr(as_conf, 'reload', lambda: None)
+    job = Job(_EXPID, '1', Status.WAITING, 0)
+    job.section = 'TEST_JOB_2'
+    job.date = datetime(2020, 1, 1)
+    job.member = 'fc0'
+    job.platform_name = 'TEST_SLURM'
+
+    parameters = job.update_parameters(as_conf, set_attributes=True)
+    valid_format = re.compile(r"""^(?:%(?:d|D|y|Y|m|M|h|H)|[-_])+$""")
+    invalid_formats = [
+        fmt for fmt in parameters["JOBS.TEST_JOB_2.SCRIPT"]
+        if not valid_format.fullmatch(fmt)
+    ]
+
+    if failure:
+        assert len(invalid_formats) == 1
+    else:
+        assert not invalid_formats, f"Invalid datetime formats: {invalid_formats}"
+
+
+def test_job_parameters_resolves_values_of_date(autosubmit_config, monkeypatch):
+    """Test checking if any of the possible values on strftime will be substituted on the conversion"""
+    as_conf = autosubmit_config('t000', {})
+
+    additional_experiment_data = {
+        "EXPERIMENT": {
+            "CALENDAR": "standard",
+            "CHUNKSIZE": 1,
+            "CHUNKSIZEUNIT": "month",
+            "DATELIST": 20200101,
+            "MEMBERS": "fc0",
+            "NUMCHUNKS": 1,
+            "SPLITSIZEUNIT": "day",
+        },
+        "CONFIG": {
+            "SAFE_PLACEHOLDERS": ["keep_format_as_INTRODUCED"]
+        },
+        "JOBS": {
+            "TEST_JOB_2": {
+                "DEPENDENCIES": {
+                    "TEST_JOB_2": {"SPLITS_FROM": {"ALL": {}}},
+                    "TEST_JOB_2-1": {},
+                },
+                "SCRIPT": "%d%d-%d_%D%D%D_%y%y-%y_%Y%Y-%Y_%m%m-%m_%M%M-%M_%h-%H-"},
+        },
+    }
+    as_conf.experiment_data = as_conf.experiment_data | additional_experiment_data
+    as_conf.set_default_parameters()
+    # Needed to monkeypatch reload to avoid overwriting experiment_data ( the files does not exist in a unit-test)
+    monkeypatch.setattr(as_conf, 'reload', lambda: None)
+    job = Job(_EXPID, '1', Status.WAITING, 0)
+    job.section = 'TEST_JOB_2'
+    job.date = datetime(2020, 1, 1)
+    job.member = 'fc0'
+    job.platform_name = 'TEST_SLURM'
+
+    parameters = job.update_parameters(as_conf, set_attributes=True)
+
+    assert parameters["JOBS.TEST_JOB_2.SCRIPT"] == "%d%d-%d_%D%D%D_%y%y-%y_%Y%Y-%Y_%m%m-%m_%M%M-%M_%h-%H-"
 
 
 def test_update_job_parameters(autosubmit_config, experiment_data):
