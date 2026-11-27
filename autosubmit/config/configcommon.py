@@ -2165,6 +2165,17 @@ class AutosubmitConfig:
         """
         return self.get_section(['GIT', 'PROJECT_ORIGIN'], "")
 
+    def get_git_project_backup(self) -> bool:
+        """Returns whether to back up the project directory on refresh.
+
+        Precedence: YAML ``GIT.PROJECT_BACKUP`` > ``BasicConfig.GIT_PROJECT_BACKUP``
+        (from ``[config] git_project_backup`` in ``.autosubmitrc``) > ``False``.
+
+        :return: whether to preserve the current ``proj/`` directory as ``proj_{timestamp}`` on refresh
+        """
+        return as_bool(self.get_section(['GIT', 'PROJECT_BACKUP'], None), 
+                       BasicConfig.GIT_PROJECT_BACKUP, 'GIT.PROJECT_BACKUP')
+    
     def get_git_project_branch(self) -> str:
         """Returns git branch  from experiment's config file
 

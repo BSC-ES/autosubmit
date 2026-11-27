@@ -116,9 +116,25 @@ where *<EXPID>* is the experiment identifier.
 
 It checks the experiment configuration and copies code from the original repository to project directory.
 
-.. warning:: THIS WILL OVERWRITE LOCAL CHANGES!
-    Project directory ``<EXPID>/proj`` will be overwritten and you may loose local changes.
+For Git projects, the project directory ``<EXPID>/proj`` is deleted and cloned again. By default no
+backup is kept, and the refresh is refused if the Git repository has uncommitted changes or unpushed
+commits. Commit and push your work, then run the command again.
 
+.. warning:: Files ignored by Git (for example, build outputs) are deleted without warning.
+
+To keep the old project directory as ``<EXPID>/proj_<timestamp>`` instead, enable the backup in the
+experiment configuration or in ``.autosubmitrc``. The experiment setting takes precedence. The backup is
+removed after a successful refresh.
+
+.. code-block:: yaml
+
+    GIT:
+      PROJECT_BACKUP: true
+
+.. code-block:: ini
+
+    [config]
+    git_project_backup = true
 
 Options:
 

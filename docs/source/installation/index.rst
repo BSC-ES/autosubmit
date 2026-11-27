@@ -235,6 +235,11 @@ These parameters provide extra functionalities to Autosubmit.
     [database]
     backup = false
 
+    # Keeps a proj_<timestamp> backup of the Git project on `autosubmit refresh`. Defaults to false.
+    # GIT.PROJECT_BACKUP in the experiment configuration takes precedence.
+    [config]
+    git_project_backup = false
+    
     [conf]
     # Allows using a different jobs_<EXPID>.yml default template on `autosubmit expid`
     jobs = <path_jobs>/jobs_<EXPID>.yml

@@ -64,6 +64,7 @@ class BasicConfig:
     CONFIG_FILE_FOUND = False
     DATABASE_BACKEND = "sqlite"
     DATABASE_CONN_URL = ""
+    GIT_PROJECT_BACKUP = False
     DATABASE_BACKUP = True
     LOG_RECOVERY_TIMEOUT: int = 60 * 5
     EXPERIMENT_LOCK_TIMEOUT: float = 10.0
@@ -223,6 +224,8 @@ class BasicConfig:
                 'autosubmitapi', 'url')
         if parser.has_option('config', 'log_recovery_timeout'):
             BasicConfig.LOG_RECOVERY_TIMEOUT = int(parser.get('config', 'log_recovery_timeout'))
+        if parser.has_option('config', 'git_project_backup'):
+            BasicConfig.GIT_PROJECT_BACKUP = parser.getboolean('config', 'git_project_backup')
 
         # Locking.
         if parser.has_option("experiment_lock", "timeout"):
