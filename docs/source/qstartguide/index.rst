@@ -289,3 +289,19 @@ Common commands
 .. seealso::
     For archiving, deleting, migrating and otherwise administering experiments, see
     :doc:`Manage experiments </userguide/manage/index>`.
+
+After your first local run
+==========================
+
+To turn the dummy experiment into your own workflow:
+
+#. :doc:`Develop a project </userguide/configure/develop_a_project>` to supply
+   the scripts or templates that jobs will run.
+#. :doc:`Define the workflow </userguide/defining_workflows/index>` to choose
+   when those jobs run and how they depend on each other.
+#. :doc:`Configure the experiment </userguide/configure/index>` to set its
+   platform and experiment parameters before generating the workflow.
+
+If a run is already in progress, see
+:doc:`Monitor and check the experiment </userguide/monitor_and_check/index>`
+for status and validation, or :ref:`workflow_recovery` to resume from completed jobs.

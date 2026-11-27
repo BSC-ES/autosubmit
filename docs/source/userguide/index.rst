@@ -11,6 +11,9 @@ configuring it, through defining and running its workflow, to monitoring and
 managing it. Advanced topics such as provenance, metrics and debugging are
 covered at the end.
 
+New to Autosubmit? Run a dummy experiment in the
+:doc:`Getting started guide </qstartguide/index>` before defining your own workflow.
+
 .. toctree::
    :maxdepth: 1
    :caption: Setting up an experiment
